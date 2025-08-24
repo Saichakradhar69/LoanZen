@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { CalculationResults } from './page';
 import { ArrowLeft, Download, Lock } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
@@ -53,54 +54,72 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
       <Card>
         <CardHeader>
           <CardTitle>Comparison for: {results.loanName}</CardTitle>
-          <CardDescription>Loan Type: {loanTypeName} • Interest Rate: {interestRateTypeName}. Here's a comparison of the total amount you'll repay for each scenario.</CardDescription>
+          <CardDescription>Loan Type: {loanTypeName} • Interest Rate: {interestRateTypeName}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-[400px] w-full">
-            <ResponsiveContainer>
-              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis tickFormatter={(value) => formatCurrency(value as number)} />
-                <Tooltip
-                  formatter={(value) => formatCurrency(value as number)}
-                  cursor={{ fill: 'hsl(var(--muted))' }}
-                />
-                <Legend />
-                <Bar dataKey="Loan Amount" stackId="a" fill="hsl(var(--primary))" />
-                <Bar dataKey="Total Interest" stackId="a" fill="hsl(var(--destructive))" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Scenario Summary</CardTitle>
-          <CardDescription>A quick look at the key numbers for each loan scenario.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Scenario</TableHead>
-                <TableHead className="text-right">Approx. Monthly Payment</TableHead>
-                <TableHead className="text-right">Total Interest Paid</TableHead>
-                <TableHead className="text-right">Total Repayment</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {results.scenarios.map(result => (
-                <TableRow key={result.scenarioName}>
-                  <TableCell className="font-medium">{result.scenarioName}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(result.monthlyPayment)}</TableCell>
-                  <TableCell className="text-right text-destructive">{formatCurrency(result.totalInterest)}</TableCell>
-                  <TableCell className="text-right font-bold">{formatCurrency(result.totalPayment)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+          <Tabs defaultValue="chart">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="chart">Comparison Chart</TabsTrigger>
+              <TabsTrigger value="summary">Summary Table</TabsTrigger>
+            </TabsList>
+            <TabsContent value="chart" className="pt-4">
+               <div className="h-[400px] w-full">
+                <ResponsiveContainer>
+                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }} barGap={10}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))"/>
+                    <XAxis 
+                      dataKey="name" 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis 
+                      stroke="hsl(var(--muted-foreground))"
+                      fontSize={12}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(value) => formatCurrency(value as number)}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        background: "hsl(var(--background))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "var(--radius)",
+                      }}
+                      formatter={(value) => formatCurrency(value as number)}
+                      cursor={{ fill: 'hsl(var(--accent))', radius: 'var(--radius)' }}
+                    />
+                    <Legend iconType="circle"/>
+                    <Bar dataKey="Loan Amount" stackId="a" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}/>
+                    <Bar dataKey="Total Interest" stackId="a" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </TabsContent>
+            <TabsContent value="summary">
+               <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Scenario</TableHead>
+                    <TableHead className="text-right">Monthly Payment</TableHead>
+                    <TableHead className="text-right">Total Interest</TableHead>
+                    <TableHead className="text-right">Total Repayment</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {results.scenarios.map(result => (
+                    <TableRow key={result.scenarioName}>
+                      <TableCell className="font-medium">{result.scenarioName}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(result.monthlyPayment)}</TableCell>
+                      <TableCell className="text-right text-destructive">{formatCurrency(result.totalInterest)}</TableCell>
+                      <TableCell className="text-right font-bold">{formatCurrency(result.totalPayment)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
 
@@ -113,7 +132,7 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex justify-center">
-          <Button size="lg">
+          <Button size="lg" className="shadow-lg">
             <Download className="mr-2" />
             Get My Full Report - $3.99
           </Button>
