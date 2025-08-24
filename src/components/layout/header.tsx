@@ -3,24 +3,32 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Landmark, Menu, Mountain } from 'lucide-react';
+import { ChevronDown, Globe, Landmark, Menu, Mountain } from 'lucide-react';
 import Logo from '../logo';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { useState } from 'react';
 
 export default function Header() {
+  const [currency, setCurrency] = useState('USD');
+
   const navLinks = [
-    { href: '#features', label: 'Features' },
-    { href: '/advisor', label: 'Advisor' },
-    { href: '#pricing', label: 'Pricing' },
-    { href: '#', label: 'Dashboard' },
+    { href: '/', label: 'Home' },
+    { href: '/#how-it-works', label: 'How It Works' },
+    { href: '/#pricing', label: 'Pricing' },
+    { href: '#', label: 'Contact' },
   ];
+
+  const currencies = ['USD', 'EUR', 'GBP', 'INR'];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
-        <div className="mr-4 hidden md:flex">
+        <div className="mr-auto hidden md:flex">
           <Logo />
         </div>
-        <div className="md:hidden">
+
+        {/* Mobile Menu */}
+        <div className="md:hidden flex-1">
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -44,16 +52,39 @@ export default function Header() {
             </SheetContent>
           </Sheet>
         </div>
-        <nav className="hidden md:flex flex-1 items-center gap-4 text-sm font-medium">
+        
+        {/* Centered logo on mobile */}
+        <div className="md:hidden">
+            <Logo />
+        </div>
+
+        {/* Desktop Menu */}
+        <nav className="hidden md:flex flex-1 items-center justify-center gap-4 text-sm font-medium">
           {navLinks.map((link) => (
             <Link key={link.href} href={link.href} className="text-foreground/60 transition-colors hover:text-foreground/80">
               {link.label}
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost">Log in</Button>
-          <Button>Sign Up</Button>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <Button variant="ghost" size="sm">Log in</Button>
+          <Button size="sm">Sign Up (Free)</Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                {currency}
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {currencies.map(c => (
+                <DropdownMenuItem key={c} onSelect={() => setCurrency(c)}>
+                  {c}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

@@ -52,6 +52,10 @@ export default {
           DEFAULT: 'hsl(var(--destructive))',
           foreground: 'hsl(var(--destructive-foreground))',
         },
+        'green-theme-primary': {
+          DEFAULT: 'hsl(var(--green-theme-primary))',
+          foreground: 'hsl(var(--green-theme-primary-foreground))',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',
