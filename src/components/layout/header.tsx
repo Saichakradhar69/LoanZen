@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { ChevronDown, Landmark, Menu } from 'lucide-react';
+import { ChevronDown, Menu } from 'lucide-react';
 import Logo from '../logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useState } from 'react';
@@ -67,8 +67,12 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2 ml-auto">
-          <Button variant="ghost" size="sm">Log in</Button>
-          <Button size="sm">Sign Up (Free)</Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/login">Log in</Link>
+          </Button>
+          <Button size="sm" asChild>
+            <Link href="/signup">Sign Up (Free)</Link>
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
