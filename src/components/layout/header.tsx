@@ -67,11 +67,8 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2 ml-auto">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/login">Log in</Link>
-          </Button>
           <Button size="sm" asChild>
-            <Link href="/signup">Sign Up (Free)</Link>
+            <Link href="/calculator">Get Started</Link>
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

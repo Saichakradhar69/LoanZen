@@ -72,9 +72,11 @@ export default function HomePage() {
                         </div>
                         <Lock className="w-8 h-8 mx-auto mt-4 text-yellow-400"/>
                     </div>
-                    <Button size="lg" className="mt-8 bg-accent text-accent-foreground hover:bg-accent/90">
-                        <Lock className="mr-2"/>
-                        Unlock My Dashboard →
+                    <Button size="lg" className="mt-8 bg-accent text-accent-foreground hover:bg-accent/90" asChild>
+                        <Link href="/signup">
+                            <Lock className="mr-2"/>
+                            Unlock My Dashboard →
+                        </Link>
                     </Button>
                 </div>
             </div>
@@ -84,35 +86,35 @@ export default function HomePage() {
       {/* How It Works Section */}
       <section id="how-it-works" className="w-full py-16 md:py-24 lg:py-32 bg-background">
         <div className="container px-4 md:px-6 text-center">
-          <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl">Get Your Answer in 3 Simple Steps</h2>
+          <h2 className="font-headline text-3xl font-bold tracking-tighter sm:text-5xl">Get Your Report in 3 Simple Steps</h2>
           <div className="mx-auto grid max-w-5xl items-start gap-8 sm:grid-cols-3 md:gap-12 mt-12">
             <div className="grid gap-1">
               <div className="flex justify-center items-center">
                 <PenSquare className="w-12 h-12 text-primary mb-4"/>
                 <div className="font-bold text-5xl text-muted-foreground/30 ml-2">1</div>
               </div>
-              <h3 className="text-lg font-bold">Enter Your Details</h3>
-              <p className="text-sm text-muted-foreground">Tell us about your loan—amount, rate, and dates.</p>
+              <h3 className="text-lg font-bold">Enter Loan Details</h3>
+              <p className="text-sm text-muted-foreground">Tell us your loan amount, interest rate, and term.</p>
             </div>
             <div className="grid gap-1">
                 <div className="flex justify-center items-center">
                     <Zap className="w-12 h-12 text-primary mb-4"/>
                     <div className="font-bold text-5xl text-muted-foreground/30 ml-2">2</div>
                 </div>
-              <h3 className="text-lg font-bold">Get Your Free Estimate</h3>
-              <p className="text-sm text-muted-foreground">See your total outstanding balance instantly.</p>
+              <h3 className="text-lg font-bold">Get a Free Preview</h3>
+              <p className="text-sm text-muted-foreground">Instantly see a summary of your loan costs.</p>
             </div>
             <div className="grid gap-1">
                 <div className="flex justify-center items-center">
-                    <Lock className="w-12 h-12 text-primary mb-4"/>
+                    <Download className="w-12 h-12 text-primary mb-4"/>
                     <div className="font-bold text-5xl text-muted-foreground/30 ml-2">3</div>
                 </div>
-              <h3 className="text-lg font-bold">Unlock the Full Picture</h3>
-              <p className="text-sm text-muted-foreground">Upgrade to see the full schedule and export reports.</p>
+              <h3 className="text-lg font-bold">Get Your Full Report</h3>
+              <p className="text-sm text-muted-foreground">Purchase the complete report, delivered to your email.</p>
             </div>
           </div>
           <Button asChild size="lg" className="mt-12">
-            <Link href="/calculator">Start Calculating - No Signup Required</Link>
+            <Link href="/calculator">Start Calculating Now</Link>
           </Button>
         </div>
       </section>
@@ -144,7 +146,7 @@ export default function HomePage() {
               <Lock className="w-10 h-10 text-primary mt-1"/>
               <div>
                 <h3 className="text-lg font-bold">Your Data is Secure</h3>
-                <p className="text-sm text-muted-foreground">Bank-grade encryption. Your data is never sold.</p>
+                <p className="text-sm text-muted-foreground">Calculations are done on your device. We don't see your data.</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
@@ -169,49 +171,50 @@ export default function HomePage() {
           <div className="mx-auto grid max-w-sm gap-8 pt-12 sm:max-w-4xl sm:grid-cols-3 lg:max-w-none">
             <Card>
               <CardHeader className="items-center">
-                <CardTitle>Free Tier</CardTitle>
+                <CardTitle>Free Calculator</CardTitle>
                 <div className="text-4xl font-bold">$0<span className="text-lg font-normal text-muted-foreground">/forever</span></div>
               </CardHeader>
               <CardContent className="space-y-2 text-left">
                 <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Basic calculation</div>
-                <div className="flex items-center gap-2 text-muted-foreground"><X className="text-red-500 w-4 h-4"/> No breakdown</div>
-                <div className="flex items-center gap-2 text-muted-foreground"><X className="text-red-500 w-4 h-4"/> No export</div>
+                <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> See total interest & payments</div>
+                <div className="flex items-center gap-2 text-muted-foreground"><X className="text-red-500 w-4 h-4"/> Full amortization schedule</div>
               </CardContent>
               <CardFooter>
                  <Button variant="outline" asChild className="w-full">
-                  <Link href="/calculator">Get Started</Link>
+                  <Link href="/calculator">Calculate Now</Link>
                 </Button>
               </CardFooter>
             </Card>
             <Card className="border-primary border-2 shadow-lg relative">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 text-sm font-semibold rounded-full">MOST POPULAR</div>
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 text-sm font-semibold rounded-full">ONE-TIME PURCHASE</div>
               <CardHeader  className="items-center">
-                <CardTitle>One-Time Report</CardTitle>
-                <div className="text-4xl font-bold">$4.99<span className="text-lg font-normal text-muted-foreground">/one-time</span></div>
+                <CardTitle>Full Report</CardTitle>
+                <div className="text-4xl font-bold">$3.99<span className="text-lg font-normal text-muted-foreground">/one-time</span></div>
               </CardHeader>
               <CardContent className="space-y-2 text-left">
                 <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Everything in Free</div>
                 <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Full amortization schedule</div>
-                <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Download PDF/Excel</div>
-                <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Floating rate calculations</div>
+                <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Emailed PDF/Excel report</div>
+                <div className="font-bold text-center pt-2">Plus a free gift:</div>
+                <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> 1-Month Tracker Pro Coupon</div>
               </CardContent>
               <CardFooter>
-                <Button className="w-full">Buy Now</Button>
+                <Button className="w-full" asChild><Link href="/calculator">Get Your Report</Link></Button>
               </CardFooter>
             </Card>
              <Card>
               <CardHeader className="items-center">
                 <CardTitle>Tracker Pro</CardTitle>
-                <div className="text-4xl font-bold">$9.99<span className="text-lg font-normal text-muted-foreground">/month</span></div>
+                 <div className="text-4xl font-bold">$9.99<span className="text-lg font-normal text-muted-foreground">/month</span></div>
               </CardHeader>
               <CardContent className="space-y-2 text-left">
                  <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Everything in One-Time</div>
                  <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Save & track unlimited loans</div>
-                 <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Prepayment advisor</div>
-                 <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Email reminders</div>
+                 <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> AI Prepayment advisor</div>
+                 <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Secure account login</div>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full">Subscribe & Save</Button>
+                <Button variant="outline" className="w-full" asChild><Link href="/signup">Subscribe & Save</Link></Button>
               </CardFooter>
             </Card>
           </div>
