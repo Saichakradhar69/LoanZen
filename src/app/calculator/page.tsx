@@ -23,6 +23,12 @@ export type ScenarioResult = {
   loanAmount: number;
 };
 
+export type CalculationResults = {
+  loanName: string;
+  loanType: string;
+  scenarios: ScenarioResult[];
+}
+
 function calculateAmortization(loanAmount: number, annualInterestRate: number, loanTermYears: number) {
   const monthlyInterestRate = annualInterestRate / 100 / 12;
   const numberOfPayments = loanTermYears * 12;
@@ -60,10 +66,10 @@ function calculateAmortization(loanAmount: number, annualInterestRate: number, l
 
 
 export default function CalculatorPage() {
-  const [results, setResults] = useState<ScenarioResult[] | null>(null);
+  const [results, setResults] = useState<CalculationResults | null>(null);
 
   const handleCalculation = (data: FormData) => {
-    const calculatedResults = data.scenarios.map((scenario) => {
+    const calculatedScenarios = data.scenarios.map((scenario) => {
       const { monthlyPayment, totalInterest, totalPayment, amortizationSchedule } = calculateAmortization(
         scenario.loanAmount,
         scenario.interestRate,
@@ -78,7 +84,11 @@ export default function CalculatorPage() {
         loanAmount: scenario.loanAmount,
       };
     });
-    setResults(calculatedResults);
+    setResults({
+      loanName: data.loanName,
+      loanType: data.loanType,
+      scenarios: calculatedScenarios
+    });
   };
   
   const handleBack = () => {

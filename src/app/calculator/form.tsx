@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { BarChart3, Plus, Trash2 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const scenarioSchema = z.object({
   scenarioName: z.string().min(1, 'Scenario name is required.'),
@@ -18,6 +19,8 @@ const scenarioSchema = z.object({
 });
 
 const formSchema = z.object({
+  loanName: z.string().min(1, 'Loan name is required.'),
+  loanType: z.string({ required_error: 'Please select a loan type.' }),
   scenarios: z.array(scenarioSchema).min(1, 'Please add at least one scenario.'),
 });
 
@@ -31,6 +34,8 @@ export default function CalculatorForm({ onCalculate }: CalculatorFormProps) {
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      loanName: 'My New Loan',
+      loanType: 'fixed',
       scenarios: [{ scenarioName: 'Scenario 1', loanAmount: 10000, interestRate: 5, loanTerm: 10 }],
     },
   });
@@ -43,83 +48,124 @@ export default function CalculatorForm({ onCalculate }: CalculatorFormProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Enter Loan Scenarios</CardTitle>
-        <CardDescription>Add one or more scenarios to compare. You can compare different loan amounts, interest rates, and terms.</CardDescription>
+        <CardTitle>Compare Loan Scenarios</CardTitle>
+        <CardDescription>Enter the details of the loan you're considering. Add multiple scenarios to compare different terms or rates.</CardDescription>
       </CardHeader>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onCalculate)}>
           <CardContent className="space-y-6">
-            {fields.map((field, index) => (
-              <div key={field.id} className="rounded-lg border p-4 space-y-4 relative pt-8">
-                {fields.length > 1 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive"
-                    onClick={() => remove(index)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Remove scenario</span>
-                  </Button>
-                )}
-                <FormField
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+               <FormField
                   control={form.control}
-                  name={`scenarios.${index}.scenarioName`}
+                  name="loanName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Scenario Name</FormLabel>
+                      <FormLabel>Loan Name</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Bank A Offer" {...field} />
+                        <Input placeholder="e.g., Main Street Home Loan" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <FormField
+                <FormField
+                  control={form.control}
+                  name="loanType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Loan Type</FormLabel>
+                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a loan type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="fixed">Fixed Rate</SelectItem>
+                          <SelectItem value="variable">Variable Rate</SelectItem>
+                          <SelectItem value="interest-only">Interest Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            </div>
+
+            <div className="space-y-4">
+              <FormLabel>Loan Scenarios</FormLabel>
+              {fields.map((field, index) => (
+                <div key={field.id} className="rounded-lg border p-4 space-y-4 relative pt-8">
+                  {fields.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => remove(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Remove scenario</span>
+                    </Button>
+                  )}
+                   <FormField
                     control={form.control}
-                    name={`scenarios.${index}.loanAmount`}
+                    name={`scenarios.${index}.scenarioName`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Loan Amount ($)</FormLabel>
+                        <FormLabel>Scenario Name</FormLabel>
                         <FormControl>
-                          <Input type="number" placeholder="e.g., 250000" {...field} />
+                          <Input placeholder="e.g., Bank A Offer" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name={`scenarios.${index}.interestRate`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Interest Rate (%)</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`scenarios.${index}.loanTerm`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Loan Term (Years)</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="e.g., 30" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <FormField
+                      control={form.control}
+                      name={`scenarios.${index}.loanAmount`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Loan Amount ($)</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="e.g., 250000" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`scenarios.${index}.interestRate`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Interest Rate (%)</FormLabel>
+                          <FormControl>
+                            <Input type="number" step="0.01" placeholder="e.g., 3.5" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`scenarios.${index}.loanTerm`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Loan Term (Years)</FormLabel>
+                          <FormControl>
+                            <Input type="number" placeholder="e.g., 30" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
-             <FormMessage>{form.formState.errors.scenarios?.message}</FormMessage>
+              ))}
+              <FormMessage>{form.formState.errors.scenarios?.message}</FormMessage>
+            </div>
 
             <Button
               type="button"

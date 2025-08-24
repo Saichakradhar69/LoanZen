@@ -5,11 +5,11 @@ import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAx
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { ScenarioResult } from './page';
+import type { CalculationResults } from './page';
 import { ArrowLeft, Download, Lock } from 'lucide-react';
 
 interface CalculatorResultsProps {
-  results: ScenarioResult[];
+  results: CalculationResults;
   onBack: () => void;
 }
 
@@ -17,12 +17,21 @@ const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 };
 
+const loanTypeLabels: { [key: string]: string } = {
+  fixed: 'Fixed Rate',
+  variable: 'Variable Rate',
+  'interest-only': 'Interest Only',
+};
+
+
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
-  const chartData = results.map(result => ({
+  const chartData = results.scenarios.map(result => ({
     name: result.scenarioName,
     'Loan Amount': result.loanAmount,
     'Total Interest': result.totalInterest,
   }));
+
+  const loanTypeName = loanTypeLabels[results.loanType] || 'Loan';
 
   return (
     <div className="space-y-8">
@@ -33,8 +42,8 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
 
       <Card>
         <CardHeader>
-          <CardTitle>Loan Comparison</CardTitle>
-          <CardDescription>Here's a comparison of the total amount you'll repay for each scenario.</CardDescription>
+          <CardTitle>Comparison for: {results.loanName}</CardTitle>
+          <CardDescription>Type: {loanTypeName}. Here's a comparison of the total amount you'll repay for each scenario.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[400px] w-full">
@@ -72,7 +81,7 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
               </TableRow>
             </TableHeader>
             <TableBody>
-              {results.map(result => (
+              {results.scenarios.map(result => (
                 <TableRow key={result.scenarioName}>
                   <TableCell className="font-medium">{result.scenarioName}</TableCell>
                   <TableCell className="text-right">{formatCurrency(result.monthlyPayment)}</TableCell>
