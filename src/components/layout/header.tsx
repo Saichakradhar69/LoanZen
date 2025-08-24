@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { ChevronDown, Globe, Landmark, Menu, Mountain } from 'lucide-react';
+import { ChevronDown, Landmark, Menu } from 'lucide-react';
 import Logo from '../logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useState } from 'react';
@@ -15,7 +15,6 @@ export default function Header() {
     { href: '/', label: 'Home' },
     { href: '/#how-it-works', label: 'How It Works' },
     { href: '/#pricing', label: 'Pricing' },
-    { href: '#', label: 'Contact' },
   ];
 
   const currencies = ['USD', 'EUR', 'GBP', 'INR'];
