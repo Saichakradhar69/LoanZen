@@ -18,6 +18,14 @@ const formatCurrency = (value: number) => {
 };
 
 const loanTypeLabels: { [key: string]: string } = {
+  home: 'Home Loan',
+  car: 'Car Loan',
+  personal: 'Personal Loan',
+  education: 'Education Loan',
+  other: 'Other',
+};
+
+const interestRateTypeLabels: { [key: string]: string } = {
   fixed: 'Fixed Rate',
   variable: 'Variable Rate',
   'interest-only': 'Interest Only',
@@ -32,6 +40,8 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
   }));
 
   const loanTypeName = loanTypeLabels[results.loanType] || 'Loan';
+  const interestRateTypeName = interestRateTypeLabels[results.interestRateType] || 'Interest';
+
 
   return (
     <div className="space-y-8">
@@ -43,7 +53,7 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
       <Card>
         <CardHeader>
           <CardTitle>Comparison for: {results.loanName}</CardTitle>
-          <CardDescription>Type: {loanTypeName}. Here's a comparison of the total amount you'll repay for each scenario.</CardDescription>
+          <CardDescription>Loan Type: {loanTypeName} • Interest Rate: {interestRateTypeName}. Here's a comparison of the total amount you'll repay for each scenario.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-[400px] w-full">

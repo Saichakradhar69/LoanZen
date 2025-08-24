@@ -21,6 +21,7 @@ const scenarioSchema = z.object({
 const formSchema = z.object({
   loanName: z.string().min(1, 'Loan name is required.'),
   loanType: z.string({ required_error: 'Please select a loan type.' }),
+  interestRateType: z.string({ required_error: 'Please select an interest rate type.' }),
   scenarios: z.array(scenarioSchema).min(1, 'Please add at least one scenario.'),
 });
 
@@ -35,7 +36,8 @@ export default function CalculatorForm({ onCalculate }: CalculatorFormProps) {
     resolver: zodResolver(formSchema),
     defaultValues: {
       loanName: 'My New Loan',
-      loanType: 'fixed',
+      loanType: 'home',
+      interestRateType: 'fixed',
       scenarios: [{ scenarioName: 'Scenario 1', loanAmount: 10000, interestRate: 5, loanTerm: 10 }],
     },
   });
@@ -54,7 +56,7 @@ export default function CalculatorForm({ onCalculate }: CalculatorFormProps) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onCalculate)}>
           <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                <FormField
                   control={form.control}
                   name="loanName"
@@ -78,6 +80,30 @@ export default function CalculatorForm({ onCalculate }: CalculatorFormProps) {
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a loan type" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="home">Home Loan</SelectItem>
+                          <SelectItem value="car">Car Loan</SelectItem>
+                          <SelectItem value="personal">Personal Loan</SelectItem>
+                          <SelectItem value="education">Education Loan</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                 <FormField
+                  control={form.control}
+                  name="interestRateType"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Interest Rate Type</FormLabel>
+                       <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an interest rate type" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>

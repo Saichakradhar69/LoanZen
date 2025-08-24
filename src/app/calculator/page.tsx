@@ -26,6 +26,7 @@ export type ScenarioResult = {
 export type CalculationResults = {
   loanName: string;
   loanType: string;
+  interestRateType: string;
   scenarios: ScenarioResult[];
 }
 
@@ -87,6 +88,7 @@ export default function CalculatorPage() {
     setResults({
       loanName: data.loanName,
       loanType: data.loanType,
+      interestRateType: data.interestRateType,
       scenarios: calculatedScenarios
     });
   };
