@@ -8,38 +8,35 @@ export default function HomePage() {
   return (
     <div className="flex flex-col dark">
       {/* Hero Section */}
-      <section className="w-full bg-background">
+      <section className="w-full bg-secondary">
         <div className="container px-4 md:px-6">
           <div className="grid lg:grid-cols-2">
-            <div className="flex flex-col justify-center space-y-4 p-8 md:p-12 bg-primary text-primary-foreground">
-              <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-5xl">
+            <div className="flex flex-col justify-center space-y-4 p-8 md:p-12">
+              <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-5xl text-primary">
                 What's My Exact Balance?
               </h1>
-              <p className="max-w-[600px] text-primary-foreground/80 md:text-xl">
+              <p className="max-w-[600px] text-muted-foreground md:text-xl">
                 Already have a loan? Find your precise outstanding amount and interest paid in seconds.
               </p>
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                <Button asChild size="lg" variant="secondary" className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+                <Button asChild size="lg">
                   <Link href="/calculator">Check Existing Loan →</Link>
                 </Button>
               </div>
             </div>
-            <div className="flex flex-col justify-center space-y-4 p-8 md:p-12 bg-green-theme-primary text-green-theme-primary-foreground">
-              <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-5xl">
+            <div className="flex flex-col justify-center space-y-4 p-8 md:p-12 bg-background">
+              <h1 className="font-headline text-4xl font-bold tracking-tighter sm:text-5xl text-primary">
                 Plan Your Future Loan?
               </h1>
-              <p className="max-w-[600px] text-green-theme-primary-foreground/80 md:text-xl">
+              <p className="max-w-[600px] text-muted-foreground md:text-xl">
                 Thinking of borrowing? Compare options and see the true cost before you sign.
               </p>
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
-                <Button asChild size="lg" variant="secondary" className="bg-green-theme-primary-foreground text-green-theme-primary hover:bg-green-theme-primary-foreground/90">
+                <Button asChild size="lg" variant="secondary">
                   <Link href="/calculator">Estimate New Loan →</Link>
                 </Button>
               </div>
             </div>
-          </div>
-          <div className="text-center py-4 text-sm text-muted-foreground">
-            Trusted by over 15,000 borrowers in 30+ countries
           </div>
         </div>
       </section>
@@ -223,3 +220,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    
