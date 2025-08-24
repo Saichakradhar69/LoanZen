@@ -91,8 +91,8 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
                       cursor={{ fill: 'hsl(var(--accent))', radius: 'var(--radius)' }}
                     />
                     <Legend iconType="circle"/>
-                    <Bar dataKey="Loan Amount" stackId="a" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]}/>
-                    <Bar dataKey="Total Interest" stackId="a" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="Loan Amount" stackId="a" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={80}/>
+                    <Bar dataKey="Total Interest" stackId="a" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} maxBarSize={80} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
