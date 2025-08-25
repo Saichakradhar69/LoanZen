@@ -1,14 +1,17 @@
 // src/app/calculator/results.tsx
 'use client';
 
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { CalculationResults } from './page';
-import { ArrowLeft, Download, Lock } from 'lucide-react';
+import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
+import { checkoutAction } from './actions';
+import { loadStripe } from '@stripe/stripe-js';
+import { useToast } from '@/hooks/use-toast';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
@@ -33,7 +36,14 @@ const interestRateTypeLabels: { [key: string]: string } = {
   'interest-only': 'Interest Only',
 };
 
+// Initialize Stripe.js
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
+  const [state, formAction] = useActionState(checkoutAction, null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const { toast } = useToast();
 
   const chartData = results.scenarios.map(result => ({
     name: result.scenarioName,
@@ -43,10 +53,45 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
 
   const loanTypeName = loanTypeLabels[results.loanType] || 'Loan';
   const interestRateTypeName = interestRateTypeLabels[results.interestRateType] || 'Interest';
+  
+  useEffect(() => {
+    if (!state) return;
+
+    if (state.type === 'error') {
+      toast({
+        variant: "destructive",
+        title: "Payment Error",
+        description: state.message,
+      });
+      setIsSubmitting(false);
+    }
+    
+    if (state.type === 'success') {
+      const redirectToCheckout = async () => {
+        const stripe = await stripePromise;
+        if (!stripe) {
+            console.error("Stripe.js has not loaded yet.");
+            setIsSubmitting(false);
+            return;
+        }
+        await stripe.redirectToCheckout({ sessionId: state.sessionId });
+      };
+      redirectToCheckout();
+    }
+  }, [state, toast]);
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    const formData = new FormData(formRef.current!);
+    // In a real app, you'd pass the specific loan data here
+    // formData.append('loanData', JSON.stringify(results));
+    formAction(formData);
+  };
 
   return (
     <div className="space-y-8">
-       <Button variant="outline" onClick={onBack}>
+      <Button variant="outline" onClick={onBack}>
         <ArrowLeft className="mr-2" />
         Back to Calculator
       </Button>
@@ -63,18 +108,18 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
               <TabsTrigger value="summary">Summary Table</TabsTrigger>
             </TabsList>
             <TabsContent value="chart" className="pt-4">
-               <div className="h-[400px] w-full">
+              <div className="h-[400px] w-full">
                 <ResponsiveContainer>
                   <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }} barGap={10}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))"/>
-                    <XAxis 
-                      dataKey="name" 
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis
+                      dataKey="name"
                       stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                       tickLine={false}
                       axisLine={false}
                     />
-                    <YAxis 
+                    <YAxis
                       stroke="hsl(var(--muted-foreground))"
                       fontSize={12}
                       tickLine={false}
@@ -90,15 +135,15 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
                       formatter={(value) => formatCurrency(value as number)}
                       cursor={{ fill: 'hsl(var(--accent))', radius: 'var(--radius)' }}
                     />
-                    <Legend iconType="circle"/>
-                    <Bar dataKey="Loan Amount" stackId="a" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={80}/>
+                    <Legend iconType="circle" />
+                    <Bar dataKey="Loan Amount" stackId="a" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} maxBarSize={80} />
                     <Bar dataKey="Total Interest" stackId="a" fill="hsl(var(--destructive))" radius={[4, 4, 0, 0]} maxBarSize={80} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </TabsContent>
             <TabsContent value="summary">
-               <Table>
+              <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Scenario</TableHead>
@@ -125,17 +170,27 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
 
       <Card className="bg-secondary border-primary border-dashed">
         <CardHeader className="items-center text-center">
-            <Lock className="w-10 h-10 text-primary mb-2"/>
-          <CardTitle className="font-headline text-2xl">Unlock Your Full Report</CardTitle>
+          <CardTitle className="font-headline text-2xl">Get Your Full Report</CardTitle>
           <CardDescription className="max-w-md">
-            Get a detailed, month-by-month amortization schedule for each scenario, an Excel download, plus a free 1-month coupon for Tracker Pro to manage your loans after you get one.
+            Get a detailed, month-by-month amortization schedule for each scenario and an Excel download.
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex justify-center">
-            <Button size="lg" className="shadow-lg">
-                <Download className="mr-2" />
-                Get My Full Report - $3.99
+          <form ref={formRef} onSubmit={handleSubmit}>
+            <Button type="submit" size="lg" className="shadow-lg" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 animate-spin" />
+                  Redirecting to payment...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2" />
+                  Get My Full Report - $3.99
+                </>
+              )}
             </Button>
+          </form>
         </CardFooter>
       </Card>
     </div>
