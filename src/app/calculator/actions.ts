@@ -11,6 +11,7 @@ export async function checkoutAction(
 ): Promise<{type: 'success', sessionId: string} | {type: 'error', message: string}> {
   const priceId = process.env.STRIPE_PRICE_ID;
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 
   if (!priceId || !appUrl) {
     return {
@@ -19,14 +20,14 @@ export async function checkoutAction(
     };
   }
   
-  if (!process.env.STRIPE_SECRET_KEY) {
+  if (!stripeSecretKey) {
       return {
           type: 'error',
-          message: 'Stripe secret key not configured.'
+          message: 'Stripe secret key not configured. Please check server environment variables.'
       }
   }
 
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  const stripe = new Stripe(stripeSecretKey, {
     apiVersion: '2024-06-20',
     typescript: true,
   });
@@ -61,6 +62,6 @@ export async function checkoutAction(
     return { type: 'success', sessionId: session.id };
   } catch (error) {
     console.error(error);
-    return { type: 'error', message: 'Could not connect to payment processor.' };
+    return { type: 'error', message: 'Could not connect to payment processor. Please check API keys and server logs.' };
   }
 }
