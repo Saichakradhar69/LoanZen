@@ -2,7 +2,7 @@
 'use server';
 import 'dotenv/config';
 
-import { stripe } from '@/lib/stripe';
+import Stripe from 'stripe';
 import { headers } from 'next/headers';
 
 export async function checkoutAction(
@@ -18,6 +18,19 @@ export async function checkoutAction(
       message: 'Payment processor not configured correctly. Missing Price ID or App URL.',
     };
   }
+  
+  if (!process.env.STRIPE_SECRET_KEY) {
+      return {
+          type: 'error',
+          message: 'Stripe secret key not configured.'
+      }
+  }
+
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+    apiVersion: '2024-06-20',
+    typescript: true,
+  });
+
 
   // We are not using loanData for now, but this is where you would pass it
   // const loanDataString = formData.get('loanData') as string;
