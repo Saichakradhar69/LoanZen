@@ -6,12 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { CalculationResults } from './page';
-import { ArrowLeft, Download, Loader2, Lock } from 'lucide-react';
+import { ArrowLeft, Download, Lock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { checkoutAction } from './actions';
-import { useActionState, useEffect, useRef, useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
-import { useToast } from '@/hooks/use-toast';
 
 
 interface CalculatorResultsProps {
@@ -37,13 +33,7 @@ const interestRateTypeLabels: { [key: string]: string } = {
   'interest-only': 'Interest Only',
 };
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
-  const [state, formAction] = useActionState(checkoutAction, null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  const { toast } = useToast();
 
   const chartData = results.scenarios.map(result => ({
     name: result.scenarioName,
@@ -53,43 +43,6 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
 
   const loanTypeName = loanTypeLabels[results.loanType] || 'Loan';
   const interestRateTypeName = interestRateTypeLabels[results.interestRateType] || 'Interest';
-
-  const handleCheckout = () => {
-    setIsSubmitting(true);
-    formRef.current?.requestSubmit();
-  }
-
-  useEffect(() => {
-    async function handleStripeRedirect() {
-      if (state?.type === 'success' && state.sessionId) {
-        const stripe = await stripePromise;
-        if (stripe) {
-          const { error } = await stripe.redirectToCheckout({ sessionId: state.sessionId });
-          if (error) {
-            toast({
-              variant: "destructive",
-              title: "Error",
-              description: "Could not redirect to Stripe. Please try again.",
-            });
-            setIsSubmitting(false);
-          }
-        }
-      }
-    }
-
-    if(state?.type === 'error') {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: state.errors._global?.[0] || 'An unexpected error occurred.',
-      });
-      setIsSubmitting(false);
-    }
-    
-    handleStripeRedirect();
-
-  }, [state, toast]);
-
 
   return (
     <div className="space-y-8">
@@ -179,22 +132,10 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex justify-center">
-          <form ref={formRef} action={formAction}>
-            <input type="hidden" name="results" value={JSON.stringify(results)} />
-            <Button size="lg" className="shadow-lg" onClick={handleCheckout} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Redirecting...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2" />
-                  Get My Full Report - $3.99
-                </>
-              )}
+            <Button size="lg" className="shadow-lg">
+                <Download className="mr-2" />
+                Get My Full Report - $3.99
             </Button>
-          </form>
         </CardFooter>
       </Card>
     </div>
