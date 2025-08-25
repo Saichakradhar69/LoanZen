@@ -1,6 +1,6 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState, useEffect, useRef } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,9 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { getAdviceAction } from './actions';
-import { useEffect, useRef } from 'react';
 import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useFormStatus } from 'react-dom';
 
 const PrepaymentAdvisorFormSchema = z.object({
   income: z.string().min(1, { message: 'Monthly income is required.' }),
@@ -48,7 +48,7 @@ function SubmitButton() {
 
 
 export default function AdvisorForm() {
-  const [state, formAction] = useFormState(getAdviceAction, null);
+  const [state, formAction] = useActionState(getAdviceAction, null);
   const { toast } = useToast();
   const resultsRef = useRef<HTMLDivElement>(null);
 

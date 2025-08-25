@@ -9,8 +9,7 @@ import type { CalculationResults } from './page';
 import { ArrowLeft, Download, Loader2, Lock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { checkoutAction } from './actions';
-import { useFormState } from 'react-dom';
-import { useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,7 +40,7 @@ const interestRateTypeLabels: { [key: string]: string } = {
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
-  const [state, formAction] = useFormState(checkoutAction, null);
+  const [state, formAction] = useActionState(checkoutAction, null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
