@@ -1,5 +1,6 @@
 // src/app/calculator/actions.ts
 'use server';
+import 'dotenv/config';
 
 import { stripe } from '@/lib/stripe';
 import { headers } from 'next/headers';
