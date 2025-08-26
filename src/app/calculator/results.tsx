@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { checkoutAction } from './actions';
 import { loadStripe } from '@stripe/stripe-js';
 import { useToast } from '@/hooks/use-toast';
+import { useFormStatus } from 'react-dom';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
@@ -39,10 +40,28 @@ const interestRateTypeLabels: { [key: string]: string } = {
 // Initialize Stripe.js
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
+function SubmitButton() {
+    const { pending } = useFormStatus();
+
+    return (
+        <Button type="submit" size="lg" className="shadow-lg" disabled={pending}>
+          {pending ? (
+            <>
+              <Loader2 className="mr-2 animate-spin" />
+              Redirecting to payment...
+            </>
+          ) : (
+            <>
+              <Download className="mr-2" />
+              Get My Full Report - $3.99
+            </>
+          )}
+        </Button>
+    )
+}
+
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
   const [state, formAction] = useActionState(checkoutAction, null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
   const { toast } = useToast();
 
   const chartData = results.scenarios.map(result => ({
@@ -63,7 +82,6 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
         title: "Payment Error",
         description: state.message,
       });
-      setIsSubmitting(false);
     }
     
     if (state.type === 'success') {
@@ -71,7 +89,11 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
         const stripe = await stripePromise;
         if (!stripe) {
             console.error("Stripe.js has not loaded yet.");
-            setIsSubmitting(false);
+             toast({
+                variant: "destructive",
+                title: "Error",
+                description: "Could not connect to payment provider.",
+            });
             return;
         }
         await stripe.redirectToCheckout({ sessionId: state.sessionId });
@@ -79,15 +101,6 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
       redirectToCheckout();
     }
   }, [state, toast]);
-
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsSubmitting(true);
-    const formData = new FormData(formRef.current!);
-    // In a real app, you'd pass the specific loan data here
-    // formData.append('loanData', JSON.stringify(results));
-    formAction(formData);
-  };
 
   return (
     <div className="space-y-8">
@@ -176,20 +189,10 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex justify-center">
-          <form ref={formRef} onSubmit={handleSubmit}>
-            <Button type="submit" size="lg" className="shadow-lg" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 animate-spin" />
-                  Redirecting to payment...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2" />
-                  Get My Full Report - $3.99
-                </>
-              )}
-            </Button>
+          <form action={formAction}>
+             {/* In a real app, you'd pass the specific loan data here */}
+            {/* <input type="hidden" name="loanData" value={JSON.stringify(results)} /> */}
+            <SubmitButton />
           </form>
         </CardFooter>
       </Card>
