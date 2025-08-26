@@ -29,7 +29,8 @@ export async function POST(request: Request) {
       cancel_url: `${appUrl}/calculator`,
     });
 
-    return NextResponse.json({ url: session.url });
+    // Return only the session ID
+    return NextResponse.json({ sessionId: session.id });
   } catch (err) {
     console.error(err);
     const errorMessage = err instanceof Error ? err.message : 'Internal server error';

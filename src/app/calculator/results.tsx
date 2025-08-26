@@ -35,10 +35,11 @@ const interestRateTypeLabels: { [key: string]: string } = {
   'interest-only': 'Interest Only',
 };
 
+// Initialize Stripe.js
 const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
 if (!publishableKey) {
-  throw new Error('Stripe publishable key is not set.');
+  throw new Error('Stripe publishable key is not set in the environment variables.');
 }
 
 const stripePromise = loadStripe(publishableKey);
@@ -59,9 +60,12 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
   const handleCheckout = async () => {
     setIsSubmitting(true);
     try {
-      const priceId = 'price_1S06wwAYc8vlhhzWADG59uZn';
+      const priceId = process.env.STRIPE_PRICE_ID;
+      if (!priceId) {
+          throw new Error('Stripe Price ID is not set.');
+      }
 
-
+      // 1. Create a checkout session by calling our API
       const response = await fetch('/api/checkout_sessions', {
           method: 'POST',
           headers: {
@@ -70,24 +74,36 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           body: JSON.stringify({ priceId }),
       });
 
-      const { url, error } = await response.json();
+      const { sessionId, error } = await response.json();
 
       if (error) {
         console.error("Error from API route:", error);
         throw new Error(error);
       }
 
-      if (!url) {
-          console.error("API route did not return a URL.");
+      if (!sessionId) {
+          console.error("API route did not return a session ID.");
           throw new Error('Could not create Stripe session.');
       }
       
-      window.location.href = url;
+      // 2. Redirect to Stripe Checkout using the session ID
+      const stripe = await stripePromise;
+      if (!stripe) {
+          throw new Error('Stripe.js has not loaded yet.');
+      }
 
+      const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
+
+      if (stripeError) {
+          console.error("Stripe redirect error:", stripeError);
+          // Display a friendly error to the user
+          alert(`Error: ${stripeError.message}`);
+      }
 
     } catch (error) {
       console.error("Checkout error:", error);
-      alert('Error: Could not connect to payment processor. Please check the console for details.');
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      alert(`Error: Could not connect to payment processor. Please check the console for details. Details: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
