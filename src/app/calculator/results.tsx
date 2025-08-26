@@ -6,8 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { CalculationResults } from './page';
-import { ArrowLeft, Download } from 'lucide-react';
+import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { loadStripe } from '@stripe/stripe-js';
+import { useState } from 'react';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
@@ -34,6 +36,8 @@ const interestRateTypeLabels: { [key: string]: string } = {
 
 
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const chartData = results.scenarios.map(result => ({
     name: result.scenarioName,
     'Loan Amount': result.loanAmount,
@@ -42,6 +46,52 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
 
   const loanTypeName = loanTypeLabels[results.loanType] || 'Loan';
   const interestRateTypeName = interestRateTypeLabels[results.interestRateType] || 'Interest';
+
+  const handleCheckout = async () => {
+    setIsSubmitting(true);
+    try {
+      const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+      const stripe = await stripePromise;
+
+      if (!stripe) {
+        throw new Error('Stripe.js failed to load.');
+      }
+      
+      const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || 'price_1S06wwAYc8vlhhzWADG59uZn';
+
+
+      const response = await fetch('/api/checkout_sessions', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ priceId }),
+      });
+
+      const { sessionId, error } = await response.json();
+
+      if (error) {
+        throw new Error(error);
+      }
+
+      if (!sessionId) {
+          throw new Error('Could not create Stripe session.');
+      }
+
+      const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
+
+      if (stripeError) {
+          console.error("Stripe redirect error:", stripeError);
+          // You can show an error message to the user here.
+      }
+
+    } catch (error) {
+      console.error("Checkout error:", error);
+      // You can show a generic error message to the user here.
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -130,9 +180,18 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex justify-center">
-          <Button size="lg" className="shadow-lg" disabled>
-            <Download className="mr-2" />
-            Full Report Coming Soon!
+          <Button size="lg" className="shadow-lg" onClick={handleCheckout} disabled={isSubmitting}>
+             {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2" />
+                Get Full Report for $3.99
+              </>
+            )}
           </Button>
         </CardFooter>
       </Card>
