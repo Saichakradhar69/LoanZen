@@ -1,18 +1,13 @@
 // src/app/calculator/results.tsx
 'use client';
 
-import { useActionState, useEffect } from 'react';
-import { useFormStatus } from 'react-dom';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { CalculationResults } from './page';
-import { ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { checkoutAction } from './actions';
-import { loadStripe } from '@stripe/stripe-js';
-import { useToast } from '@/hooks/use-toast';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
@@ -37,33 +32,8 @@ const interestRateTypeLabels: { [key: string]: string } = {
   'interest-only': 'Interest Only',
 };
 
-// Initialize Stripe.js
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-
-function SubmitButton() {
-    const { pending } = useFormStatus();
-
-    return (
-        <Button type="submit" size="lg" className="shadow-lg" disabled={pending}>
-          {pending ? (
-            <>
-              <Loader2 className="mr-2 animate-spin" />
-              Redirecting to payment...
-            </>
-          ) : (
-            <>
-              <Download className="mr-2" />
-              Get My Full Report - $3.99
-            </>
-          )}
-        </Button>
-    )
-}
 
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
-  const [state, formAction] = useActionState(checkoutAction, null);
-  const { toast } = useToast();
-
   const chartData = results.scenarios.map(result => ({
     name: result.scenarioName,
     'Loan Amount': result.loanAmount,
@@ -72,35 +42,6 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
 
   const loanTypeName = loanTypeLabels[results.loanType] || 'Loan';
   const interestRateTypeName = interestRateTypeLabels[results.interestRateType] || 'Interest';
-  
-  useEffect(() => {
-    if (!state) return;
-
-    if (state.type === 'error') {
-      toast({
-        variant: "destructive",
-        title: "Payment Error",
-        description: state.message,
-      });
-    }
-    
-    if (state.type === 'success') {
-      const redirectToCheckout = async () => {
-        const stripe = await stripePromise;
-        if (!stripe) {
-            console.error("Stripe.js has not loaded yet.");
-             toast({
-                variant: "destructive",
-                title: "Error",
-                description: "Could not connect to payment provider.",
-            });
-            return;
-        }
-        await stripe.redirectToCheckout({ sessionId: state.sessionId });
-      };
-      redirectToCheckout();
-    }
-  }, [state, toast]);
 
   return (
     <div className="space-y-8">
@@ -189,11 +130,10 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex justify-center">
-          <form action={formAction}>
-             {/* In a real app, you'd pass the specific loan data here */}
-            {/* <input type="hidden" name="loanData" value={JSON.stringify(results)} /> */}
-            <SubmitButton />
-          </form>
+          <Button size="lg" className="shadow-lg" disabled>
+            <Download className="mr-2" />
+            Full Report Coming Soon!
+          </Button>
         </CardFooter>
       </Card>
     </div>
