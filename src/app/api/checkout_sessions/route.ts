@@ -4,10 +4,11 @@ import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  const { priceId } = await request.json();
+  // The priceId is now read from the server's environment variables
+  const priceId = process.env.STRIPE_PRICE_ID;
 
   if (!priceId) {
-    return NextResponse.json({ error: 'Price ID is required' }, { status: 400 });
+    return NextResponse.json({ error: 'Stripe Price ID is not configured on the server.' }, { status: 500 });
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL;

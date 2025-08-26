@@ -60,18 +60,14 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
   const handleCheckout = async () => {
     setIsSubmitting(true);
     try {
-      const priceId = process.env.STRIPE_PRICE_ID;
-      if (!priceId) {
-          throw new Error('Stripe Price ID is not set.');
-      }
-
       // 1. Create a checkout session by calling our API
       const response = await fetch('/api/checkout_sessions', {
           method: 'POST',
           headers: {
               'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ priceId }),
+          // We don't need to pass a body, the API route will get the price ID from the server environment
+          body: JSON.stringify({}),
       });
 
       const { sessionId, error } = await response.json();
