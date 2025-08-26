@@ -10,6 +10,7 @@ import type { CalculationResults } from './page';
 import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
@@ -49,6 +50,7 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
 
   const handleCheckout = async () => {
     setIsSubmitting(true);
+    console.log("Starting checkout...");
     try {
       const priceId = 'price_1S06wwAYc8vlhhzWADG59uZn';
 
@@ -64,19 +66,22 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
       const { url, error } = await response.json();
 
       if (error) {
+        console.error("Error from API route:", error);
         throw new Error(error);
       }
 
       if (!url) {
+          console.error("API route did not return a URL.");
           throw new Error('Could not create Stripe session.');
       }
       
+      console.log("Got checkout URL:", url);
       window.location.href = url;
 
 
     } catch (error) {
       console.error("Checkout error:", error);
-      // You can show a generic error message to the user here.
+      alert('Error: Could not connect to payment processor. Please check the console for details.');
     } finally {
       setIsSubmitting(false);
     }
