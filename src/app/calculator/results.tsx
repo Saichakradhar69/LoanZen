@@ -35,6 +35,14 @@ const interestRateTypeLabels: { [key: string]: string } = {
   'interest-only': 'Interest Only',
 };
 
+const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+
+if (!publishableKey) {
+  throw new Error('Stripe publishable key is not set.');
+}
+
+const stripePromise = loadStripe(publishableKey);
+
 
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,7 +58,6 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
 
   const handleCheckout = async () => {
     setIsSubmitting(true);
-    console.log("Starting checkout...");
     try {
       const priceId = 'price_1S06wwAYc8vlhhzWADG59uZn';
 
@@ -75,7 +82,6 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           throw new Error('Could not create Stripe session.');
       }
       
-      console.log("Got checkout URL:", url);
       window.location.href = url;
 
 
