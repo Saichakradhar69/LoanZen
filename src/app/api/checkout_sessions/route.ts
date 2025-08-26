@@ -1,3 +1,4 @@
+
 // src/app/api/checkout_sessions/route.ts
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
       cancel_url: `${appUrl}/calculator`,
     });
 
-    return NextResponse.json({ sessionId: session.id });
+    return NextResponse.json({ url: session.url });
   } catch (err) {
     console.error(err);
     const errorMessage = err instanceof Error ? err.message : 'Internal server error';

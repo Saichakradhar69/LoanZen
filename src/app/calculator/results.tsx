@@ -1,3 +1,4 @@
+
 // src/app/calculator/results.tsx
 'use client';
 
@@ -8,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { CalculationResults } from './page';
 import { ArrowLeft, Download, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { loadStripe } from '@stripe/stripe-js';
 import { useState } from 'react';
 
 interface CalculatorResultsProps {
@@ -50,14 +50,7 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
   const handleCheckout = async () => {
     setIsSubmitting(true);
     try {
-      const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-      const stripe = await stripePromise;
-
-      if (!stripe) {
-        throw new Error('Stripe.js failed to load.');
-      }
-      
-      const priceId = process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || 'price_1S06wwAYc8vlhhzWADG59uZn';
+      const priceId = 'price_1S06wwAYc8vlhhzWADG59uZn';
 
 
       const response = await fetch('/api/checkout_sessions', {
@@ -68,22 +61,18 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           body: JSON.stringify({ priceId }),
       });
 
-      const { sessionId, error } = await response.json();
+      const { url, error } = await response.json();
 
       if (error) {
         throw new Error(error);
       }
 
-      if (!sessionId) {
+      if (!url) {
           throw new Error('Could not create Stripe session.');
       }
+      
+      window.location.href = url;
 
-      const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
-
-      if (stripeError) {
-          console.error("Stripe redirect error:", stripeError);
-          // You can show an error message to the user here.
-      }
 
     } catch (error) {
       console.error("Checkout error:", error);
