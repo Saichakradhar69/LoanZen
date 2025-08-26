@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       ],
       mode: 'payment',
       success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/calculator`,
+      cancel_url: `${appUrl}/calculator?status=cancelled`,
     });
 
     if (!session.url) {

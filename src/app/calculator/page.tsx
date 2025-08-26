@@ -1,10 +1,13 @@
 // src/app/calculator/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import CalculatorForm from './form';
 import CalculatorResults from './results';
 import type { FormData } from './form';
+import { useSearchParams } from 'next/navigation';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Terminal } from 'lucide-react';
 
 export type AmortizationData = {
   month: number;
@@ -65,8 +68,10 @@ function calculateAmortization(loanAmount: number, annualInterestRate: number, l
   };
 }
 
+function CalculatorContent() {
+  const searchParams = useSearchParams();
+  const status = searchParams.get('status');
 
-export default function CalculatorPage() {
   const [results, setResults] = useState<CalculationResults | null>(null);
 
   const handleCalculation = (data: FormData) => {
@@ -95,11 +100,22 @@ export default function CalculatorPage() {
   
   const handleBack = () => {
     setResults(null);
+     // Clear the status from the URL to hide the alert
+    window.history.replaceState(null, '', '/calculator');
   };
 
 
   return (
     <div className="container mx-auto max-w-5xl py-12 px-4">
+      {status === 'cancelled' && (
+         <Alert variant="destructive" className="mb-8">
+            <Terminal className="h-4 w-4" />
+            <AlertTitle>Payment Cancelled</AlertTitle>
+            <AlertDescription>
+                Your payment was not processed. You can try again at any time.
+            </AlertDescription>
+        </Alert>
+      )}
       <div className="text-center mb-10">
         <h1 className="font-headline text-4xl font-bold tracking-tight text-primary sm:text-5xl">
           Loan Comparison Calculator
@@ -116,4 +132,12 @@ export default function CalculatorPage() {
       )}
     </div>
   );
+}
+
+export default function CalculatorPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <CalculatorContent />
+    </Suspense>
+  )
 }
