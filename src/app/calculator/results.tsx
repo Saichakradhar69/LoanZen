@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { CalculationResults } from './page';
-import { ArrowLeft, Download, Loader2 } from 'lucide-react';
+import { ArrowLeft, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
+import Link from 'next/link';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
@@ -35,18 +35,10 @@ const interestRateTypeLabels: { [key: string]: string } = {
   'interest-only': 'Interest Only',
 };
 
-// Initialize Stripe.js
-const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-
-if (!publishableKey) {
-  throw new Error('Stripe publishable key is not set in the environment variables.');
-}
-
-const stripePromise = loadStripe(publishableKey);
-
-
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   const chartData = results.scenarios.map(result => ({
     name: result.scenarioName,
@@ -59,6 +51,7 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
 
   const handleCheckout = async () => {
     setIsSubmitting(true);
+    setError(null);
     try {
       // 1. Create a checkout session by calling our API
       const response = await fetch('/api/checkout_sessions', {
@@ -66,40 +59,25 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           headers: {
               'Content-Type': 'application/json',
           },
-          // We don't need to pass a body, the API route will get the price ID from the server environment
           body: JSON.stringify({}),
       });
 
-      const { sessionId, error } = await response.json();
+      const { url, error } = await response.json();
 
       if (error) {
-        console.error("Error from API route:", error);
         throw new Error(error);
       }
 
-      if (!sessionId) {
-          console.error("API route did not return a session ID.");
+      if (!url) {
           throw new Error('Could not create Stripe session.');
       }
       
-      // 2. Redirect to Stripe Checkout using the session ID
-      const stripe = await stripePromise;
-      if (!stripe) {
-          throw new Error('Stripe.js has not loaded yet.');
-      }
-
-      const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
-
-      if (stripeError) {
-          console.error("Stripe redirect error:", stripeError);
-          // Display a friendly error to the user
-          alert(`Error: ${stripeError.message}`);
-      }
+      setCheckoutUrl(url);
 
     } catch (error) {
       console.error("Checkout error:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      alert(`Error: Could not connect to payment processor. Please check the console for details. Details: ${errorMessage}`);
+      setError(`Error: Could not connect to payment processor. Please try again. Details: ${errorMessage}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -192,20 +170,30 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex justify-center">
-          <Button size="lg" className="shadow-lg" onClick={handleCheckout} disabled={isSubmitting}>
-             {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Download className="mr-2" />
-                Get Full Report for $3.99
-              </>
-            )}
-          </Button>
+          {!checkoutUrl ? (
+            <Button size="lg" className="shadow-lg" onClick={handleCheckout} disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2" />
+                  Get Full Report for $3.99
+                </>
+              )}
+            </Button>
+          ) : (
+             <Button size="lg" className="shadow-lg" asChild>
+                <Link href={checkoutUrl} target="_blank">
+                    <ExternalLink className="mr-2"/>
+                    Proceed to Secure Payment
+                </Link>
+            </Button>
+          )}
         </CardFooter>
+        {error && <p className="text-destructive text-center text-sm pb-4">{error}</p>}
       </Card>
     </div>
   );
