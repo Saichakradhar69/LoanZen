@@ -11,7 +11,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Stripe Price ID is not configured on the server.' }, { status: 500 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  // Use the NEXT_PUBLIC_APP_URL which should be set by the environment
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+
+  if (!appUrl) {
+    return NextResponse.json({ error: 'Application URL is not configured on the server.' }, { status: 500 });
+  }
+
 
   try {
     const session = await stripe.checkout.sessions.create({
