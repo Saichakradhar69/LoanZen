@@ -1,23 +1,18 @@
-
 // src/app/api/checkout_sessions/route.ts
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
 
 export async function POST(request: Request) {
-  // The priceId is now read from the server's environment variables
+  const { appUrl } = await request.json();
   const priceId = process.env.STRIPE_PRICE_ID;
 
   if (!priceId) {
     return NextResponse.json({ error: 'Stripe Price ID is not configured on the server.' }, { status: 500 });
   }
-
-  // Use the NEXT_PUBLIC_APP_URL which should be set by the environment
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-
+  
   if (!appUrl) {
-    return NextResponse.json({ error: 'Application URL is not configured on the server.' }, { status: 500 });
+    return NextResponse.json({ error: 'Application URL was not provided by the client.' }, { status: 500 });
   }
-
 
   try {
     const session = await stripe.checkout.sessions.create({

@@ -59,7 +59,7 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           headers: {
               'Content-Type': 'application/json',
           },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ appUrl: window.location.origin }),
       });
 
       const { url, error } = await response.json();
