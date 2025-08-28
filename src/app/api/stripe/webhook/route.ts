@@ -5,13 +5,102 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import type { CalculationResults, AmortizationData } from '@/app/calculator/page';
-
+import type { FormData as CalculatorFormData } from '@/app/calculator/form';
 
 // Extend the jsPDF type to include the autoTable method
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => jsPDF;
 }
+
+// --- Data types needed for recalculation ---
+
+export type AmortizationData = {
+  month: number;
+  monthlyPayment: number;
+  principal: number;
+  interest: number;
+  remainingBalance: number;
+};
+
+export type ScenarioResult = {
+  scenarioName: string;
+  totalInterest: number;
+  totalPayment: number;
+  monthlyPayment: number;
+  amortizationSchedule: AmortizationData[];
+  loanAmount: number;
+};
+
+export type CalculationResults = {
+  loanName: string;
+  loanType: string;
+  interestRateType: string;
+  scenarios: ScenarioResult[];
+};
+
+// --- Calculation logic moved to the server ---
+
+function calculateAmortization(loanAmount: number, annualInterestRate: number, loanTermYears: number) {
+  const monthlyInterestRate = annualInterestRate / 100 / 12;
+  const numberOfPayments = loanTermYears * 12;
+
+  const monthlyPayment =
+    (loanAmount * monthlyInterestRate * Math.pow(1 + monthlyInterestRate, numberOfPayments)) /
+    (Math.pow(1 + monthlyInterestRate, numberOfPayments) - 1);
+
+  let remainingBalance = loanAmount;
+  let totalInterest = 0;
+  const amortizationSchedule: AmortizationData[] = [];
+
+  for (let month = 1; month <= numberOfPayments; month++) {
+    const interest = remainingBalance * monthlyInterestRate;
+    const principal = monthlyPayment - interest;
+    remainingBalance -= principal;
+    totalInterest += interest;
+
+    amortizationSchedule.push({
+      month,
+      monthlyPayment: parseFloat(monthlyPayment.toFixed(2)),
+      principal: parseFloat(principal.toFixed(2)),
+      interest: parseFloat(interest.toFixed(2)),
+      remainingBalance: parseFloat(Math.abs(remainingBalance).toFixed(2)),
+    });
+  }
+
+  return {
+    monthlyPayment: parseFloat(monthlyPayment.toFixed(2)),
+    totalInterest: parseFloat(totalInterest.toFixed(2)),
+    totalPayment: parseFloat((loanAmount + totalInterest).toFixed(2)),
+    amortizationSchedule,
+  };
+}
+
+function performCalculations(formData: CalculatorFormData): CalculationResults {
+    const calculatedScenarios = formData.scenarios.map((scenario) => {
+      const { monthlyPayment, totalInterest, totalPayment, amortizationSchedule } = calculateAmortization(
+        scenario.loanAmount,
+        scenario.interestRate,
+        scenario.loanTerm
+      );
+      return {
+        scenarioName: scenario.scenarioName,
+        totalInterest,
+        totalPayment,
+        monthlyPayment,
+        amortizationSchedule,
+        loanAmount: scenario.loanAmount,
+      };
+    });
+    return {
+      loanName: formData.loanName,
+      loanType: formData.loanType,
+      interestRateType: formData.interestRateType,
+      scenarios: calculatedScenarios
+    };
+}
+
+
+// --- PDF and Webhook Logic ---
 
 function generateCouponCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -110,21 +199,24 @@ async function handleStripeWebhook(event: Stripe.Event) {
     const session = event.data.object as Stripe.Checkout.Session;
     
     if (session.payment_status === 'paid') {
-      const resultsString = session.metadata?.results;
-      if (!resultsString) {
-          console.error("Webhook Error: No calculation results found in session metadata.");
+      const formDataString = session.metadata?.formData;
+      if (!formDataString) {
+          console.error("Webhook Error: No form data found in session metadata.");
           return;
       }
 
-      const results: CalculationResults = JSON.parse(resultsString);
+      const formData: CalculatorFormData = JSON.parse(formDataString);
       const userEmail = session.customer_details?.email;
 
       if (!userEmail) {
            console.error("Webhook Error: No user email found in session.");
            return;
       }
+      
+      // 1. Recalculate results on the server
+      const results = performCalculations(formData);
 
-      // 1. Generate the PDF
+      // 2. Generate the PDF
       const pdfBuffer = generateReportPdf(results);
       const pdfBase64 = pdfBuffer.toString('base64');
       const dataUri = `data:application/pdf;base64,${pdfBase64}`;
@@ -133,7 +225,7 @@ async function handleStripeWebhook(event: Stripe.Event) {
       // --- SIMULATION ---
       // In a real application, you would do the following:
 
-      // 2. Upload the PDF to Firebase Storage
+      // 3. Upload the PDF to Firebase Storage
       // const storageRef = ref(storage, `reports/${session.id}.pdf`);
       // const uploadResult = await uploadBytes(storageRef, pdfBuffer);
       // const downloadUrl = await getDownloadURL(uploadResult.ref);
@@ -144,7 +236,7 @@ async function handleStripeWebhook(event: Stripe.Event) {
       console.log('PDF Data URI (for testing):', dataUri.substring(0, 100) + '...');
 
 
-      // 3. Save download URL to Firestore
+      // 4. Save download URL to Firestore
       // await setDoc(doc(db, "reports", session.id), {
       //   userId: userEmail,
       //   downloadUrl: downloadUrl,
@@ -155,7 +247,7 @@ async function handleStripeWebhook(event: Stripe.Event) {
       console.log(`Saving report details for session: ${session.id}`);
 
 
-      // 4. Send the email with the download link
+      // 5. Send the email with the download link
       // await resend.emails.send({
       //   from: 'LoanZen <reports@loanzen.com>',
       //   to: [userEmail],

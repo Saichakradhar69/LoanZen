@@ -73,6 +73,7 @@ function CalculatorContent() {
   const status = searchParams.get('status');
 
   const [results, setResults] = useState<CalculationResults | null>(null);
+  const [formData, setFormData] = useState<FormData | null>(null);
 
   const handleCalculation = (data: FormData) => {
     const calculatedScenarios = data.scenarios.map((scenario) => {
@@ -90,6 +91,7 @@ function CalculatorContent() {
         loanAmount: scenario.loanAmount,
       };
     });
+    setFormData(data);
     setResults({
       loanName: data.loanName,
       loanType: data.loanType,
@@ -100,6 +102,7 @@ function CalculatorContent() {
   
   const handleBack = () => {
     setResults(null);
+    setFormData(null);
      // Clear the status from the URL to hide the alert
     window.history.replaceState(null, '', '/calculator');
   };
@@ -125,10 +128,10 @@ function CalculatorContent() {
         </p>
       </div>
 
-      {!results ? (
+      {!results || !formData ? (
         <CalculatorForm onCalculate={handleCalculation} />
       ) : (
-        <CalculatorResults results={results} onBack={handleBack}/>
+        <CalculatorResults results={results} formData={formData} onBack={handleBack}/>
       )}
     </div>
   );

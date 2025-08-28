@@ -10,9 +10,12 @@ import { ArrowLeft, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
+import Link from 'next/link';
+import type { FormData } from './form';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
+  formData: FormData;
   onBack: () => void;
 }
 
@@ -37,9 +40,10 @@ const interestRateTypeLabels: { [key: string]: string } = {
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
+export default function CalculatorResults({ results, formData, onBack }: CalculatorResultsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
 
   const chartData = results.scenarios.map(result => ({
     name: result.scenarioName,
@@ -62,27 +66,27 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           },
           body: JSON.stringify({ 
             appUrl: window.location.origin,
-            calculationResults: results 
+            formData: formData // Pass the original form data
           }),
       });
 
-      const { sessionId, error: apiError } = await response.json();
+      const { sessionId, error: apiError, url } = await response.json();
 
-      if (apiError) {
-        throw new Error(apiError);
-      }
-
-      if (!sessionId) {
-          throw new Error('Could not create Stripe session.');
+      if (!response.ok) {
+          throw new Error(apiError || 'Failed to create checkout session.');
       }
       
       const stripe = await stripePromise;
       if (!stripe) {
           throw new Error('Stripe.js has not loaded yet.');
       }
+      
+      // We are using a link instead of redirectToCheckout to avoid iframe issues
+      // in some development environments.
+      setCheckoutUrl(url); 
 
       const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
-
+      
       if (stripeError) {
           console.error("Stripe redirect error:", stripeError);
           throw new Error(stripeError.message);
@@ -96,6 +100,50 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
       setIsSubmitting(false);
     }
   };
+  
+   const handleCheckoutLink = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+        const response = await fetch('/api/checkout_sessions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+                appUrl: window.location.origin,
+                formData: formData 
+            }),
+        });
+
+        const { sessionId, error: apiError } = await response.json();
+
+        if (!response.ok) {
+            throw new Error(apiError || 'Failed to create checkout session.');
+        }
+
+        const stripe = await stripePromise;
+        if (!stripe) {
+            throw new Error('Stripe.js has not loaded yet.');
+        }
+
+        // This is the session ID. The full URL is constructed by Stripe.
+        // We will now use this to redirect.
+        const { error } = await stripe.redirectToCheckout({ sessionId });
+
+        if (error) {
+            console.error("Stripe redirect error:", error);
+            throw error;
+        }
+
+    } catch (error) {
+      console.error("Checkout error:", error);
+      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
+      setError(`Error: Could not connect to payment processor. Please try again. Details: ${errorMessage}`);
+      setIsSubmitting(false); // Only stop loading if there's an error
+    }
+  };
+
 
   return (
     <div className="space-y-8">
@@ -184,7 +232,7 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex-col">
-            <Button size="lg" className="shadow-lg" onClick={handleCheckout} disabled={isSubmitting}>
+            <Button size="lg" className="shadow-lg" onClick={handleCheckoutLink} disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -1,10 +1,10 @@
 // src/app/api/checkout_sessions/route.ts
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
-import type { CalculationResults } from '@/app/calculator/page';
+import type { FormData as CalculatorFormData } from '@/app/calculator/form';
 
 export async function POST(request: Request) {
-  const { appUrl, calculationResults } = (await request.json()) as { appUrl: string, calculationResults: CalculationResults };
+  const { appUrl, formData } = (await request.json()) as { appUrl: string, formData: CalculatorFormData };
   const priceId = process.env.STRIPE_PRICE_ID;
 
   if (!priceId) {
@@ -13,6 +13,10 @@ export async function POST(request: Request) {
   
   if (!appUrl) {
     return NextResponse.json({ error: 'Application URL was not provided by the client.' }, { status: 500 });
+  }
+  
+  if (!formData) {
+    return NextResponse.json({ error: 'Form data was not provided by the client.' }, { status: 500 });
   }
 
   try {
@@ -27,8 +31,8 @@ export async function POST(request: Request) {
       success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/calculator?status=cancelled`,
       metadata: {
-        // Pass the calculation results to the webhook
-        results: JSON.stringify(calculationResults),
+        // Pass the small form input data to the webhook
+        formData: JSON.stringify(formData),
       }
     });
 
@@ -37,6 +41,10 @@ export async function POST(request: Request) {
   } catch (err) {
     console.error(err);
     const errorMessage = err instanceof Error ? err.message : 'Internal server error';
+    // Check for metadata size error specifically
+    if (errorMessage.includes('metadata')) {
+       return NextResponse.json({ error: `Metadata error: ${errorMessage}` }, { status: 400 });
+    }
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
