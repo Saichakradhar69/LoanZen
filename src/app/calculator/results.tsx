@@ -1,4 +1,3 @@
-
 // src/app/calculator/results.tsx
 'use client';
 
@@ -10,7 +9,7 @@ import type { CalculationResults } from './page';
 import { ArrowLeft, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState } from 'react';
-import Link from 'next/link';
+import { loadStripe } from '@stripe/stripe-js';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
@@ -35,11 +34,13 @@ const interestRateTypeLabels: { [key: string]: string } = {
   'interest-only': 'Interest Only',
 };
 
+
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
+
 export default function CalculatorResults({ results, onBack }: CalculatorResultsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+
   const chartData = results.scenarios.map(result => ({
     name: result.scenarioName,
     'Loan Amount': result.loanAmount,
@@ -59,20 +60,33 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
           headers: {
               'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ appUrl: window.location.origin }),
+          body: JSON.stringify({ 
+            appUrl: window.location.origin,
+            calculationResults: results 
+          }),
       });
 
-      const { url, error } = await response.json();
+      const { sessionId, error: apiError } = await response.json();
 
-      if (error) {
-        throw new Error(error);
+      if (apiError) {
+        throw new Error(apiError);
       }
 
-      if (!url) {
+      if (!sessionId) {
           throw new Error('Could not create Stripe session.');
       }
       
-      setCheckoutUrl(url);
+      const stripe = await stripePromise;
+      if (!stripe) {
+          throw new Error('Stripe.js has not loaded yet.');
+      }
+
+      const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
+
+      if (stripeError) {
+          console.error("Stripe redirect error:", stripeError);
+          throw new Error(stripeError.message);
+      }
 
     } catch (error) {
       console.error("Checkout error:", error);
@@ -169,8 +183,7 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
             Get a detailed, month-by-month amortization schedule for each scenario and an Excel download.
           </CardDescription>
         </CardHeader>
-        <CardFooter className="flex justify-center">
-          {!checkoutUrl ? (
+        <CardFooter className="flex-col">
             <Button size="lg" className="shadow-lg" onClick={handleCheckout} disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
@@ -184,16 +197,8 @@ export default function CalculatorResults({ results, onBack }: CalculatorResults
                 </>
               )}
             </Button>
-          ) : (
-             <Button size="lg" className="shadow-lg" asChild>
-                <Link href={checkoutUrl} target="_blank">
-                    <ExternalLink className="mr-2"/>
-                    Proceed to Secure Payment
-                </Link>
-            </Button>
-          )}
+            {error && <p className="text-destructive text-center text-sm pt-4">{error}</p>}
         </CardFooter>
-        {error && <p className="text-destructive text-center text-sm pb-4">{error}</p>}
       </Card>
     </div>
   );

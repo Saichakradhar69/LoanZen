@@ -1,0 +1,197 @@
+// src/app/api/stripe/webhook/route.ts
+import { stripe } from '@/lib/stripe';
+import { headers } from 'next/headers';
+import { NextResponse } from 'next/server';
+import Stripe from 'stripe';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
+import type { CalculationResults, AmortizationData } from '@/app/calculator/page';
+
+
+// Extend the jsPDF type to include the autoTable method
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => jsPDF;
+}
+
+function generateCouponCode(): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = 'PREMIUM-';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
+function generateReportPdf(results: CalculationResults): Buffer {
+    const doc = new jsPDF() as jsPDFWithAutoTable;
+    const couponCode = generateCouponCode();
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.text('LoanZen - Amortization Report', 105, 20, { align: 'center' });
+
+    doc.setFontSize(16);
+    doc.text(`Loan Name: ${results.loanName}`, 14, 35);
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.text(`Loan Type: ${results.loanType}`, 14, 42);
+    doc.text(`Interest Rate Type: ${results.interestRateType}`, 14, 49);
+
+    let yPos = 60;
+
+    results.scenarios.forEach((scenario, index) => {
+        if (index > 0) {
+            yPos += 10;
+        }
+
+        if (yPos > 250) {
+            doc.addPage();
+            yPos = 20;
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text(`Scenario: ${scenario.scenarioName}`, 14, yPos);
+        yPos += 8;
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.text(`Monthly Payment: $${scenario.monthlyPayment.toFixed(2)}`, 14, yPos);
+        doc.text(`Total Interest: $${scenario.totalInterest.toFixed(2)}`, 80, yPos);
+        doc.text(`Total Cost: $${scenario.totalPayment.toFixed(2)}`, 140, yPos);
+        yPos += 8;
+
+        const head = [['Month', 'Principal', 'Interest', 'Balance']];
+        const body = scenario.amortizationSchedule.map((row: AmortizationData) => [
+            row.month,
+            `$${row.principal.toFixed(2)}`,
+            `$${row.interest.toFixed(2)}`,
+            `$${row.remainingBalance.toFixed(2)}`
+        ]);
+
+        doc.autoTable({
+            head,
+            body,
+            startY: yPos,
+            headStyles: { fillColor: [63, 81, 181] }, // #3F51B5
+            margin: { left: 14, right: 14 }
+        });
+
+        yPos = (doc as any).lastAutoTable.finalY;
+    });
+    
+    // Add coupon code
+    yPos += 15;
+     if (yPos > 260) {
+        doc.addPage();
+        yPos = 20;
+    }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Your Premium Bonus!', 105, yPos, {align: 'center'});
+    yPos += 8;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(12);
+    doc.text('Thank you for your purchase. As a bonus, here is a coupon for one free month of our Tracker Pro service:', 105, yPos, { align: 'center', maxWidth: 180 });
+    yPos += 12;
+
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(16);
+    doc.text(couponCode, 105, yPos, { align: 'center' });
+    
+    return Buffer.from(doc.output('arraybuffer'));
+}
+
+
+async function handleStripeWebhook(event: Stripe.Event) {
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object as Stripe.Checkout.Session;
+    
+    if (session.payment_status === 'paid') {
+      const resultsString = session.metadata?.results;
+      if (!resultsString) {
+          console.error("Webhook Error: No calculation results found in session metadata.");
+          return;
+      }
+
+      const results: CalculationResults = JSON.parse(resultsString);
+      const userEmail = session.customer_details?.email;
+
+      if (!userEmail) {
+           console.error("Webhook Error: No user email found in session.");
+           return;
+      }
+
+      // 1. Generate the PDF
+      const pdfBuffer = generateReportPdf(results);
+      const pdfBase64 = pdfBuffer.toString('base64');
+      const dataUri = `data:application/pdf;base64,${pdfBase64}`;
+
+
+      // --- SIMULATION ---
+      // In a real application, you would do the following:
+
+      // 2. Upload the PDF to Firebase Storage
+      // const storageRef = ref(storage, `reports/${session.id}.pdf`);
+      // const uploadResult = await uploadBytes(storageRef, pdfBuffer);
+      // const downloadUrl = await getDownloadURL(uploadResult.ref);
+      console.log(`--- SIMULATING PDF UPLOAD ---`);
+      console.log(`Session ID: ${session.id}`);
+      console.log(`PDF generated for: ${userEmail}`);
+      // console.log(`Download URL would be: ${downloadUrl}`);
+      console.log('PDF Data URI (for testing):', dataUri.substring(0, 100) + '...');
+
+
+      // 3. Save download URL to Firestore
+      // await setDoc(doc(db, "reports", session.id), {
+      //   userId: userEmail,
+      //   downloadUrl: downloadUrl,
+      //   generatedAt: serverTimestamp(),
+      //   status: 'completed'
+      // });
+      console.log(`--- SIMULATING FIRESTORE WRITE ---`);
+      console.log(`Saving report details for session: ${session.id}`);
+
+
+      // 4. Send the email with the download link
+      // await resend.emails.send({
+      //   from: 'LoanZen <reports@loanzen.com>',
+      //   to: [userEmail],
+      //   subject: 'Your LoanZen Report is Ready!',
+      //   html: `<h1>Thank You!</h1><p>Your report is ready. <a href="${downloadUrl}">Click here to download</a>.</p>`,
+      // });
+      console.log(`--- SIMULATING EMAIL SEND ---`);
+      console.log(`Sending email to ${userEmail} with the report link.`);
+    }
+  }
+}
+
+export async function POST(req: Request) {
+  const body = await req.text();
+  const signature = headers().get('stripe-signature') as string;
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+  if (!webhookSecret) {
+    return NextResponse.json({ error: 'Stripe webhook secret is not configured.' }, { status: 500 });
+  }
+
+  let event: Stripe.Event;
+  try {
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+    console.error(`Webhook signature verification failed: ${errorMessage}`);
+    return NextResponse.json({ error: `Webhook Error: ${errorMessage}` }, { status: 400 });
+  }
+
+  try {
+    await handleStripeWebhook(event);
+    return NextResponse.json({ received: true });
+  } catch (err) {
+     const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+     console.error(`Webhook handler failed: ${errorMessage}`);
+     return NextResponse.json({ error: `Webhook handler error: ${errorMessage}` }, { status: 500 });
+  }
+}

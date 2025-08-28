@@ -1,9 +1,10 @@
 // src/app/api/checkout_sessions/route.ts
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
+import type { CalculationResults } from '@/app/calculator/page';
 
 export async function POST(request: Request) {
-  const { appUrl } = await request.json();
+  const { appUrl, calculationResults } = (await request.json()) as { appUrl: string, calculationResults: CalculationResults };
   const priceId = process.env.STRIPE_PRICE_ID;
 
   if (!priceId) {
@@ -25,14 +26,14 @@ export async function POST(request: Request) {
       mode: 'payment',
       success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/calculator?status=cancelled`,
+      metadata: {
+        // Pass the calculation results to the webhook
+        results: JSON.stringify(calculationResults),
+      }
     });
 
-    if (!session.url) {
-      return NextResponse.json({ error: 'Could not create Stripe session URL.' }, { status: 500 });
-    }
-
-    // Return the full session URL
-    return NextResponse.json({ url: session.url });
+    // Return only the session ID to the client
+    return NextResponse.json({ sessionId: session.id });
   } catch (err) {
     console.error(err);
     const errorMessage = err instanceof Error ? err.message : 'Internal server error';
