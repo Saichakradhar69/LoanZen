@@ -1,3 +1,4 @@
+
 // src/app/api/checkout_sessions/route.ts
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
@@ -36,14 +37,14 @@ export async function POST(request: Request) {
       }
     });
 
-    // Return only the session ID to the client
-    return NextResponse.json({ sessionId: session.id });
+    // Return the full session URL to the client
+    return NextResponse.json({ url: session.url });
   } catch (err) {
     console.error(err);
     const errorMessage = err instanceof Error ? err.message : 'Internal server error';
     // Check for metadata size error specifically
-    if (errorMessage.includes('metadata')) {
-       return NextResponse.json({ error: `Metadata error: ${errorMessage}` }, { status: 400 });
+    if (errorMessage.includes('Metadata values can have up to 500 characters')) {
+       return NextResponse.json({ error: `Metadata error: The loan scenario is too complex to process in one transaction. Please simplify and try again.` }, { status: 400 });
     }
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }

@@ -1,3 +1,4 @@
+
 // src/app/calculator/results.tsx
 'use client';
 
@@ -53,53 +54,6 @@ export default function CalculatorResults({ results, formData, onBack }: Calcula
 
   const loanTypeName = loanTypeLabels[results.loanType] || 'Loan';
   const interestRateTypeName = interestRateTypeLabels[results.interestRateType] || 'Interest';
-
-  const handleCheckout = async () => {
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      // 1. Create a checkout session by calling our API
-      const response = await fetch('/api/checkout_sessions', {
-          method: 'POST',
-          headers: {
-              'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            appUrl: window.location.origin,
-            formData: formData // Pass the original form data
-          }),
-      });
-
-      const { sessionId, error: apiError, url } = await response.json();
-
-      if (!response.ok) {
-          throw new Error(apiError || 'Failed to create checkout session.');
-      }
-      
-      const stripe = await stripePromise;
-      if (!stripe) {
-          throw new Error('Stripe.js has not loaded yet.');
-      }
-      
-      // We are using a link instead of redirectToCheckout to avoid iframe issues
-      // in some development environments.
-      setCheckoutUrl(url); 
-
-      const { error: stripeError } = await stripe.redirectToCheckout({ sessionId });
-      
-      if (stripeError) {
-          console.error("Stripe redirect error:", stripeError);
-          throw new Error(stripeError.message);
-      }
-
-    } catch (error) {
-      console.error("Checkout error:", error);
-      const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      setError(`Error: Could not connect to payment processor. Please try again. Details: ${errorMessage}`);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
   
    const handleCheckoutLink = async () => {
     setIsSubmitting(true);
@@ -116,31 +70,20 @@ export default function CalculatorResults({ results, formData, onBack }: Calcula
             }),
         });
 
-        const { sessionId, error: apiError } = await response.json();
+        const { url, error: apiError } = await response.json();
 
         if (!response.ok) {
             throw new Error(apiError || 'Failed to create checkout session.');
         }
 
-        const stripe = await stripePromise;
-        if (!stripe) {
-            throw new Error('Stripe.js has not loaded yet.');
-        }
-
-        // This is the session ID. The full URL is constructed by Stripe.
-        // We will now use this to redirect.
-        const { error } = await stripe.redirectToCheckout({ sessionId });
-
-        if (error) {
-            console.error("Stripe redirect error:", error);
-            throw error;
-        }
+        setCheckoutUrl(url);
 
     } catch (error) {
       console.error("Checkout error:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      setError(`Error: Could not connect to payment processor. Please try again. Details: ${errorMessage}`);
-      setIsSubmitting(false); // Only stop loading if there's an error
+      setError(`Error: Could not process payment. Please try again. Details: ${errorMessage}`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -232,19 +175,28 @@ export default function CalculatorResults({ results, formData, onBack }: Calcula
           </CardDescription>
         </CardHeader>
         <CardFooter className="flex-col">
-            <Button size="lg" className="shadow-lg" onClick={handleCheckoutLink} disabled={isSubmitting}>
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Download className="mr-2" />
-                  Get Full Report for $3.99
-                </>
-              )}
-            </Button>
+            {!checkoutUrl ? (
+                 <Button size="lg" className="shadow-lg" onClick={handleCheckoutLink} disabled={isSubmitting}>
+                    {isSubmitting ? (
+                        <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing...
+                        </>
+                    ) : (
+                        <>
+                        <Download className="mr-2" />
+                        Get Full Report for $3.99
+                        </>
+                    )}
+                </Button>
+            ) : (
+                <Button size="lg" className="shadow-lg" asChild>
+                    <Link href={checkoutUrl} target="_blank">
+                        <ExternalLink className="mr-2"/>
+                        Proceed to Secure Payment
+                    </Link>
+                </Button>
+            )}
             {error && <p className="text-destructive text-center text-sm pt-4">{error}</p>}
         </CardFooter>
       </Card>
