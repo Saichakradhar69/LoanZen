@@ -32,17 +32,14 @@ export async function POST(request: Request) {
       success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/calculator?status=cancelled`,
       metadata: {
-        // Pass the small form input data to the webhook
         formData: JSON.stringify(formData),
       }
     });
 
-    // Return the full session URL to the client
     return NextResponse.json({ url: session.url });
   } catch (err) {
     console.error(err);
     const errorMessage = err instanceof Error ? err.message : 'Internal server error';
-    // Check for metadata size error specifically
     if (errorMessage.includes('Metadata values can have up to 500 characters')) {
        return NextResponse.json({ error: `Metadata error: The loan scenario is too complex to process in one transaction. Please simplify and try again.` }, { status: 400 });
     }

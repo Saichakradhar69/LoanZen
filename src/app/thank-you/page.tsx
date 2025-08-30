@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
@@ -27,7 +28,9 @@ function ThankYouContent() {
     const generationTimeout = setTimeout(() => {
       // Here you would get the real downloadUrl from your database.
       // We'll simulate a success. In a real app, you would need to handle errors.
-      const simulatedUrl = "#"; // Placeholder
+      // For the demo, we point to the webhook itself which will regenerate the PDF.
+      // In production, this URL should come from your database (e.g., Firestore) and point to a file in storage.
+      const simulatedUrl = `/api/stripe/webhook?session_id=${sessionId}&download=true`;
       setDownloadUrl(simulatedUrl);
       setIsGenerating(false);
     }, 5000); // 5-second delay to simulate PDF generation and email sending
@@ -63,7 +66,6 @@ function ThankYouContent() {
              <div>
                 <p>Your full loan report has been generated and sent to your email address.</p>
                  <Button asChild size="lg" className="mt-6">
-                    {/* In a real app, this `href` would be the real downloadUrl */}
                     <Link href={downloadUrl} download="LoanZen-Report.pdf">
                         <Download className="mr-2"/>
                         Download Your Report

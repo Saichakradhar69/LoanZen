@@ -1,7 +1,8 @@
+
 // src/app/api/stripe/webhook/route.ts
 import { stripe } from '@/lib/stripe';
 import { headers } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
@@ -190,12 +191,16 @@ function generateReportPdf(results: CalculationResults): Buffer {
     doc.setFontSize(16);
     doc.text(couponCode, 105, yPos, { align: 'center' });
     
-    return Buffer.from(doc.output('arraybuffer'));
+    // The key change: return the PDF as a Buffer
+    const pdfOutput = doc.output('arraybuffer');
+    return Buffer.from(pdfOutput);
 }
 
 
 async function handleStripeWebhook(event: Stripe.Event) {
-  if (event.type === 'checkout.session.completed') {
+    if (event.type !== 'checkout.session.completed') {
+        return;
+    }
     const session = event.data.object as Stripe.Checkout.Session;
     
     if (session.payment_status === 'paid') {
@@ -213,30 +218,21 @@ async function handleStripeWebhook(event: Stripe.Event) {
            return;
       }
       
-      // 1. Recalculate results on the server
       const results = performCalculations(formData);
-
-      // 2. Generate the PDF
       const pdfBuffer = generateReportPdf(results);
-      const pdfBase64 = pdfBuffer.toString('base64');
-      const dataUri = `data:application/pdf;base64,${pdfBase64}`;
-
-
+      
       // --- SIMULATION ---
       // In a real application, you would do the following:
-
-      // 3. Upload the PDF to Firebase Storage
+      // 1. Upload the PDF to Firebase Storage
       // const storageRef = ref(storage, `reports/${session.id}.pdf`);
       // const uploadResult = await uploadBytes(storageRef, pdfBuffer);
       // const downloadUrl = await getDownloadURL(uploadResult.ref);
       console.log(`--- SIMULATING PDF UPLOAD ---`);
       console.log(`Session ID: ${session.id}`);
       console.log(`PDF generated for: ${userEmail}`);
-      // console.log(`Download URL would be: ${downloadUrl}`);
-      console.log('PDF Data URI (for testing):', dataUri.substring(0, 100) + '...');
+      console.log(`PDF Buffer size: ${pdfBuffer.byteLength} bytes`);
 
-
-      // 4. Save download URL to Firestore
+      // 2. Save download URL to Firestore
       // await setDoc(doc(db, "reports", session.id), {
       //   userId: userEmail,
       //   downloadUrl: downloadUrl,
@@ -246,8 +242,7 @@ async function handleStripeWebhook(event: Stripe.Event) {
       console.log(`--- SIMULATING FIRESTORE WRITE ---`);
       console.log(`Saving report details for session: ${session.id}`);
 
-
-      // 5. Send the email with the download link
+      // 3. Send the email with the download link
       // await resend.emails.send({
       //   from: 'LoanZen <reports@loanzen.com>',
       //   to: [userEmail],
@@ -257,8 +252,45 @@ async function handleStripeWebhook(event: Stripe.Event) {
       console.log(`--- SIMULATING EMAIL SEND ---`);
       console.log(`Sending email to ${userEmail} with the report link.`);
     }
-  }
 }
+
+// This GET handler is a workaround for the demo to allow downloading the report.
+// In production, the "Thank You" page would get the download URL from Firestore
+// after the webhook has successfully processed the payment and uploaded the file.
+async function handleGetRequest(req: NextRequest) {
+    const sessionId = req.nextUrl.searchParams.get('session_id');
+    const shouldDownload = req.nextUrl.searchParams.get('download');
+
+    if (!sessionId || !shouldDownload) {
+        return NextResponse.json({ error: 'Missing session_id or download parameter' }, { status: 400 });
+    }
+
+    try {
+        const session = await stripe.checkout.sessions.retrieve(sessionId);
+        const formDataString = session.metadata?.formData;
+
+        if (!formDataString) {
+            return NextResponse.json({ error: 'Form data not found in session.' }, { status: 404 });
+        }
+
+        const formData: CalculatorFormData = JSON.parse(formDataString);
+        const results = performCalculations(formData);
+        const pdfBuffer = generateReportPdf(results);
+
+        return new NextResponse(pdfBuffer, {
+            status: 200,
+            headers: {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': 'attachment; filename="LoanZen-Report.pdf"',
+            },
+        });
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        console.error(`Failed to retrieve session or generate PDF: ${errorMessage}`);
+        return NextResponse.json({ error: `Failed to generate report: ${errorMessage}` }, { status: 500 });
+    }
+}
+
 
 export async function POST(req: Request) {
   const body = await req.text();
@@ -286,4 +318,14 @@ export async function POST(req: Request) {
      console.error(`Webhook handler failed: ${errorMessage}`);
      return NextResponse.json({ error: `Webhook handler error: ${errorMessage}` }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+    try {
+        return await handleGetRequest(req);
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        console.error(`GET request handler failed: ${errorMessage}`);
+        return NextResponse.json({ error: `An unexpected error occurred: ${errorMessage}` }, { status: 500 });
+    }
 }

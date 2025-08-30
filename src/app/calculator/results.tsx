@@ -81,7 +81,11 @@ export default function CalculatorResults({ results, formData, onBack }: Calcula
     } catch (error) {
       console.error("Checkout error:", error);
       const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred.';
-      setError(`Error: Could not process payment. Please try again. Details: ${errorMessage}`);
+       if (errorMessage.includes('Metadata values can have up to 500 characters')) {
+         setError(`Error: The loan scenario is too complex to process in one transaction. Please simplify and try again.`);
+       } else {
+         setError(`Error: Could not process payment. Please try again. Details: ${errorMessage}`);
+       }
     } finally {
       setIsSubmitting(false);
     }
