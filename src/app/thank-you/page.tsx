@@ -4,7 +4,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Download, Loader2 } from 'lucide-react';
+import { CheckCircle, Download, Loader2, Sheet } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -12,7 +12,8 @@ function ThankYouContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
   const [isGenerating, setIsGenerating] = useState(true);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [csvUrl, setCsvUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
@@ -26,12 +27,13 @@ function ThankYouContent() {
     // to wait for the webhook to update a document in the database with the download URL.
     // For this simulation, we'll just use a timeout to mimic the report generation time.
     const generationTimeout = setTimeout(() => {
-      // Here you would get the real downloadUrl from your database.
+      // Here you would get the real downloadUrls from your database.
       // We'll simulate a success. In a real app, you would need to handle errors.
-      // For the demo, we point to the webhook itself which will regenerate the PDF.
-      // In production, this URL should come from your database (e.g., Firestore) and point to a file in storage.
-      const simulatedUrl = `/api/stripe/webhook?session_id=${sessionId}&download=true`;
-      setDownloadUrl(simulatedUrl);
+      // For the demo, we point to the webhook itself which will regenerate the report.
+      const simulatedPdfUrl = `/api/stripe/webhook?session_id=${sessionId}&download=true&format=pdf`;
+      const simulatedCsvUrl = `/api/stripe/webhook?session_id=${sessionId}&download=true&format=csv`;
+      setPdfUrl(simulatedPdfUrl);
+      setCsvUrl(simulatedCsvUrl);
       setIsGenerating(false);
     }, 5000); // 5-second delay to simulate PDF generation and email sending
 
@@ -54,7 +56,7 @@ function ThankYouContent() {
           {isGenerating && (
             <div className="flex flex-col items-center gap-4 p-8">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground">Generating your personalized report... <br/>This may take a moment. Your report will also be sent to your email.</p>
+              <p className="text-muted-foreground">Generating your personalized reports... <br/>This may take a moment. Your reports will also be sent to your email.</p>
             </div>
           )}
 
@@ -62,15 +64,23 @@ function ThankYouContent() {
             <p className="text-destructive">{error}</p>
           )}
 
-          {!isGenerating && downloadUrl && (
-             <div>
-                <p>Your full loan report has been generated and sent to your email address.</p>
-                 <Button asChild size="lg" className="mt-6">
-                    <Link href={downloadUrl} download="LoanZen-Report.pdf">
-                        <Download className="mr-2"/>
-                        Download Your Report
-                    </Link>
-                </Button>
+          {!isGenerating && pdfUrl && csvUrl && (
+             <div className="space-y-4">
+                <p>Your full loan reports have been generated and sent to your email address.</p>
+                 <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                    <Button asChild size="lg">
+                        <Link href={pdfUrl} download="LoanZen-Report.pdf">
+                            <Download className="mr-2"/>
+                            Download PDF Report
+                        </Link>
+                    </Button>
+                     <Button asChild size="lg" variant="secondary">
+                        <Link href={csvUrl} download="LoanZen-Report.csv">
+                            <Sheet className="mr-2"/>
+                            Download CSV Report
+                        </Link>
+                    </Button>
+                </div>
             </div>
           )}
 

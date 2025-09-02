@@ -196,6 +196,31 @@ function generateReportPdf(results: CalculationResults): Buffer {
     return Buffer.from(pdfOutput);
 }
 
+// --- CSV Generation ---
+function generateCsvReport(results: CalculationResults): string {
+    const headers = [
+        'Scenario Name',
+        'Month',
+        'Monthly Payment',
+        'Principal',
+        'Interest',
+        'Remaining Balance'
+    ];
+
+    const rows = results.scenarios.flatMap(scenario =>
+        scenario.amortizationSchedule.map(row => [
+            `"${scenario.scenarioName.replace(/"/g, '""')}"`,
+            row.month,
+            row.monthlyPayment.toFixed(2),
+            row.principal.toFixed(2),
+            row.interest.toFixed(2),
+            row.remainingBalance.toFixed(2)
+        ].join(','))
+    );
+
+    return [headers.join(','), ...rows].join('\n');
+}
+
 
 async function handleStripeWebhook(event: Stripe.Event) {
     if (event.type !== 'checkout.session.completed') {
@@ -220,37 +245,44 @@ async function handleStripeWebhook(event: Stripe.Event) {
       
       const results = performCalculations(formData);
       const pdfBuffer = generateReportPdf(results);
+      const csvContent = generateCsvReport(results);
       
       // --- SIMULATION ---
       // In a real application, you would do the following:
-      // 1. Upload the PDF to Firebase Storage
-      // const storageRef = ref(storage, `reports/${session.id}.pdf`);
-      // const uploadResult = await uploadBytes(storageRef, pdfBuffer);
-      // const downloadUrl = await getDownloadURL(uploadResult.ref);
-      console.log(`--- SIMULATING PDF UPLOAD ---`);
+      // 1. Upload the PDF and CSV to Firebase Storage
+      // const storageRefPdf = ref(storage, `reports/${session.id}.pdf`);
+      // await uploadBytes(storageRefPdf, pdfBuffer);
+      // const downloadUrlPdf = await getDownloadURL(storageRefPdf);
+      // const storageRefCsv = ref(storage, `reports/${session.id}.csv`);
+      // await uploadString(storageRefCsv, csvContent, 'raw');
+      // const downloadUrlCsv = await getDownloadURL(storageRefCsv);
+      console.log(`--- SIMULATING REPORT UPLOAD ---`);
       console.log(`Session ID: ${session.id}`);
-      console.log(`PDF generated for: ${userEmail}`);
+      console.log(`Reports generated for: ${userEmail}`);
       console.log(`PDF Buffer size: ${pdfBuffer.byteLength} bytes`);
+      console.log(`CSV Content size: ${csvContent.length} chars`);
 
-      // 2. Save download URL to Firestore
+
+      // 2. Save download URLs to Firestore
       // await setDoc(doc(db, "reports", session.id), {
       //   userId: userEmail,
-      //   downloadUrl: downloadUrl,
+      //   downloadUrlPdf: downloadUrlPdf,
+      //   downloadUrlCsv: downloadUrlCsv,
       //   generatedAt: serverTimestamp(),
       //   status: 'completed'
       // });
       console.log(`--- SIMULATING FIRESTORE WRITE ---`);
       console.log(`Saving report details for session: ${session.id}`);
 
-      // 3. Send the email with the download link
+      // 3. Send the email with the download links
       // await resend.emails.send({
       //   from: 'LoanZen <reports@loanzen.com>',
       //   to: [userEmail],
       //   subject: 'Your LoanZen Report is Ready!',
-      //   html: `<h1>Thank You!</h1><p>Your report is ready. <a href="${downloadUrl}">Click here to download</a>.</p>`,
+      //   html: `<h1>Thank You!</h1><p>Your report is ready. <a href="${downloadUrlPdf}">Click here to download PDF</a> or <a href="${downloadUrlCsv}">download the CSV</a>.</p>`,
       // });
       console.log(`--- SIMULATING EMAIL SEND ---`);
-      console.log(`Sending email to ${userEmail} with the report link.`);
+      console.log(`Sending email to ${userEmail} with report links.`);
     }
 }
 
@@ -260,6 +292,7 @@ async function handleStripeWebhook(event: Stripe.Event) {
 async function handleGetRequest(req: NextRequest) {
     const sessionId = req.nextUrl.searchParams.get('session_id');
     const shouldDownload = req.nextUrl.searchParams.get('download');
+    const format = req.nextUrl.searchParams.get('format') || 'pdf'; // Default to pdf
 
     if (!sessionId || !shouldDownload) {
         return NextResponse.json({ error: 'Missing session_id or download parameter' }, { status: 400 });
@@ -275,8 +308,20 @@ async function handleGetRequest(req: NextRequest) {
 
         const formData: CalculatorFormData = JSON.parse(formDataString);
         const results = performCalculations(formData);
-        const pdfBuffer = generateReportPdf(results);
 
+        if (format === 'csv') {
+            const csvContent = generateCsvReport(results);
+            return new NextResponse(csvContent, {
+                status: 200,
+                headers: {
+                    'Content-Type': 'text/csv',
+                    'Content-Disposition': 'attachment; filename="LoanZen-Report.csv"',
+                },
+            });
+        }
+
+        // Default to PDF
+        const pdfBuffer = generateReportPdf(results);
         return new NextResponse(pdfBuffer, {
             status: 200,
             headers: {
@@ -284,9 +329,10 @@ async function handleGetRequest(req: NextRequest) {
                 'Content-Disposition': 'attachment; filename="LoanZen-Report.pdf"',
             },
         });
+
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        console.error(`Failed to retrieve session or generate PDF: ${errorMessage}`);
+        console.error(`Failed to retrieve session or generate report: ${errorMessage}`);
         return NextResponse.json({ error: `Failed to generate report: ${errorMessage}` }, { status: 500 });
     }
 }
