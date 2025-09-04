@@ -1,3 +1,4 @@
+
 // src/app/calculator/page.tsx
 'use client';
 
@@ -24,6 +25,7 @@ export type ScenarioResult = {
   monthlyPayment: number;
   amortizationSchedule: AmortizationData[];
   loanAmount: number;
+  interestRate: number; // Added interest rate
 };
 
 export type CalculationResults = {
@@ -89,6 +91,7 @@ function CalculatorContent() {
         monthlyPayment,
         amortizationSchedule,
         loanAmount: scenario.loanAmount,
+        interestRate: scenario.interestRate,
       };
     });
     setFormData(data);
@@ -144,3 +147,5 @@ export default function CalculatorPage() {
     </Suspense>
   )
 }
+
+    
