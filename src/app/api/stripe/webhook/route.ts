@@ -118,24 +118,6 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
-function generateAsciiBarChart(scenarios: ScenarioResult[]): string {
-    const maxBarLength = 40;
-    const maxValue = Math.max(...scenarios.map(s => s.totalPayment));
-    
-    let chart = 'Total Cost of Loan\n';
-    chart += '────────────────────────────────────────────────────────────\n';
-
-    scenarios.forEach(scenario => {
-        const barLength = Math.round((scenario.totalPayment / maxValue) * maxBarLength);
-        const bar = '█'.repeat(barLength);
-        const label = `${scenario.scenarioName} @ ${scenario.interestRate}%`;
-        chart += `${label.padEnd(25)} ${bar} (${formatCurrency(scenario.totalPayment)})\n`;
-    });
-
-    chart += '────────────────────────────────────────────────────────────\n';
-    return chart;
-}
-
 function generateReportPdf(results: CalculationResults, userEmail: string): Buffer {
     const doc = new jsPDF() as jsPDFWithPlugins;
     const couponCode = generateCouponCode();
@@ -261,32 +243,10 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
          });
          yPos = (doc as any).lastAutoTable.finalY;
     }
-    
-    // --- Page 3: ASCII Visual Comparison ---
-    if (results.scenarios.length > 1) {
-        doc.addPage();
-        addHeader('Visual Comparison');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.text(`Visual Comparison of Loan Costs`, 14, yPos);
-        yPos += 15;
 
-        doc.setFont('courier', 'normal');
-        doc.setFontSize(10);
-        const chartText = generateAsciiBarChart(results.scenarios);
-        doc.text(chartText, 14, yPos, {
-            lineHeightFactor: 1.5
-        });
-        yPos += 60; // Adjust as needed
-    }
-
-    // --- Page 4: Amortization Schedule ---
+    // --- Page 3: Amortization Schedule ---
     results.scenarios.forEach((scenario, index) => {
-        if (index > 0 && results.scenarios.length > 1) {
-            // don't create a new page for every scenario unless necessary
-        } else {
-            doc.addPage();
-        }
+        doc.addPage();
         addHeader('Amortization Schedule');
         
         const schedule = scenario.amortizationSchedule;
