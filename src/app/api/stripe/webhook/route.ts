@@ -115,7 +115,25 @@ function generateCouponCode(): string {
 }
 
 const formatCurrency = (value: number) => {
-    return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+function generateAsciiBarChart(scenarios: ScenarioResult[]): string {
+    const maxBarLength = 40;
+    const maxValue = Math.max(...scenarios.map(s => s.totalPayment));
+    
+    let chart = 'Total Cost of Loan\n';
+    chart += '────────────────────────────────────────────────────────────\n';
+
+    scenarios.forEach(scenario => {
+        const barLength = Math.round((scenario.totalPayment / maxValue) * maxBarLength);
+        const bar = '█'.repeat(barLength);
+        const label = `${scenario.scenarioName} @ ${scenario.interestRate}%`;
+        chart += `${label.padEnd(25)} ${bar} (${formatCurrency(scenario.totalPayment)})\n`;
+    });
+
+    chart += '────────────────────────────────────────────────────────────\n';
+    return chart;
 }
 
 function generateReportPdf(results: CalculationResults, userEmail: string): Buffer {
@@ -128,7 +146,7 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
     const addHeader = (title: string) => {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(24);
-        doc.setTextColor(39, 59, 122); // #273B7A, a slightly darker primary for text
+        doc.setTextColor(39, 59, 122); // A slightly darker primary for text
         doc.text('LoanZen', 105, 20, { align: 'center' });
 
         doc.setFont('helvetica', 'normal');
@@ -155,7 +173,7 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
     // --- Page 1: Cover Page ---
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(40);
-    doc.setTextColor(63, 81, 181); // Primary color #3F51B5
+    doc.setTextColor(63, 81, 181); // Primary color
     doc.text('LoanZen', 105, 80, { align: 'center' });
 
     doc.setFontSize(22);
@@ -202,9 +220,9 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
 
         const summaryHead = [['', ...results.scenarios.map(s => `${s.scenarioName} @ ${s.interestRate}%`), 'Difference']];
         const summaryBody = [
-            ['Monthly Payment', ...results.scenarios.map(s => formatCurrency(s.monthlyPayment)), formatCurrency(bestScenario.monthlyPayment - worstScenario.monthlyPayment)],
-            ['Total Interest', ...results.scenarios.map(s => formatCurrency(s.totalInterest)), formatCurrency(bestScenario.totalInterest - worstScenario.totalInterest)],
-            ['Total Cost of Loan', ...results.scenarios.map(s => formatCurrency(s.totalPayment)), formatCurrency(bestScenario.totalPayment - worstScenario.totalPayment)]
+            ['Monthly Payment', ...results.scenarios.map(s => formatCurrency(s.monthlyPayment)), formatCurrency(worstScenario.monthlyPayment - bestScenario.monthlyPayment)],
+            ['Total Interest', ...results.scenarios.map(s => formatCurrency(s.totalInterest)), formatCurrency(worstScenario.totalInterest - bestScenario.totalInterest)],
+            ['Total Cost of Loan', ...results.scenarios.map(s => formatCurrency(s.totalPayment)), formatCurrency(worstScenario.totalPayment - bestScenario.totalPayment)]
         ];
 
         doc.autoTable({
@@ -243,10 +261,32 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
          });
          yPos = (doc as any).lastAutoTable.finalY;
     }
-
-    // --- Page 3: Amortization Schedule ---
-    results.scenarios.forEach((scenario) => {
+    
+    // --- Page 3: ASCII Visual Comparison ---
+    if (results.scenarios.length > 1) {
         doc.addPage();
+        addHeader('Visual Comparison');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text(`Visual Comparison of Loan Costs`, 14, yPos);
+        yPos += 15;
+
+        doc.setFont('courier', 'normal');
+        doc.setFontSize(10);
+        const chartText = generateAsciiBarChart(results.scenarios);
+        doc.text(chartText, 14, yPos, {
+            lineHeightFactor: 1.5
+        });
+        yPos += 60; // Adjust as needed
+    }
+
+    // --- Page 4: Amortization Schedule ---
+    results.scenarios.forEach((scenario, index) => {
+        if (index > 0 && results.scenarios.length > 1) {
+            // don't create a new page for every scenario unless necessary
+        } else {
+            doc.addPage();
+        }
         addHeader('Amortization Schedule');
         
         const schedule = scenario.amortizationSchedule;
@@ -275,10 +315,10 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
             headStyles: { fillColor: [63, 81, 181] },
             margin: { left: 14, right: 14 }
         });
-        yPos = (doc as any).lastAutoTable.finalY + 5;
+        const finalY = (doc as any).lastAutoTable.finalY + 5;
         doc.setFontSize(9);
         doc.setTextColor(100);
-        doc.text("A full amortization schedule is available in the accompanying CSV file.", 14, yPos);
+        doc.text("A full amortization schedule is available in the accompanying CSV file.", 14, finalY);
         yPos=0; // Reset yPos for next scenario if any
     });
 
@@ -329,6 +369,7 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
     const pdfOutput = doc.output('arraybuffer');
     return Buffer.from(pdfOutput);
 }
+
 
 // --- CSV Generation ---
 function generateCsvReport(results: CalculationResults): string {
@@ -514,7 +555,3 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: `An unexpected error occurred: ${errorMessage}` }, { status: 500 });
     }
 }
-
-    
-
-    
