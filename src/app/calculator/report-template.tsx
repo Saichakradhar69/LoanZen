@@ -105,8 +105,7 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
             <tr className="border-b">
               <td className="p-3">Monthly Payment</td>
               {scenarios.map(s => <td key={s.scenarioName} className="p-3 text-right">{formatCurrency(s.monthlyPayment)}</td>)}
-              {hasMultipleSce
-narios && <td className="p-3 text-right">{formatCurrency(bestScenario.monthlyPayment - worstScenario.monthlyPayment)}</td>}
+              {hasMultipleScenarios && <td className="p-3 text-right">{formatCurrency(bestScenario.monthlyPayment - worstScenario.monthlyPayment)}</td>}
             </tr>
              <tr className="border-b">
               <td className="p-3">Total Interest Paid</td>
