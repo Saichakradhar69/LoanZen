@@ -8,10 +8,9 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import type { FormData as CalculatorFormData } from '@/app/calculator/form';
 
-// Extend the jsPDF type to include the autoTable and svg methods
+// Extend the jsPDF type to include the autoTable method
 interface jsPDFWithPlugins extends jsPDF {
   autoTable: (options: any) => jsPDF;
-  svg: (svg: string, options: any) => Promise<jsPDF>;
 }
 
 // --- Data types needed for recalculation ---
@@ -119,56 +118,11 @@ const formatCurrency = (value: number) => {
     return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' });
 }
 
-function generateBarChartSvg(scenarios: ScenarioResult[]): string {
-    const chartWidth = 500;
-    const chartHeight = 250;
-    const barWidth = 40;
-    const chartXStart = 60;
-    const chartYStart = 20;
-
-    const values = scenarios.map(s => s.totalPayment);
-    const maxValue = Math.max(...values);
-    const scale = (chartHeight - 30) / maxValue; // -30 for label space
-
-    const colors = ["#3F51B5", "#FFAB40"];
-
-    let bars = '';
-    let labels = '';
-
-    const totalBarWidth = scenarios.length * barWidth;
-    const totalSpacing = chartWidth - totalBarWidth - chartXStart;
-    const spacing = totalSpacing / (scenarios.length + 1);
-
-    scenarios.forEach((scenario, index) => {
-        const barHeight = scenario.totalPayment * scale;
-        const x = chartXStart + spacing * (index + 1) + barWidth * index;
-        const y = chartYStart + (chartHeight - 30 - barHeight);
-        
-        bars += `<rect x="${x}" y="${y}" width="${barWidth}" height="${barHeight}" fill="${colors[index % colors.length]}" />`;
-        bars += `<text x="${x + barWidth / 2}" y="${y - 5}" text-anchor="middle" font-family="helvetica" font-size="10" fill="#333">${formatCurrency(scenario.totalPayment)}</text>`;
-        labels += `<text x="${x + barWidth / 2}" y="${chartYStart + chartHeight - 5}" text-anchor="middle" font-family="helvetica" font-size="10" fill="#333">${scenario.scenarioName} @ ${scenario.interestRate}%</text>`;
-    });
-
-    return `
-        <svg width="550" height="300" xmlns="http://www.w3.org/2000/svg">
-            <g transform="translate(20, 20)">
-                <line x1="${chartXStart - 10}" y1="${chartYStart - 10}" x2="${chartXStart - 10}" y2="${chartYStart + chartHeight - 30}" stroke="#333" stroke-width="1" />
-                <line x1="${chartXStart - 10}" y1="${chartYStart + chartHeight - 30}" x2="${chartWidth}" y2="${chartYStart + chartHeight - 30}" stroke="#333" stroke-width="1" />
-                <text x="10" y="${chartYStart + (chartHeight - 30) / 2}" text-anchor="middle" font-family="helvetica" font-size="10" fill="#333" transform="rotate(-90, 10, ${chartYStart + (chartHeight - 30) / 2})">Total Cost ($)</text>
-                ${bars}
-                ${labels}
-            </g>
-        </svg>
-    `;
-}
-
-
-async function generateReportPdf(results: CalculationResults, userEmail: string): Promise<Buffer> {
+function generateReportPdf(results: CalculationResults, userEmail: string): Buffer {
     const doc = new jsPDF() as jsPDFWithPlugins;
     const couponCode = generateCouponCode();
     const pageHeight = doc.internal.pageSize.height;
     let yPos = 0;
-    let pageCount = 0;
 
     // --- Helper Functions for PDF construction ---
     const addHeader = (title: string) => {
@@ -216,7 +170,6 @@ async function generateReportPdf(results: CalculationResults, userEmail: string)
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.text('This report is for informational purposes only. All calculations are estimates based on the data you provided.', 105, 250, { align: 'center', maxWidth: 180 });
-    pageCount++;
 
     // --- Page 2: Executive Summary ---
     doc.addPage();
@@ -290,32 +243,9 @@ async function generateReportPdf(results: CalculationResults, userEmail: string)
          });
          yPos = (doc as any).lastAutoTable.finalY;
     }
-    pageCount++;
 
-    // --- Page 3: Visual Comparison (if multiple scenarios) ---
-    if (results.scenarios.length > 1) {
-        doc.addPage();
-        addHeader("Visual Breakdown");
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.text("Total Cost of Loan Comparison", 105, yPos, { align: 'center' });
-        yPos += 15;
-
-        const svgString = generateBarChartSvg(results.scenarios);
-        await doc.svg(svgString, {
-            x: 14,
-            y: yPos,
-            width: 180,
-            height: 100
-        });
-
-        pageCount++;
-    }
-
-
-    // --- Page 4: Amortization Schedule ---
-    results.scenarios.forEach((scenario, index) => {
+    // --- Page 3: Amortization Schedule ---
+    results.scenarios.forEach((scenario) => {
         doc.addPage();
         addHeader('Amortization Schedule');
         
@@ -349,8 +279,8 @@ async function generateReportPdf(results: CalculationResults, userEmail: string)
         doc.setFontSize(9);
         doc.setTextColor(100);
         doc.text("A full amortization schedule is available in the accompanying CSV file.", 14, yPos);
+        yPos=0; // Reset yPos for next scenario if any
     });
-    pageCount += results.scenarios.length;
 
     // --- Final Page: Next Steps & Upsell ---
     doc.addPage();
@@ -394,7 +324,6 @@ async function generateReportPdf(results: CalculationResults, userEmail: string)
     doc.setFont('courier', 'bold');
     doc.setFontSize(18);
     doc.text(couponCode, 105, yPos + 12.5, { align: 'center' });
-    pageCount++;
 
     addFooter();
     const pdfOutput = doc.output('arraybuffer');
@@ -449,7 +378,7 @@ async function handleStripeWebhook(event: Stripe.Event) {
       }
       
       const results = performCalculations(formData);
-      const pdfBuffer = await generateReportPdf(results, userEmail);
+      const pdfBuffer = generateReportPdf(results, userEmail);
       const csvContent = generateCsvReport(results);
       
       // --- SIMULATION ---
@@ -531,7 +460,7 @@ async function handleGetRequest(req: NextRequest) {
         }
 
         // Default to PDF
-        const pdfBuffer = await generateReportPdf(results, userEmail);
+        const pdfBuffer = generateReportPdf(results, userEmail);
         return new NextResponse(pdfBuffer, {
             status: 200,
             headers: {
