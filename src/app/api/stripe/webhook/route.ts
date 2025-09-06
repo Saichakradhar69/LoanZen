@@ -171,9 +171,11 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
     doc.text(`Prepared for: ${userEmail}`, pageWidth / 2, 130, { align: 'center' });
     doc.text(`Date Generated: ${new Date().toLocaleDateString()}`, pageWidth / 2, 137, { align: 'center' });
 
+    yPos = 250;
     doc.setFontSize(8);
     doc.setTextColor(150);
-    doc.text('This report is for informational purposes only. All calculations are estimates based on the data you provided.', pageWidth / 2, 250, { align: 'center', maxWidth: 180 });
+    const disclaimerText = 'This report is for informational purposes only. All calculations are estimates based on the data you provided.';
+    doc.text(disclaimerText, pageWidth / 2, yPos, { align: 'center', maxWidth: 180 });
 
     // --- Page 2: Executive Summary ---
     doc.addPage();
@@ -225,7 +227,7 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
     } else {
          const scenario = results.scenarios[0];
          doc.setFont('helvetica', 'bold');
-         docsetFontSize(16);
+         doc.setFontSize(16);
          doc.text(`Loan Overview: "${scenario.scenarioName}"`, leftMargin, yPos);
          yPos += 10;
          doc.setFont('helvetica', 'normal');
@@ -322,7 +324,7 @@ function generateReportPdf(results: CalculationResults, userEmail: string): Buff
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
-    const nextStepsText = "Your loan journey doesn't end at signing. Use your exclusive code below to try LoanZen Tracker Pro free for 30 days. Add your real loan details to get reminders before payments are due, see the impact of making extra payments, and track your progress to becoming debt-free.";
+    const nextStepsText = "Your loan journey doesn't end at signing. Use your exclusive code below to try LoanZen Tracker Pro free for 14 days. Add your real loan details to get reminders before payments are due, see the impact of making extra payments, and track your progress to becoming debt-free.";
     doc.text(nextStepsText, pageWidth / 2, yPos, {maxWidth: contentWidth - 20, align: 'center'});
     yPos += 30;
     

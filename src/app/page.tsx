@@ -196,7 +196,7 @@ export default function HomePage() {
                 <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Full amortization schedule</div>
                 <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> Emailed PDF/Excel report</div>
                 <div className="font-bold text-center pt-2">Plus a free gift:</div>
-                <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> 1-Month Tracker Pro Coupon</div>
+                <div className="flex items-center gap-2"><Check className="text-green-500 w-4 h-4"/> 14-Day Tracker Pro Coupon</div>
               </CardContent>
               <CardFooter>
                 <Button className="w-full" asChild><Link href="/calculator">Get Your Report</Link></Button>
