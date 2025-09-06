@@ -1,44 +1,81 @@
 
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Download, Loader2, Sheet } from 'lucide-react';
+import { CheckCircle, Download, Loader2, FileText, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import type { CalculationResults } from '@/app/api/stripe/webhook/route';
+import ReportTemplate from '@/app/calculator/report-template';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 
 function ThankYouContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
-  const [isGenerating, setIsGenerating] = useState(true);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-  const [csvUrl, setCsvUrl] = useState<string | null>(null);
+  
+  const [reportData, setReportData] = useState<CalculationResults | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const reportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
     if (!sessionId) {
       setError("No session ID found. Cannot verify purchase.");
-      setIsGenerating(false);
+      setIsLoading(false);
       return;
     }
 
-    // In a real app, you would use a real-time listener (like Firebase's onSnapshot)
-    // to wait for the webhook to update a document in the database with the download URL.
-    // For this simulation, we'll just use a timeout to mimic the report generation time.
-    const generationTimeout = setTimeout(() => {
-      // Here you would get the real downloadUrls from your database.
-      // We'll simulate a success. In a real app, you would need to handle errors.
-      // For the demo, we point to the webhook itself which will regenerate the report.
-      const simulatedPdfUrl = `/api/stripe/webhook?session_id=${sessionId}&download=true&format=pdf`;
-      const simulatedCsvUrl = `/api/stripe/webhook?session_id=${sessionId}&download=true&format=csv`;
-      setPdfUrl(simulatedPdfUrl);
-      setCsvUrl(simulatedCsvUrl);
-      setIsGenerating(false);
-    }, 5000); // 5-second delay to simulate PDF generation and email sending
+    const fetchData = async () => {
+        try {
+            const res = await fetch(`/api/stripe/webhook?session_id=${sessionId}`);
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.error || 'Failed to fetch report data.');
+            }
+            const data: CalculationResults = await res.json();
+            setReportData(data);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            setError(errorMessage);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-    return () => clearTimeout(generationTimeout);
+    fetchData();
   }, [sessionId]);
+
+  const handleDownloadPdf = async () => {
+    if (!reportRef.current) return;
+    setIsGenerating(true);
+    try {
+        const canvas = await html2canvas(reportRef.current, {
+            scale: 2, // Higher scale for better quality
+        });
+        const imgData = canvas.toDataURL('image/png');
+        
+        const pdf = new jsPDF({
+            orientation: 'p',
+            unit: 'px',
+            format: [canvas.width, canvas.height]
+        });
+
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save('LoanZen-Report.pdf');
+
+    } catch (e) {
+        console.error("PDF Generation Error: ", e);
+        setError("Sorry, there was an error generating the PDF.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+  
+  // TODO: Add CSV Download Handler
 
   return (
     <div className="container mx-auto max-w-2xl py-12 px-4 flex items-center justify-center min-h-[60vh]">
@@ -49,36 +86,38 @@ function ThankYouContent() {
           </div>
           <CardTitle className="text-3xl font-headline mt-4">Payment Successful!</CardTitle>
           <CardDescription className="text-lg">
-            Thank you for your purchase.
+            Thank you for your purchase. Your report is ready to download.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {isGenerating && (
+          {isLoading && (
             <div className="flex flex-col items-center gap-4 p-8">
               <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground">Generating your personalized reports... <br/>This may take a moment. Your reports will also be sent to your email.</p>
+              <p className="text-muted-foreground">Retrieving your calculation data...</p>
             </div>
           )}
 
           {error && (
-            <p className="text-destructive">{error}</p>
+             <div className="flex flex-col items-center gap-4 p-8 bg-destructive/10 rounded-lg">
+              <AlertCircle className="h-12 w-12 text-destructive" />
+              <p className="text-destructive font-semibold">Could not load report data</p>
+              <p className="text-muted-foreground text-sm">{error}</p>
+            </div>
           )}
 
-          {!isGenerating && pdfUrl && csvUrl && (
+          {reportData && !error && (
              <div className="space-y-4">
-                <p>Your full loan reports have been generated and sent to your email address.</p>
                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Button asChild size="lg">
-                        <Link href={pdfUrl} download="LoanZen-Report.pdf">
-                            <Download className="mr-2"/>
-                            Download PDF Report
-                        </Link>
+                    <Button onClick={handleDownloadPdf} disabled={isGenerating} size="lg">
+                        {isGenerating ? (
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</>
+                        ) : (
+                            <><Download className="mr-2"/> Download PDF Report</>
+                        )}
                     </Button>
-                     <Button asChild size="lg" variant="secondary">
-                        <Link href={csvUrl} download="LoanZen-Report.csv">
-                            <Sheet className="mr-2"/>
-                            Download CSV Report
-                        </Link>
+                     <Button size="lg" variant="secondary" disabled>
+                        <FileText className="mr-2"/>
+                        Download CSV
                     </Button>
                 </div>
             </div>
@@ -89,9 +128,15 @@ function ThankYouContent() {
                 <Link href="/">Return to Homepage</Link>
              </Button>
           </div>
-
         </CardContent>
       </Card>
+      
+      {/* Hidden component used for PDF generation */}
+      <div className="absolute top-0 left-0 -z-50 opacity-0" aria-hidden="true">
+        <div ref={reportRef}>
+            {reportData && <ReportTemplate reportData={reportData} />}
+        </div>
+      </div>
     </div>
   );
 }
