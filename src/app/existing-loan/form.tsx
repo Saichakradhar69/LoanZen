@@ -1,14 +1,14 @@
 
 'use client';
 
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CalendarIcon, Info, Plus, Trash2, Zap } from 'lucide-react';
+import { CalendarIcon, Info, Loader2, Plus, Trash2, Zap } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -17,6 +17,10 @@ import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useActionState } from 'react';
+import { calculateOutstandingBalanceAction } from './actions';
+import { useFormStatus } from 'react-dom';
+
 
 const disbursementSchema = z.object({
   date: z.date({ required_error: 'Disbursement date is required.' }),
@@ -58,7 +62,29 @@ const formSchema = z.object({
 
 export type ExistingLoanFormData = z.infer<typeof formSchema>;
 
+function SubmitButton() {
+    const { pending } = useFormStatus();
+    return (
+        <Button type="submit" size="lg" disabled={pending}>
+            {pending ? (
+                <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Calculating...
+                </>
+            ) : (
+                <>
+                    <Zap className="mr-2" />
+                    Calculate My Outstanding Balance
+                </>
+            )}
+        </Button>
+    )
+}
+
+
 export default function ExistingLoanForm() {
+    const [state, formAction] = useActionState(calculateOutstandingBalanceAction, null);
+
     const form = useForm<ExistingLoanFormData>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -83,8 +109,19 @@ export default function ExistingLoanForm() {
     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
 
     const onSubmit = (data: ExistingLoanFormData) => {
-        console.log(data);
-        // TODO: Wire up to server action for calculation
+        const formData = new FormData();
+        Object.entries(data).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+                if (value instanceof Date) {
+                    formData.append(key, value.toISOString());
+                } else if (Array.isArray(value)) {
+                    formData.append(key, JSON.stringify(value));
+                } else {
+                    formData.append(key, String(value));
+                }
+            }
+        });
+        formAction(formData);
     };
 
     const renderCommonFields = () => (
@@ -93,7 +130,7 @@ export default function ExistingLoanForm() {
                 <FormItem>
                     <FormLabel>Original Loan Amount</FormLabel>
                     <FormControl><Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} /></FormControl>
-                    <FormMessage />
+                    <FormMessage>{state?.errors?.originalLoanAmount?.[0]}</FormMessage>
                 </FormItem>
             )} />
              <FormField control={form.control} name="disbursementDate" render={({ field }) => (
@@ -306,13 +343,18 @@ export default function ExistingLoanForm() {
                         </div>
                         
                         <div className="flex justify-end pt-4">
-                            <Button type="submit" size="lg">
-                                <Zap className="mr-2" />
-                                Calculate My Outstanding Balance
-                            </Button>
+                           <SubmitButton />
                         </div>
                     </form>
                 </Form>
+                 {state?.type === 'success' && (
+                    <div className="mt-8 p-6 bg-secondary rounded-lg">
+                        <h3 className="text-xl font-bold text-primary">Calculation Result</h3>
+                        <p>Outstanding Balance: ${state.data.outstandingBalance.toFixed(2)}</p>
+                        <p>Interest Paid to Date: ${state.data.interestPaidToDate.toFixed(2)}</p>
+                        <p>Next EMI Date: {new Date(state.data.nextEmiDate).toLocaleDateString()}</p>
+                    </div>
+                 )}
             </CardContent>
         </Card>
     );
