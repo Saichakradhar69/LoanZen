@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
@@ -62,6 +63,12 @@ export default function ExistingLoanForm() {
         defaultValues: {
             loanType: 'personal',
             interestType: 'reducing',
+            originalLoanAmount: undefined,
+            disbursementDate: undefined,
+            interestRate: undefined,
+            emiAmount: undefined,
+            moratoriumPeriod: undefined,
+            emisPaid: undefined,
             disbursements: [{ date: new Date(), amount: 0 }],
             rateChanges: [{ date: new Date(), rate: 0 }],
             transactions: [{ date: new Date(), type: 'withdrawal', amount: 0 }]
@@ -84,7 +91,7 @@ export default function ExistingLoanForm() {
             <FormField control={form.control} name="originalLoanAmount" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Original Loan Amount</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 50000" {...field} /></FormControl>
+                    <FormControl><Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} /></FormControl>
                     <FormMessage />
                 </FormItem>
             )} />
@@ -110,7 +117,7 @@ export default function ExistingLoanForm() {
             <FormField control={form.control} name="interestRate" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Interest Rate (%)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 8.5" {...field} /></FormControl>
+                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 8.5" {...field} value={field.value ?? ''} /></FormControl>
                     <FormMessage />
                 </FormItem>
             )} />
@@ -135,7 +142,7 @@ export default function ExistingLoanForm() {
              <FormField control={form.control} name="emiAmount" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Monthly Payment (EMI) Amount (Optional)</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 1200" {...field} /></FormControl>
+                    <FormControl><Input type="number" placeholder="e.g., 1200" {...field} value={field.value ?? ''} /></FormControl>
                     <FormMessage />
                 </FormItem>
             )} />
@@ -150,7 +157,7 @@ export default function ExistingLoanForm() {
                         <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Moratorium Period (in months)</FormLabel>
-                                <FormControl><Input type="number" placeholder="e.g., 6" {...field} /></FormControl>
+                                <FormControl><Input type="number" placeholder="e.g., 6" {...field} value={field.value ?? ''} /></FormControl>
                                 <FormMessage />
                             </FormItem>
                         )} />
@@ -234,7 +241,7 @@ export default function ExistingLoanForm() {
                     <FormField control={form.control} name="emisPaid" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Number of EMIs Already Paid (Optional)</FormLabel>
-                            <FormControl><Input type="number" placeholder="e.g., 12" {...field} /></FormControl>
+                            <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
@@ -291,3 +298,5 @@ export default function ExistingLoanForm() {
         </Card>
     );
 }
+
+    
