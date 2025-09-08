@@ -58,7 +58,7 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
             <p className="text-3xl font-semibold mt-12">Loan Comparison Analysis Report</p>
             <div className="mt-24 text-lg">
               <p>Prepared for: {userEmail || 'Valued Customer'}</p>
-              <p>Date Generated: {new Date(generatedAt).toLocaleDateTimeString()}</p>
+              <p>Date Generated: {new Date(generatedAt).toLocaleString()}</p>
             </div>
           </div>
           <p className="text-center text-xs text-gray-500 pb-4">
