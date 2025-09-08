@@ -55,7 +55,7 @@ function ThankYouContent() {
     
     try {
         const reportElement = reportRef.current;
-        const pdf = new jsPDF('p', 'px');
+        const pdf = new jsPDF('p', 'px', 'a4');
         const pageElements = reportElement.querySelectorAll('.pdf-page') as NodeListOf<HTMLElement>;
         const pdfWidth = pdf.internal.pageSize.getWidth();
         
@@ -66,7 +66,9 @@ function ThankYouContent() {
                 useCORS: true,
                 logging: false,
                 width: pageElement.offsetWidth,
-                height: pageElement.offsetHeight
+                height: pageElement.offsetHeight,
+                windowWidth: pageElement.scrollWidth,
+                windowHeight: pageElement.scrollHeight
             });
 
             const imgData = canvas.toDataURL('image/png');
@@ -91,27 +93,72 @@ function ThankYouContent() {
   const handleDownloadCsv = () => {
     if (!reportData) return;
 
-    let csvContent = "Scenario,Month,Principal,Interest,Remaining Balance\n";
+    const lines: string[] = [];
+    const today = new Date().toISOString().split('T')[0];
 
-    reportData.scenarios.forEach((scenario: ScenarioResult) => {
-        scenario.amortizationSchedule.forEach(row => {
-            const csvRow = [
-                `"${scenario.scenarioName.replace(/"/g, '""')}"`,
-                row.month,
-                row.principal,
-                row.interest,
-                row.remainingBalance
-            ].join(',');
-            csvContent += csvRow + "\n";
-        });
+    // 1. Add Header and Metadata
+    lines.push('LoanZen - Amortization Data');
+    lines.push(`Generated: ${today} for ${reportData.userEmail || 'N/A'}`);
+    lines.push('');
+
+    // 2. Add Summary Section
+    lines.push('[SUMMARY]');
+    lines.push('Scenario,Loan Amount,Interest Rate (%),Term (Years),Monthly Payment,Total Interest,Total Cost');
+    reportData.scenarios.forEach((scenario) => {
+      lines.push(
+        [
+          `"${scenario.scenarioName.replace(/"/g, '""')}"`,
+          scenario.loanAmount,
+          scenario.interestRate,
+          scenario.loanTerm,
+          scenario.monthlyPayment,
+          scenario.totalInterest,
+          scenario.totalPayment,
+        ].join(',')
+      );
     });
+    lines.push('');
 
+    // 3. Add Amortization Schedule for each Scenario
+    reportData.scenarios.forEach((scenario) => {
+      lines.push(`[AMORTIZATION_SCHEDULE: ${scenario.scenarioName.replace(/"/g, '""')}]`);
+      lines.push('Month,Payment Date,Beginning Balance,Payment,Principal,Interest,Ending Balance');
+      
+      let runningBalance = scenario.loanAmount;
+      const monthlyInterestRate = scenario.interestRate / 100 / 12;
+
+      scenario.amortizationSchedule.forEach((payment, monthIndex) => {
+        // Since we don't have a start date, we'll calculate from today.
+        let paymentDate = new Date();
+        paymentDate.setMonth(paymentDate.getMonth() + monthIndex + 1);
+        const dateString = paymentDate.toISOString().split('T')[0];
+        
+        const beginningBalance = payment.remainingBalance + payment.principal;
+
+        lines.push(
+          [
+            payment.month,
+            dateString,
+            beginningBalance.toFixed(2),
+            payment.monthlyPayment.toFixed(2),
+            payment.principal.toFixed(2),
+            payment.interest.toFixed(2),
+            payment.remainingBalance.toFixed(2),
+          ].join(',')
+        );
+      });
+      lines.push('');
+    });
+    
+    const csvContent = lines.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
+
     if (link.download !== undefined) {
         const url = URL.createObjectURL(blob);
+        const fileName = `LoanZen-Report_${today}.csv`;
         link.setAttribute("href", url);
-        link.setAttribute("download", "LoanZen-Amortization-Schedule.csv");
+        link.setAttribute("download", fileName);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
