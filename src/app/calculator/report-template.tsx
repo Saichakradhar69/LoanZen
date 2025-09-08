@@ -47,7 +47,7 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     }));
     
     return (
-      <div className="bg-white text-gray-800 font-sans" style={{width: '800px'}}>
+        <div className="bg-white text-gray-800 font-sans" style={{width: '800px'}}>
         {/* Page 1: Cover */}
         <div className="pdf-page h-full flex flex-col justify-between p-10">
           <div className="text-center pt-24">
@@ -58,7 +58,7 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
             <p className="text-3xl font-semibold mt-12">Loan Comparison Analysis Report</p>
             <div className="mt-24 text-lg">
               <p>Prepared for: {userEmail || 'Valued Customer'}</p>
-              <p>Date Generated: {new Date(generatedAt).toLocaleDateString()}</p>
+              <p>Date Generated: {new Date(generatedAt).toLocaleDateTimeString()}</p>
             </div>
           </div>
           <p className="text-center text-xs text-gray-500 pb-4">
@@ -102,17 +102,17 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
               <tr className="border-b">
                 <td className="p-3">Monthly Payment</td>
                 {scenarios.map(s => <td key={s.scenarioName} className="p-3 text-right">{formatCurrency(s.monthlyPayment)}</td>)}
-                {hasMultipleScenarios && <td className="p-3 text-right">{formatCurrency(bestScenario.monthlyPayment - worstScenario.monthlyPayment)}</td>}
+                {hasMultipleScenarios && <td className="p-3 text-right">{formatCurrency(Math.abs(bestScenario.monthlyPayment - worstScenario.monthlyPayment))}</td>}
               </tr>
                <tr className="border-b">
                 <td className="p-3">Total Interest Paid</td>
                 {scenarios.map(s => <td key={s.scenarioName} className="p-3 text-right text-red-600">{formatCurrency(s.totalInterest)}</td>)}
-                {hasMultipleScenarios && <td className="p-3 text-right text-red-600">{formatCurrency(bestScenario.totalInterest - worstScenario.totalInterest)}</td>}
+                {hasMultipleScenarios && <td className="p-3 text-right text-red-600">{formatCurrency(Math.abs(bestScenario.totalInterest - worstScenario.totalInterest))}</td>}
               </tr>
                <tr className="border-b">
                 <td className="p-3 font-bold">Total Cost of Loan</td>
                 {scenarios.map(s => <td key={s.scenarioName} className="p-3 text-right font-bold">{formatCurrency(s.totalPayment)}</td>)}
-                {hasMultipleScenarios && <td className="p-3 text-right font-bold">{formatCurrency(bestScenario.totalPayment - worstScenario.totalPayment)}</td>}
+                {hasMultipleScenarios && <td className="p-3 text-right font-bold">{formatCurrency(Math.abs(bestScenario.totalPayment - worstScenario.totalPayment))}</td>}
               </tr>
             </tbody>
           </table>
@@ -138,7 +138,7 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
             </div>
           )}
 
-          <div className="grid grid-cols-1 gap-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
             {scenarios.map((scenario) => {
               const pieData = [
                 { name: 'Principal', value: scenario.loanAmount },
@@ -174,6 +174,7 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
                    <thead className="bg-gray-100">
                       <tr>
                           <th className="p-2">Month</th>
+                          <th className="p-2 text-right">Payment</th>
                           <th className="p-2 text-right">Principal</th>
                           <th className="p-2 text-right">Interest</th>
                           <th className="p-2 text-right">Balance</th>
@@ -183,6 +184,7 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
                       {scenario.amortizationSchedule.slice(0, 12).map(row => (
                           <tr key={row.month} className="border-b">
                               <td className="p-2">{row.month}</td>
+                              <td className="p-2 text-right">{formatCurrency(row.monthlyPayment)}</td>
                               <td className="p-2 text-right">{formatCurrency(row.principal)}</td>
                               <td className="p-2 text-right">{formatCurrency(row.interest)}</td>
                               <td className="p-2 text-right">{formatCurrency(row.remainingBalance)}</td>
@@ -190,12 +192,13 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
                       ))}
                       {scenario.amortizationSchedule.length > 24 && (
                           <tr>
-                              <td colSpan={4} className="text-center p-4">...</td>
+                              <td colSpan={5} className="text-center p-4">...</td>
                           </tr>
                       )}
                       {scenario.amortizationSchedule.slice(-12).map(row => (
                            <tr key={row.month} className="border-b">
                               <td className="p-2">{row.month}</td>
+                              <td className="p-2 text-right">{formatCurrency(row.monthlyPayment)}</td>
                               <td className="p-2 text-right">{formatCurrency(row.principal)}</td>
                               <td className="p-2 text-right">{formatCurrency(row.interest)}</td>
                               <td className="p-2 text-right">{formatCurrency(row.remainingBalance)}</td>
