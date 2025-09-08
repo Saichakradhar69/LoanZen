@@ -4,7 +4,7 @@
 import { Suspense, useEffect, useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, Download, Loader2, FileText, AlertCircle } from 'lucide-react';
+import { CheckCircle, Download, Loader2, FileText, AlertCircle, Gift } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import type { CalculationResults } from '@/app/api/stripe/webhook/route';
@@ -52,19 +52,30 @@ function ThankYouContent() {
   const handleDownloadPdf = async () => {
     if (!reportRef.current) return;
     setIsGenerating(true);
+    
     try {
-        const canvas = await html2canvas(reportRef.current, {
-            scale: 2, // Higher scale for better quality
-        });
-        const imgData = canvas.toDataURL('image/png');
+        const reportElement = reportRef.current;
+        const pdf = new jsPDF('p', 'px'); // A4 is default, but px makes it easier
+        const pageElements = reportElement.querySelectorAll('.pdf-page') as NodeListOf<HTMLElement>;
+        const pdfWidth = pdf.internal.pageSize.getWidth();
         
-        const pdf = new jsPDF({
-            orientation: 'p',
-            unit: 'px',
-            format: [canvas.width, canvas.height]
-        });
+        for (let i = 0; i < pageElements.length; i++) {
+            const pageElement = pageElements[i];
+            const canvas = await html2canvas(pageElement, {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+            });
 
-        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            const imgData = canvas.toDataURL('image/png');
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            
+            if (i > 0) {
+                pdf.addPage();
+            }
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+        }
+
         pdf.save('LoanZen-Report.pdf');
 
     } catch (e) {
@@ -78,8 +89,8 @@ function ThankYouContent() {
   // TODO: Add CSV Download Handler
 
   return (
-    <div className="container mx-auto max-w-2xl py-12 px-4 flex items-center justify-center min-h-[60vh]">
-      <Card className="text-center w-full">
+    <div className="container mx-auto max-w-4xl py-12 px-4 flex flex-col items-center justify-center min-h-[60vh] gap-8">
+      <Card className="text-center w-full shadow-lg">
         <CardHeader>
           <div className="mx-auto bg-green-100 dark:bg-green-900 rounded-full h-16 w-16 flex items-center justify-center">
             <CheckCircle className="h-10 w-10 text-green-500" />
@@ -110,7 +121,7 @@ function ThankYouContent() {
                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <Button onClick={handleDownloadPdf} disabled={isGenerating} size="lg">
                         {isGenerating ? (
-                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating...</>
+                            <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating PDF...</>
                         ) : (
                             <><Download className="mr-2"/> Download PDF Report</>
                         )}
@@ -131,8 +142,29 @@ function ThankYouContent() {
         </CardContent>
       </Card>
       
+      {reportData && !error && (
+        <Card className="w-full bg-secondary border-dashed border-primary">
+            <CardHeader className="text-center">
+                <div className="mx-auto bg-primary/10 rounded-full h-16 w-16 flex items-center justify-center border-4 border-primary/20">
+                    <Gift className="h-8 w-8 text-primary" />
+                </div>
+                <CardTitle className="text-2xl font-headline mt-4">Your Bonus Offer</CardTitle>
+                <CardDescription>As a thank you, here is your exclusive code for a 14-day free trial of LoanZen Tracker Pro.</CardDescription>
+            </CardHeader>
+            <CardContent className="text-center">
+                <div className="bg-background border-dashed border-2 border-muted-foreground p-4 rounded-lg inline-block">
+                    <p className="text-3xl font-mono tracking-widest text-primary">{reportData.couponCode}</p>
+                </div>
+                <p className="text-muted-foreground mt-4 text-sm max-w-md mx-auto">
+                    To redeem, create an account and enter this code on the billing page. Enjoy tracking your loans and finding more ways to save!
+                </p>
+            </CardContent>
+        </Card>
+      )}
+
+
       {/* Hidden component used for PDF generation */}
-      <div className="absolute top-0 left-0 -z-50 opacity-0" aria-hidden="true">
+      <div className="fixed top-0 left-0 -z-50 opacity-0" aria-hidden="true">
         <div ref={reportRef}>
             {reportData && <ReportTemplate reportData={reportData} />}
         </div>
