@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CheckCircle, Download, Loader2, FileText, AlertCircle, Gift } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import type { CalculationResults } from '@/app/api/stripe/webhook/route';
+import type { CalculationResults, ScenarioResult } from '@/app/api/stripe/webhook/route';
 import ReportTemplate from '@/app/calculator/report-template';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -18,7 +18,7 @@ function ThankYouContent() {
   
   const [reportData, setReportData] = useState<CalculationResults | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   
@@ -51,11 +51,11 @@ function ThankYouContent() {
 
   const handleDownloadPdf = async () => {
     if (!reportRef.current) return;
-    setIsGenerating(true);
+    setIsGeneratingPdf(true);
     
     try {
         const reportElement = reportRef.current;
-        const pdf = new jsPDF('p', 'px'); // A4 is default, but px makes it easier
+        const pdf = new jsPDF('p', 'px');
         const pageElements = reportElement.querySelectorAll('.pdf-page') as NodeListOf<HTMLElement>;
         const pdfWidth = pdf.internal.pageSize.getWidth();
         
@@ -65,6 +65,8 @@ function ThankYouContent() {
                 scale: 2,
                 useCORS: true,
                 logging: false,
+                width: pageElement.offsetWidth,
+                height: pageElement.offsetHeight
             });
 
             const imgData = canvas.toDataURL('image/png');
@@ -82,11 +84,41 @@ function ThankYouContent() {
         console.error("PDF Generation Error: ", e);
         setError("Sorry, there was an error generating the PDF.");
     } finally {
-      setIsGenerating(false);
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadCsv = () => {
+    if (!reportData) return;
+
+    let csvContent = "Scenario,Month,Principal,Interest,Remaining Balance\n";
+
+    reportData.scenarios.forEach((scenario: ScenarioResult) => {
+        scenario.amortizationSchedule.forEach(row => {
+            const csvRow = [
+                `"${scenario.scenarioName.replace(/"/g, '""')}"`,
+                row.month,
+                row.principal,
+                row.interest,
+                row.remainingBalance
+            ].join(',');
+            csvContent += csvRow + "\n";
+        });
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "LoanZen-Amortization-Schedule.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
   };
   
-  // TODO: Add CSV Download Handler
 
   return (
     <div className="container mx-auto max-w-4xl py-12 px-4 flex flex-col items-center justify-center min-h-[60vh] gap-8">
@@ -119,14 +151,14 @@ function ThankYouContent() {
           {reportData && !error && (
              <div className="space-y-4">
                  <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                    <Button onClick={handleDownloadPdf} disabled={isGenerating} size="lg">
-                        {isGenerating ? (
+                    <Button onClick={handleDownloadPdf} disabled={isGeneratingPdf} size="lg">
+                        {isGeneratingPdf ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating PDF...</>
                         ) : (
                             <><Download className="mr-2"/> Download PDF Report</>
                         )}
                     </Button>
-                     <Button size="lg" variant="secondary" disabled>
+                     <Button size="lg" variant="secondary" onClick={handleDownloadCsv}>
                         <FileText className="mr-2"/>
                         Download CSV
                     </Button>
