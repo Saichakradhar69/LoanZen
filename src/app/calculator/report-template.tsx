@@ -45,11 +45,6 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
         'Principal': s.loanAmount,
         'Total Interest': s.totalInterest
     }));
-
-    const pieData = [
-        { name: 'Principal', value: bestScenario.loanAmount },
-        { name: 'Total Interest', value: bestScenario.totalInterest },
-    ];
     
     return (
       <div className="bg-white text-gray-800 font-sans" style={{width: '800px'}}>
@@ -143,19 +138,29 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
             </div>
           )}
 
-          <div>
-              <h3 className="text-2xl font-semibold text-center mb-6">Principal vs. Interest Breakdown ({bestScenario.scenarioName})</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                      <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                           {pieData.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                          ))}
-                      </Pie>
-                       <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                      <Legend />
-                  </PieChart>
-              </ResponsiveContainer>
+          <div className="grid grid-cols-1 gap-12">
+            {scenarios.map((scenario) => {
+              const pieData = [
+                { name: 'Principal', value: scenario.loanAmount },
+                { name: 'Total Interest', value: scenario.totalInterest },
+              ];
+              return (
+                 <div key={scenario.scenarioName}>
+                    <h3 className="text-2xl font-semibold text-center mb-6">Principal vs. Interest ({scenario.scenarioName})</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <PieChart>
+                            <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                                {pieData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                            </Pie>
+                            <Tooltip formatter={(val) => formatCurrency(val as number)}/>
+                            <Legend />
+                        </PieChart>
+                    </ResponsiveContainer>
+                </div>
+              );
+            })}
           </div>
         </div>
         
@@ -206,3 +211,4 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
       </div>
     );
 }
+
