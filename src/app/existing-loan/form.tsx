@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CalendarIcon, Plus, Trash2, Zap } from 'lucide-react';
+import { CalendarIcon, Info, Plus, Trash2, Zap } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const disbursementSchema = z.object({
   date: z.date({ required_error: 'Disbursement date is required.' }),
@@ -69,9 +70,9 @@ export default function ExistingLoanForm() {
             emiAmount: undefined,
             moratoriumPeriod: undefined,
             emisPaid: undefined,
-            disbursements: [{ date: new Date(), amount: 0 }],
-            rateChanges: [{ date: new Date(), rate: 0 }],
-            transactions: [{ date: new Date(), type: 'withdrawal', amount: 0 }]
+            disbursements: [],
+            rateChanges: [],
+            transactions: []
         },
     });
 
@@ -97,7 +98,7 @@ export default function ExistingLoanForm() {
             )} />
              <FormField control={form.control} name="disbursementDate" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                    <FormLabel>Disbursement Date</FormLabel>
+                    <FormLabel>First Disbursement Date</FormLabel>
                     <Popover>
                         <PopoverTrigger asChild>
                             <FormControl>
@@ -116,14 +117,29 @@ export default function ExistingLoanForm() {
             )} />
             <FormField control={form.control} name="interestRate" render={({ field }) => (
                 <FormItem>
-                    <FormLabel>Interest Rate (%)</FormLabel>
+                    <FormLabel>Current Interest Rate (%)</FormLabel>
                     <FormControl><Input type="number" step="0.01" placeholder="e.g., 8.5" {...field} value={field.value ?? ''} /></FormControl>
                     <FormMessage />
                 </FormItem>
             )} />
              <FormField control={form.control} name="interestType" render={({ field }) => (
                 <FormItem className="space-y-3">
-                    <FormLabel>Interest Type</FormLabel>
+                    <div className="flex items-center gap-2">
+                        <FormLabel>Interest Type</FormLabel>
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                    <p className="font-bold">Reducing Balance:</p>
+                                    <p className="mb-2">Interest is calculated on the remaining loan balance. Your interest payment decreases over time. (Most common)</p>
+                                    <p className="font-bold">Flat:</p>
+                                    <p>Interest is calculated on the original loan amount for the entire term. Your interest payment remains constant.</p>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    </div>
                     <FormControl>
                         <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
                             <FormItem className="flex items-center space-x-2 space-y-0">
@@ -162,7 +178,8 @@ export default function ExistingLoanForm() {
                             </FormItem>
                         )} />
                         <div>
-                             <Label>Disbursements</Label>
+                             <Label>Disbursements (if more than one)</Label>
+                             <CardDescription>If your loan was paid out in multiple parts, add them here. The "Original Loan Amount" field will be ignored.</CardDescription>
                              <div className="space-y-4 mt-2">
                                 {disbursementFields.map((field, index) => (
                                     <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
@@ -196,6 +213,7 @@ export default function ExistingLoanForm() {
                 return (
                      <div>
                          <Label>Floating Rate History</Label>
+                         <CardDescription>If your interest rate has changed over time, add each change here.</CardDescription>
                          <div className="space-y-4 mt-2">
                             {rateChangeFields.map((field, index) => (
                                 <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
@@ -216,6 +234,7 @@ export default function ExistingLoanForm() {
                  return (
                      <div>
                          <Label>Transaction History</Label>
+                          <CardDescription>Add all withdrawals and repayments you have made.</CardDescription>
                          <div className="space-y-4 mt-2">
                             {transactionFields.map((field, index) => (
                                 <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
@@ -298,5 +317,3 @@ export default function ExistingLoanForm() {
         </Card>
     );
 }
-
-    
