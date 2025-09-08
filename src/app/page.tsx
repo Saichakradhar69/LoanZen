@@ -20,7 +20,7 @@ export default function HomePage() {
               </p>
               <div className="flex flex-col gap-2 min-[400px]:flex-row">
                 <Button asChild size="lg">
-                  <Link href="/calculator">Check Existing Loan →</Link>
+                  <Link href="/existing-loan">Check Existing Loan →</Link>
                 </Button>
               </div>
             </div>
