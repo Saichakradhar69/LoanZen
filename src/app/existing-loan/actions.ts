@@ -27,6 +27,7 @@ const formSchema = z.object({
     disbursementDate: z.date({ required_error: 'Disbursement date is required.' }),
     interestRate: z.coerce.number().positive('Interest rate must be positive.').max(100, "Rate seems too high."),
     interestType: z.enum(['reducing', 'flat']),
+    rateType: z.enum(['fixed', 'floating']),
     emiAmount: z.coerce.number().optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
     disbursements: z.array(disbursementSchema).optional(),
@@ -53,6 +54,7 @@ export async function calculateOutstandingBalanceAction(
       disbursementDate: new Date(formData.get('disbursementDate') as string),
       interestRate: formData.get('interestRate'),
       interestType: formData.get('interestType'),
+      rateType: formData.get('rateType'),
       // ... and so on for all fields
     });
     

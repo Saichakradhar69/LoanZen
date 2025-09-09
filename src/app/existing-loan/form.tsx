@@ -44,19 +44,12 @@ const formSchema = z.object({
     disbursementDate: z.date({ required_error: 'Disbursement date is required.' }),
     interestRate: z.coerce.number().positive('Interest rate must be positive.').max(100, "Rate seems too high."),
     interestType: z.enum(['reducing', 'flat']),
+    rateType: z.enum(['fixed', 'floating']),
     emiAmount: z.coerce.number().optional(),
-
-    // Education Loan Specific
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
     disbursements: z.array(disbursementSchema).optional(),
-
-    // Home Loan Specific
     rateChanges: z.array(rateChangeSchema).optional(),
-
-    // Credit Line Specific
     transactions: z.array(transactionSchema).optional(),
-
-    // Personal/Car Loan Specific
     emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional()
 });
 
@@ -90,6 +83,7 @@ export default function ExistingLoanForm() {
         defaultValues: {
             loanType: 'personal',
             interestType: 'reducing',
+            rateType: 'fixed',
             originalLoanAmount: undefined,
             disbursementDate: undefined,
             interestRate: undefined,
@@ -103,6 +97,7 @@ export default function ExistingLoanForm() {
     });
 
     const loanType = form.watch('loanType');
+    const rateType = form.watch('rateType');
     
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
@@ -154,7 +149,7 @@ export default function ExistingLoanForm() {
             )} />
             <FormField control={form.control} name="interestRate" render={({ field }) => (
                 <FormItem>
-                    <FormLabel>Current Interest Rate (%)</FormLabel>
+                    <FormLabel>Current/Initial Interest Rate (%)</FormLabel>
                     <FormControl><Input type="number" step="0.01" placeholder="e.g., 8.5" {...field} value={field.value ?? ''} /></FormControl>
                     <FormMessage />
                 </FormItem>
@@ -162,7 +157,7 @@ export default function ExistingLoanForm() {
              <FormField control={form.control} name="interestType" render={({ field }) => (
                 <FormItem className="space-y-3">
                     <div className="flex items-center gap-2">
-                        <FormLabel>Interest Type</FormLabel>
+                        <FormLabel>Interest Calculation</FormLabel>
                         <TooltipProvider>
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -178,7 +173,7 @@ export default function ExistingLoanForm() {
                         </TooltipProvider>
                     </div>
                     <FormControl>
-                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
+                        <RadioGroup onValuechange={field.onChange} defaultValue={field.value} className="flex space-x-4">
                             <FormItem className="flex items-center space-x-2 space-y-0">
                                 <FormControl><RadioGroupItem value="reducing" /></FormControl>
                                 <Label className="font-normal">Reducing Balance</Label>
@@ -186,6 +181,24 @@ export default function ExistingLoanForm() {
                             <FormItem className="flex items-center space-x-2 space-y-0">
                                 <FormControl><RadioGroupItem value="flat" /></FormControl>
                                 <Label className="font-normal">Flat</Label>
+                            </FormItem>
+                        </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            )} />
+            <FormField control={form.control} name="rateType" render={({ field }) => (
+                <FormItem className="space-y-3">
+                     <FormLabel>Interest Rate Type</FormLabel>
+                    <FormControl>
+                        <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl><RadioGroupItem value="fixed" /></FormControl>
+                                <Label className="font-normal">Fixed</Label>
+                            </FormItem>
+                            <FormItem className="flex items-center space-x-2 space-y-0">
+                                <FormControl><RadioGroupItem value="floating" /></FormControl>
+                                <Label className="font-normal">Floating</Label>
                             </FormItem>
                         </RadioGroup>
                     </FormControl>
@@ -201,6 +214,28 @@ export default function ExistingLoanForm() {
             )} />
         </>
     )
+    
+    const renderFloatingRateHistory = () => (
+        <div>
+            <Label>Floating Rate History</Label>
+            <CardDescription>If your interest rate has changed over time, add each change here.</CardDescription>
+            <div className="space-y-4 mt-2">
+            {rateChangeFields.map((field, index) => (
+                <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
+                    <FormField control={form.control} name={`rateChanges.${index}.date`} render={({ field }) => (
+                        <FormItem className="flex flex-col"><FormLabel>Effective Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                    )} />
+                    <FormField control={form.control} name={`rateChanges.${index}.rate`} render={({ field }) => (
+                            <FormItem><FormLabel>New Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 9.2" {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <Button type="button" variant="destructive" size="icon" onClick={() => removeRateChange(index)}><Trash2 className="h-4 w-4" /></Button>
+                </div>
+            ))}
+            <Button type="button" variant="outline" onClick={() => appendRateChange({ date: new Date(), rate: 0 })}><Plus className="mr-2" />Add Rate Change</Button>
+        </div>
+    </div>
+    )
+
 
     const renderLoanSpecificFields = () => {
         switch (loanType) {
@@ -216,7 +251,7 @@ export default function ExistingLoanForm() {
                         )} />
                         <div>
                              <Label>Disbursements (if more than one)</Label>
-                             <CardDescription>If your loan was paid out in multiple parts, add them here. The "Original Loan Amount" field will be ignored.</CardDescription>
+                             <CardDescription>If your loan was paid out in multiple parts, add them here. If you do, the "Original Loan Amount" field above will be ignored.</CardDescription>
                              <div className="space-y-4 mt-2">
                                 {disbursementFields.map((field, index) => (
                                     <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
@@ -246,27 +281,6 @@ export default function ExistingLoanForm() {
                         </div>
                     </div>
                 )
-            case 'home':
-                return (
-                     <div>
-                         <Label>Floating Rate History</Label>
-                         <CardDescription>If your interest rate has changed over time, add each change here.</CardDescription>
-                         <div className="space-y-4 mt-2">
-                            {rateChangeFields.map((field, index) => (
-                                <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
-                                    <FormField control={form.control} name={`rateChanges.${index}.date`} render={({ field }) => (
-                                        <FormItem className="flex flex-col"><FormLabel>Effective Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`rateChanges.${index}.rate`} render={({ field }) => (
-                                         <FormItem><FormLabel>New Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 9.2" {...field} /></FormControl><FormMessage /></FormItem>
-                                    )} />
-                                    <Button type="button" variant="destructive" size="icon" onClick={() => removeRateChange(index)}><Trash2 className="h-4 w-4" /></Button>
-                                </div>
-                            ))}
-                            <Button type="button" variant="outline" onClick={() => appendRateChange({ date: new Date(), rate: 0 })}><Plus className="mr-2" />Add Rate Change</Button>
-                        </div>
-                    </div>
-                )
             case 'credit-line':
                  return (
                      <div>
@@ -293,6 +307,7 @@ export default function ExistingLoanForm() {
                 )
             case 'personal':
             case 'car':
+            case 'home':
                  return (
                     <FormField control={form.control} name="emisPaid" render={({ field }) => (
                         <FormItem>
@@ -340,6 +355,11 @@ export default function ExistingLoanForm() {
                         <div className="space-y-6 pt-4 border-t">
                             <h3 className="text-lg font-medium text-primary">Loan-Specific Details</h3>
                             {renderLoanSpecificFields()}
+                             {rateType === 'floating' && (
+                                <div className="pt-6 border-t">
+                                    {renderFloatingRateHistory()}
+                                </div>
+                            )}
                         </div>
                         
                         <div className="flex justify-end pt-4">
