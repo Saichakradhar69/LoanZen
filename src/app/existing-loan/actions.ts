@@ -23,11 +23,13 @@ const transactionSchema = z.object({
 
 const formSchema = z.object({
     loanType: z.string({ required_error: 'Please select a loan type.' }),
+    loanName: z.string().optional(),
     originalLoanAmount: z.coerce.number().positive('Original loan amount is required.'),
     disbursementDate: z.date({ required_error: 'Disbursement date is required.' }),
     interestRate: z.coerce.number().positive('Interest rate must be positive.').max(100, "Rate seems too high."),
     interestType: z.enum(['reducing', 'flat']),
     rateType: z.enum(['fixed', 'floating']),
+    paymentStructure: z.enum(['fixed', 'variable']).optional(),
     emiAmount: z.coerce.number().optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
     disbursements: z.array(disbursementSchema).optional(),

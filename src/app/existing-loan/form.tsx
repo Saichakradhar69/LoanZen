@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CalendarIcon, Info, Loader2, Plus, Trash2, Zap } from 'lucide-react';
+import { CalendarIcon, ChevronDown, Info, Loader2, Plus, Trash2, Zap } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -17,9 +17,10 @@ import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { calculateOutstandingBalanceAction } from './actions';
 import { useFormStatus } from 'react-dom';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 
 const disbursementSchema = z.object({
@@ -40,11 +41,13 @@ const transactionSchema = z.object({
 
 const formSchema = z.object({
     loanType: z.string({ required_error: 'Please select a loan type.' }),
+    loanName: z.string().optional(),
     originalLoanAmount: z.coerce.number().positive('Original loan amount is required.'),
     disbursementDate: z.date({ required_error: 'Disbursement date is required.' }),
     interestRate: z.coerce.number().positive('Interest rate must be positive.').max(100, "Rate seems too high."),
     interestType: z.enum(['reducing', 'flat']),
     rateType: z.enum(['fixed', 'floating']),
+    paymentStructure: z.enum(['fixed', 'variable']).optional(),
     emiAmount: z.coerce.number().optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
     disbursements: z.array(disbursementSchema).optional(),
@@ -77,6 +80,7 @@ function SubmitButton() {
 
 export default function ExistingLoanForm() {
     const [state, formAction] = useActionState(calculateOutstandingBalanceAction, null);
+    const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
     const form = useForm<ExistingLoanFormData>({
         resolver: zodResolver(formSchema),
@@ -90,6 +94,8 @@ export default function ExistingLoanForm() {
             emiAmount: undefined,
             moratoriumPeriod: undefined,
             emisPaid: undefined,
+            loanName: '',
+            paymentStructure: 'fixed',
             disbursements: [],
             rateChanges: [],
             transactions: []
@@ -98,6 +104,7 @@ export default function ExistingLoanForm() {
 
     const loanType = form.watch('loanType');
     const rateType = form.watch('rateType');
+    const paymentStructure = form.watch('paymentStructure');
     
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
@@ -236,6 +243,65 @@ export default function ExistingLoanForm() {
     </div>
     )
 
+    const renderTransactionHistory = (isRepaymentOnly = false) => (
+        <div>
+             <Label>{isRepaymentOnly ? 'Variable Payments' : 'Transaction History'}</Label>
+              <CardDescription>{isRepaymentOnly ? 'Add each payment you have made.' : 'Add all withdrawals and repayments you have made.'}</CardDescription>
+             <div className="space-y-4 mt-2">
+                {transactionFields.map((field, index) => (
+                    <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
+                         <FormField control={form.control} name={`transactions.${index}.date`} render={({ field }) => (
+                            <FormItem className="flex flex-col"><FormLabel>Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                        )} />
+                        {!isRepaymentOnly && (
+                        <FormField control={form.control} name={`transactions.${index}.type`} render={({ field }) => (
+                            <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="withdrawal">Withdrawal</SelectItem><SelectItem value="repayment">Repayment</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                        )} />
+                        )}
+                        <FormField control={form.control} name={`transactions.${index}.amount`} render={({ field }) => (
+                            <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <Button type="button" variant="destructive" size="icon" onClick={() => removeTransaction(index)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                ))}
+                <Button type="button" variant="outline" onClick={() => appendTransaction({ date: new Date(), type: isRepaymentOnly ? 'repayment' : 'withdrawal', amount: 0  })}><Plus className="mr-2" />Add {isRepaymentOnly ? 'Payment' : 'Transaction'}</Button>
+            </div>
+        </div>
+    )
+
+    const renderDisbursements = () => (
+         <div>
+             <Label>Disbursements (if more than one)</Label>
+             <CardDescription>If your loan was paid out in multiple parts, add them here. If you do, the "Original Loan Amount" field above will be ignored.</CardDescription>
+             <div className="space-y-4 mt-2">
+                {disbursementFields.map((field, index) => (
+                    <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
+                        <FormField control={form.control} name={`disbursements.${index}.date`} render={({ field }) => (
+                            <FormItem className="flex flex-col">
+                                <FormLabel>Disbursement Date</FormLabel>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus/></PopoverContent>
+                                </Popover>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name={`disbursements.${index}.amount`} render={({ field }) => (
+                             <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 25000" {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <Button type="button" variant="destructive" size="icon" onClick={() => removeDisbursement(index)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                ))}
+                <Button type="button" variant="outline" onClick={() => appendDisbursement({ date: new Date(), amount: 0 })}><Plus className="mr-2" />Add Disbursement</Button>
+            </div>
+        </div>
+    )
+
 
     const renderLoanSpecificFields = () => {
         switch (loanType) {
@@ -249,62 +315,65 @@ export default function ExistingLoanForm() {
                                 <FormMessage />
                             </FormItem>
                         )} />
-                        <div>
-                             <Label>Disbursements (if more than one)</Label>
-                             <CardDescription>If your loan was paid out in multiple parts, add them here. If you do, the "Original Loan Amount" field above will be ignored.</CardDescription>
-                             <div className="space-y-4 mt-2">
-                                {disbursementFields.map((field, index) => (
-                                    <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
-                                        <FormField control={form.control} name={`disbursements.${index}.date`} render={({ field }) => (
-                                            <FormItem className="flex flex-col">
-                                                <FormLabel>Disbursement Date</FormLabel>
-                                                <Popover>
-                                                    <PopoverTrigger asChild>
-                                                        <Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}>
-                                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                                            {field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}
-                                                        </Button>
-                                                    </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus/></PopoverContent>
-                                                </Popover>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )} />
-                                        <FormField control={form.control} name={`disbursements.${index}.amount`} render={({ field }) => (
-                                             <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 25000" {...field} /></FormControl><FormMessage /></FormItem>
-                                        )} />
-                                        <Button type="button" variant="destructive" size="icon" onClick={() => removeDisbursement(index)}><Trash2 className="h-4 w-4" /></Button>
-                                    </div>
-                                ))}
-                                <Button type="button" variant="outline" onClick={() => appendDisbursement({ date: new Date(), amount: 0 })}><Plus className="mr-2" />Add Disbursement</Button>
-                            </div>
-                        </div>
+                        {renderDisbursements()}
                     </div>
                 )
             case 'credit-line':
+                 return renderTransactionHistory(false);
+            case 'custom':
                  return (
-                     <div>
-                         <Label>Transaction History</Label>
-                          <CardDescription>Add all withdrawals and repayments you have made.</CardDescription>
-                         <div className="space-y-4 mt-2">
-                            {transactionFields.map((field, index) => (
-                                <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
-                                     <FormField control={form.control} name={`transactions.${index}.date`} render={({ field }) => (
-                                        <FormItem className="flex flex-col"><FormLabel>Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`transactions.${index}.type`} render={({ field }) => (
-                                        <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="withdrawal">Withdrawal</SelectItem><SelectItem value="repayment">Repayment</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                                    )} />
-                                    <FormField control={form.control} name={`transactions.${index}.amount`} render={({ field }) => (
-                                        <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} /></FormControl><FormMessage /></FormItem>
-                                    )} />
-                                    <Button type="button" variant="destructive" size="icon" onClick={() => removeTransaction(index)}><Trash2 className="h-4 w-4" /></Button>
-                                </div>
-                            ))}
-                            <Button type="button" variant="outline" onClick={() => appendTransaction({ date: new Date(), type: 'withdrawal', amount: 0  })}><Plus className="mr-2" />Add Transaction</Button>
-                        </div>
+                    <div className="space-y-6">
+                         <FormField control={form.control} name="loanName" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Loan Nickname (Optional)</FormLabel>
+                                <FormControl><Input placeholder="e.g., Personal Loan from Dad" {...field} value={field.value ?? ''} /></FormControl>
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="paymentStructure" render={({ field }) => (
+                             <FormItem className="space-y-3">
+                                 <FormLabel>How do you make payments?</FormLabel>
+                                <FormControl>
+                                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                            <FormControl><RadioGroupItem value="fixed" /></FormControl>
+                                            <Label className="font-normal">Fixed Amount (e.g., Monthly EMI)</Label>
+                                        </FormItem>
+                                        <FormItem className="flex items-center space-x-2 space-y-0">
+                                            <FormControl><RadioGroupItem value="variable" /></FormControl>
+                                            <Label className="font-normal">Variable Amounts</Label>
+                                        </FormItem>
+                                    </RadioGroup>
+                                </FormControl>
+                             </FormItem>
+                        )} />
+                       
+                        {paymentStructure === 'fixed' && (
+                             <FormField control={form.control} name="emiAmount" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Fixed Payment Amount</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ''} /></FormControl>
+                                </FormItem>
+                            )} />
+                        )}
+                        {paymentStructure === 'variable' && (
+                            renderTransactionHistory(true)
+                        )}
+                        
+                        <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+                            <CollapsibleTrigger asChild>
+                                <Button type="button" variant="link" className="p-0">
+                                    <Plus className="mr-2"/>
+                                    Add more details (optional)
+                                    <ChevronDown className="ml-2 h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                                </Button>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="space-y-6 pt-4 animate-in fade-in-0">
+                               {renderDisbursements()}
+                               {renderFloatingRateHistory()}
+                            </CollapsibleContent>
+                        </Collapsible>
                     </div>
-                )
+                 )
             case 'personal':
             case 'car':
             case 'home':
@@ -342,6 +411,7 @@ export default function ExistingLoanForm() {
                                         <SelectItem value="home">Home Loan</SelectItem>
                                         <SelectItem value="education">Education Loan</SelectItem>
                                         <SelectItem value="credit-line">Credit Line</SelectItem>
+                                        <SelectItem value="custom">Custom Loan</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -355,7 +425,7 @@ export default function ExistingLoanForm() {
                         <div className="space-y-6 pt-4 border-t">
                             <h3 className="text-lg font-medium text-primary">Loan-Specific Details</h3>
                             {renderLoanSpecificFields()}
-                             {rateType === 'floating' && (
+                             {rateType === 'floating' && loanType !== 'custom' && (
                                 <div className="pt-6 border-t">
                                     {renderFloatingRateHistory()}
                                 </div>
