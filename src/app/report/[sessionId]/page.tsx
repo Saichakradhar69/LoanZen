@@ -245,10 +245,10 @@ function ReportContent({ sessionId }: { sessionId: string }) {
   );
 }
 
-export default function ReportPage({ params: { sessionId } }: { params: { sessionId: string } }) {
+export default function ReportPage({ params }: { params: { sessionId: string } }) {
     return (
         <Suspense fallback={<div className="container mx-auto max-w-4xl py-12 px-4 flex items-center justify-center min-h-[60vh]"><Loader2 className="h-16 w-16 animate-spin text-primary" /></div>}>
-            <ReportContent sessionId={sessionId} />
+            <ReportContent sessionId={params.sessionId} />
         </Suspense>
     )
 }
