@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, startTransition } from 'react';
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -17,8 +17,10 @@ function ExistingLoanContent() {
   const [state, formAction] = useActionState(calculateOutstandingBalanceAction, { type: 'initial' });
 
   const handleBack = () => {
-    // Pass a form with no 'form_data_json' to reset the state
-    formAction(new FormData());
+    // Wrap the state update in a transition to avoid errors
+    startTransition(() => {
+      formAction(new FormData());
+    });
   };
 
   const showResults = state?.type === 'success' && state.data;
