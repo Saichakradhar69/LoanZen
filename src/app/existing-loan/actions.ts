@@ -66,7 +66,7 @@ export async function calculateOutstandingBalanceAction(
   formData: FormData,
 ) {
     // This is called with empty FormData to reset the state, so we handle it gracefully.
-    if (!formData.has('loanType')) {
+    if (!formData || !formData.has('loanType')) {
         return null;
     }
 
