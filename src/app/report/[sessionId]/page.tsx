@@ -10,6 +10,7 @@ import type { CalculationResults as ReportDataType, NewLoanCalculationResults, E
 import ReportTemplate from '@/app/calculator/report-template';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { notFound } from 'next/navigation';
 
 function ReportContent({ sessionId }: { sessionId: string }) {
   const [reportData, setReportData] = useState<ReportDataType | null>(null);
@@ -245,10 +246,17 @@ function ReportContent({ sessionId }: { sessionId: string }) {
   );
 }
 
-export default function ReportPage({ params }: { params: { sessionId: string } }) {
+export default async function ReportPage({ params }: { params: Promise<{ sessionId: string }> }) {
+    const unwrappedParams = await params;
+    const { sessionId } = unwrappedParams;
+
+    if (!sessionId) {
+        notFound();
+    }
+
     return (
         <Suspense fallback={<div className="container mx-auto max-w-4xl py-12 px-4 flex items-center justify-center min-h-[60vh]"><Loader2 className="h-16 w-16 animate-spin text-primary" /></div>}>
-            <ReportContent sessionId={params.sessionId} />
+            <ReportContent sessionId={sessionId} />
         </Suspense>
     )
 }
