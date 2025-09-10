@@ -62,44 +62,14 @@ const formSchema = z.object({
 });
 
 
-function buildObjectFromFormData(formData: FormData): Record<string, any> {
-  const data: Record<string, any> = {};
-  
-  // A more robust way to reconstruct the object, especially for nested arrays.
-  for (const [key, value] of formData.entries()) {
-    if (key.includes('.')) {
-      const [outerKey, index, innerKey] = key.split(/[[.\]]/).filter(Boolean);
-      if (!data[outerKey]) data[outerKey] = [];
-      if (!data[outerKey][Number(index)]) data[outerKey][Number(index)] = {};
-      
-      data[outerKey][Number(index)][innerKey] = value;
-    } else {
-      data[key] = value;
-    }
-  }
-
-  // Coerce date strings to Date objects for validation
-  if (data.disbursementDate) data.disbursementDate = new Date(data.disbursementDate);
-  ['disbursements', 'rateChanges', 'transactions'].forEach(key => {
-    if (data[key]) {
-      data[key] = data[key].map((item: any) => ({ ...item, date: new Date(item.date) }));
-    }
-  });
-
-  return data;
-}
-
-
 export async function calculateOutstandingBalanceAction(
   prevState: any,
-  formData: FormData,
+  data: ExistingLoanFormData | null,
 ) {
-    if (!formData.has('loanType')) {
+    if (!data) {
         return null;
     }
     
-    const data = buildObjectFromFormData(formData);
-
     const validatedFields = formSchema.safeParse(data);
     
     if (!validatedFields.success) {

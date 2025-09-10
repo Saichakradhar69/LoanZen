@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useActionState, useState } from 'react';
+import { useActionState, useState, startTransition } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { CalculationResult } from './actions';
@@ -79,8 +79,8 @@ function SubmitButton() {
 }
 
 interface ExistingLoanFormProps {
-    formAction: (prevState: any, formData: FormData) => Promise<{ type: string; errors?: any; data?: CalculationResult; }>;
-    state: {
+    formAction: (prevState: any, formData: ExistingLoanFormData) => Promise<{ type: string; errors?: any; data?: CalculationResult; }>;
+    initialState: {
         type: string;
         errors?: any;
         data?: CalculationResult;
@@ -88,7 +88,7 @@ interface ExistingLoanFormProps {
 }
 
 
-export default function ExistingLoanForm({ formAction, state: initialState }: ExistingLoanFormProps) {
+export default function ExistingLoanForm({ formAction, initialState }: ExistingLoanFormProps) {
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
     const [state, dispatchFormAction] = useActionState(formAction, initialState);
 
@@ -120,6 +120,12 @@ export default function ExistingLoanForm({ formAction, state: initialState }: Ex
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
+    
+    const onSubmit = (data: ExistingLoanFormData) => {
+        startTransition(() => {
+            dispatchFormAction(data);
+        });
+    };
 
     const renderCommonFields = () => (
         <>
@@ -401,7 +407,7 @@ export default function ExistingLoanForm({ formAction, state: initialState }: Ex
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form action={form.handleSubmit(data => dispatchFormAction(data as any))} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>

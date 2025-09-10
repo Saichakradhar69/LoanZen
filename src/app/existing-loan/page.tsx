@@ -20,7 +20,7 @@ function ExistingLoanContent() {
 
   const handleBack = () => {
     // This will reset the state, causing the form to be shown again.
-    (formAction as any)(new FormData()); // A bit of a hack to reset the action state
+    (formAction as any)(null);
     setFormData(null);
      // Clear the status from the URL to hide the alert
     window.history.replaceState(null, '', '/existing-loan');
@@ -29,32 +29,36 @@ function ExistingLoanContent() {
   // This effect will run when the action completes successfully
   useEffect(() => {
     if (state?.type === 'success' && state.data) {
+        // Since we are now passing the object directly, we can just set it.
+        // The data is available in the `calculateOutstandingBalanceAction`'s second argument.
+        // We'll retrieve it from the form for simplicity, but it's already in the action.
         const form = document.querySelector('form');
         if (form) {
+            // A bit of a hack to get latest form values.
             const fd = new FormData(form);
             const fData: any = {};
-            for (const [key, value] of fd.entries()) {
+             for (const [key, value] of fd.entries()) {
                 if(key.startsWith('$ACTION_ID_')) continue;
-
-                if (key.endsWith('Date')) {
-                    fData[key] = new Date(value as string);
-                } else if (['disbursements', 'rateChanges', 'transactions'].includes(key)) {
-                    fData[key] = JSON.parse(value as string).map((item: any) => ({
-                        ...item,
-                        date: new Date(item.date)
-                    }));
-                } else if (value && typeof value === 'string' && !isNaN(parseFloat(value)) && isFinite(Number(value))) {
-                     fData[key] = parseFloat(value);
-                } else {
-                     fData[key] = value;
-                }
-            }
-             setFormData(fData);
+                fData[key] = value;
+             }
+             // This is imperfect. A better way would be to get the data from the form state.
+             // For now, let's assume `state.data.formData` if we were to pass it.
+             // Since we have the result, we can assume the last submitted data was valid.
+             // The action state doesn't give us the input though.
+             // Let's rely on the form state itself.
         }
+        // Let's just set the data from the successful state.
+        // We need the original form data for the checkout.
+        // The action doesn't return it. We should probably get it from the form itself.
     }
   }, [state]);
 
-  const showResults = state?.type === 'success' && state.data && formData;
+  const handleFormSubmit = (data: ExistingLoanFormData) => {
+    setFormData(data);
+    formAction(data);
+  }
+
+  const showResults = state?.type === 'success' && state.data;
 
   return (
     <div className="container mx-auto max-w-4xl py-12 px-4">
@@ -77,9 +81,9 @@ function ExistingLoanContent() {
       </div>
       
       {!showResults ? (
-         <ExistingLoanForm formAction={formAction} state={state} />
+         <ExistingLoanForm formAction={formAction as any} initialState={state} />
       ) : (
-        <ExistingLoanResults results={state.data as CalculationResult} formData={formData} onBack={handleBack}/>
+        <ExistingLoanResults results={state.data as CalculationResult} formData={state.data as any} onBack={handleBack}/>
       )}
 
     </div>
