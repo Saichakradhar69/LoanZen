@@ -20,46 +20,41 @@ function ExistingLoanContent() {
 
   const handleBack = () => {
     // This will reset the state, causing the form to be shown again.
-    (formAction as any)(null); // A bit of a hack to reset the action state
+    (formAction as any)(new FormData()); // A bit of a hack to reset the action state
     setFormData(null);
      // Clear the status from the URL to hide the alert
     window.history.replaceState(null, '', '/existing-loan');
   };
-
-  const showResults = state?.type === 'success' && state.data && formData;
   
-  const handleFormSubmit = (data: FormData) => {
-    const values = new FormData(data.currentTarget as HTMLFormElement);
-    const formValues = Object.fromEntries(values.entries());
-    
-    // This is a bit of a hack to get the form data for the results page
-    const tempFd = new FormData();
-    const currentData = new FormData(data.currentTarget as HTMLFormElement);
-    currentData.forEach((value, key) => {
-        tempFd.append(key, value);
-    });
+  // This effect will run when the action completes successfully
+  useEffect(() => {
+    if (state?.type === 'success' && state.data) {
+        const form = document.querySelector('form');
+        if (form) {
+            const fd = new FormData(form);
+            const fData: any = {};
+            for (const [key, value] of fd.entries()) {
+                if(key.startsWith('$ACTION_ID_')) continue;
 
-    const fData: any = {};
-     for (const [key, value] of tempFd.entries()) {
-        if (key.endsWith('Date')) {
-             fData[key] = new Date(value as string);
-        } else if (['disbursements', 'rateChanges', 'transactions'].includes(key)) {
-            fData[key] = JSON.parse(value as string).map((item: any) => ({
-                ...item,
-                date: new Date(item.date)
-            }));
-        } else if (value && typeof value === 'string' && !isNaN(parseFloat(value)) && isFinite(Number(value)) && !key.startsWith('$ACTION')) {
-            fData[key] = parseFloat(value);
-        } else {
-            if(!key.startsWith('$ACTION'))
-                fData[key] = value;
+                if (key.endsWith('Date')) {
+                    fData[key] = new Date(value as string);
+                } else if (['disbursements', 'rateChanges', 'transactions'].includes(key)) {
+                    fData[key] = JSON.parse(value as string).map((item: any) => ({
+                        ...item,
+                        date: new Date(item.date)
+                    }));
+                } else if (value && typeof value === 'string' && !isNaN(parseFloat(value)) && isFinite(Number(value))) {
+                     fData[key] = parseFloat(value);
+                } else {
+                     fData[key] = value;
+                }
+            }
+             setFormData(fData);
         }
     }
-    setFormData(fData);
+  }, [state]);
 
-
-    formAction(data);
-  }
+  const showResults = state?.type === 'success' && state.data && formData;
 
   return (
     <div className="container mx-auto max-w-4xl py-12 px-4">
@@ -69,7 +64,7 @@ function ExistingLoanContent() {
             <AlertTitle>Payment Cancelled</AlertTitle>
             <AlertDescription>
                 Your payment was not processed. You can try again at any time.
-            </AlertDescription>
+            </Aler tDescription>
         </Alert>
       )}
       <div className="text-center mb-10">
@@ -82,7 +77,7 @@ function ExistingLoanContent() {
       </div>
       
       {!showResults ? (
-         <ExistingLoanForm formAction={handleFormSubmit} state={state} />
+         <ExistingLoanForm formAction={formAction} state={state} />
       ) : (
         <ExistingLoanResults results={state.data as CalculationResult} formData={formData} onBack={handleBack}/>
       )}
@@ -99,5 +94,3 @@ export default function ExistingLoanPage() {
         </Suspense>
     )
 }
-
-    

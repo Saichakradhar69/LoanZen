@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { CalculationResult } from './actions';
@@ -89,6 +89,7 @@ interface ExistingLoanFormProps {
 
 export default function ExistingLoanForm({ formAction, state }: ExistingLoanFormProps) {
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+    const [state, clientFormAction] = useActionState(formAction, null);
 
     const form = useForm<ExistingLoanFormData>({
         resolver: zodResolver(formSchema),
@@ -96,12 +97,12 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
             loanType: 'personal',
             interestType: 'reducing',
             rateType: 'fixed',
-            originalLoanAmount: undefined,
+            originalLoanAmount: '' as any,
             disbursementDate: undefined,
-            interestRate: undefined,
-            emiAmount: undefined,
-            moratoriumPeriod: undefined,
-            emisPaid: undefined,
+            interestRate: '' as any,
+            emiAmount: '' as any,
+            moratoriumPeriod: '' as any,
+            emisPaid: '' as any,
             loanName: '',
             paymentStructure: 'fixed',
             disbursements: [],
@@ -118,10 +119,10 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
 
-    const clientAction = (formData: FormData) => {
-        const data = form.getValues();
-        Object.entries(data).forEach(([key, value]) => {
-             if (value !== undefined && value !== null) {
+    const createFormData = (data: ExistingLoanFormData): FormData => {
+        const formData = new FormData();
+         Object.entries(data).forEach(([key, value]) => {
+             if (value !== undefined && value !== null && value !== '' && !(Array.isArray(value) && value.length === 0)) {
                 if (Array.isArray(value)) {
                     formData.append(key, JSON.stringify(value));
                 } else if (value instanceof Date) {
@@ -131,17 +132,20 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
                 }
             }
         });
-        formAction(formData);
-    }
+        return formData;
+    };
 
+    const onSubmit = (data: ExistingLoanFormData) => {
+        clientFormAction(createFormData(data));
+    };
 
     const renderCommonFields = () => (
         <>
             <FormField control={form.control} name="originalLoanAmount" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Original Loan Amount</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 50000" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
-                    <FormMessage>{form.formState.errors.originalLoanAmount?.message}</FormMessage>
+                    <FormControl><Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} /></FormControl>
+                    <FormMessage>{state?.errors?.originalLoanAmount?.[0]}</FormMessage>
                 </FormItem>
             )} />
              <FormField control={form.control} name="disbursementDate" render={({ field }) => (
@@ -160,14 +164,14 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
                             <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
                         </PopoverContent>
                     </Popover>
-                    <FormMessage>{form.formState.errors.disbursementDate?.message}</FormMessage>
+                    <FormMessage>{state?.errors?.disbursementDate?.[0]}</FormMessage>
                 </FormItem>
             )} />
             <FormField control={form.control} name="interestRate" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Current/Initial Interest Rate (%)</FormLabel>
-                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 8.5" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
-                     <FormMessage>{form.formState.errors.interestRate?.message}</FormMessage>
+                    <FormControl><Input type="number" step="0.01" placeholder="e.g., 8.5" {...field} value={field.value ?? ''} /></FormControl>
+                     <FormMessage>{state?.errors?.interestRate?.[0]}</FormMessage>
                 </FormItem>
             )} />
              <FormField control={form.control} name="interestType" render={({ field }) => (
@@ -224,8 +228,8 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
              <FormField control={form.control} name="emiAmount" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Monthly Payment (EMI) Amount (Optional)</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 1200" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
-                    <FormMessage>{form.formState.errors.emiAmount?.message}</FormMessage>
+                    <FormControl><Input type="number" placeholder="e.g., 1200" {...field} value={field.value ?? ''} /></FormControl>
+                    <FormMessage>{state?.errors?.emiAmount?.[0]}</FormMessage>
                 </FormItem>
             )} />
         </>
@@ -239,15 +243,15 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
             {rateChangeFields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
                     <FormField control={form.control} name={`rateChanges.${index}.date`} render={({ field }) => (
-                        <FormItem className="flex flex-col"><FormLabel>Effective Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                        <FormItem className="flex flex-col"><FormLabel>Effective Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage>{state?.errors?.rateChanges?.[index]?.date?.[0]}</FormMessage></FormItem>
                     )} />
                     <FormField control={form.control} name={`rateChanges.${index}.rate`} render={({ field }) => (
-                            <FormItem><FormLabel>New Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 9.2" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>New Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 9.2" {...field} value={field.value ?? ''} /></FormControl><FormMessage>{state?.errors?.rateChanges?.[index]?.rate?.[0]}</FormMessage></FormItem>
                     )} />
                     <Button type="button" variant="destructive" size="icon" onClick={() => removeRateChange(index)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
             ))}
-            <Button type="button" variant="outline" onClick={() => appendRateChange({ date: new Date(), rate: 0 })}><Plus className="mr-2" />Add Rate Change</Button>
+            <Button type="button" variant="outline" onClick={() => appendRateChange({ date: new Date(), rate: '' as any })}><Plus className="mr-2" />Add Rate Change</Button>
         </div>
     </div>
     )
@@ -260,20 +264,20 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
                 {transactionFields.map((field, index) => (
                     <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
                          <FormField control={form.control} name={`transactions.${index}.date`} render={({ field }) => (
-                            <FormItem className="flex flex-col"><FormLabel>Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                            <FormItem className="flex flex-col"><FormLabel>Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage>{state?.errors?.transactions?.[index]?.date?.[0]}</FormMessage></FormItem>
                         )} />
                         {!isRepaymentOnly && (
                         <FormField control={form.control} name={`transactions.${index}.type`} render={({ field }) => (
-                            <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="withdrawal">Withdrawal</SelectItem><SelectItem value="repayment">Repayment</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="withdrawal">Withdrawal</SelectItem><SelectItem value="repayment">Repayment</SelectItem></SelectContent></Select><FormMessage>{state?.errors?.transactions?.[index]?.type?.[0]}</FormMessage></FormItem>
                         )} />
                         )}
                         <FormField control={form.control} name={`transactions.${index}.amount`} render={({ field }) => (
-                            <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ''} /></FormControl><FormMessage>{state?.errors?.transactions?.[index]?.amount?.[0]}</FormMessage></FormItem>
                         )} />
                         <Button type="button" variant="destructive" size="icon" onClick={() => removeTransaction(index)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                 ))}
-                <Button type="button" variant="outline" onClick={() => appendTransaction({ date: new Date(), type: isRepaymentOnly ? 'repayment' : 'withdrawal', amount: 0  })}><Plus className="mr-2" />Add {isRepaymentOnly ? 'Payment' : 'Transaction'}</Button>
+                 <Button type="button" variant="outline" onClick={() => appendTransaction({ date: new Date(), type: isRepaymentOnly ? 'repayment' : 'withdrawal', amount: '' as any })}><Plus className="mr-2" />Add {isRepaymentOnly ? 'Payment' : 'Transaction'}</Button>
             </div>
         </div>
     )
@@ -297,16 +301,16 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
                                     </PopoverTrigger>
                                     <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus/></PopoverContent>
                                 </Popover>
-                                <FormMessage />
+                                <FormMessage>{state?.errors?.disbursements?.[index]?.date?.[0]}</FormMessage>
                             </FormItem>
                         )} />
                         <FormField control={form.control} name={`disbursements.${index}.amount`} render={({ field }) => (
-                             <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 25000" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl><FormMessage /></FormItem>
+                             <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 25000" {...field} value={field.value ?? ''} /></FormControl><FormMessage>{state?.errors?.disbursements?.[index]?.amount?.[0]}</FormMessage></FormItem>
                         )} />
                         <Button type="button" variant="destructive" size="icon" onClick={() => removeDisbursement(index)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                 ))}
-                <Button type="button" variant="outline" onClick={() => appendDisbursement({ date: new Date(), amount: 0 })}><Plus className="mr-2" />Add Disbursement</Button>
+                <Button type="button" variant="outline" onClick={() => appendDisbursement({ date: new Date(), amount: '' as any })}><Plus className="mr-2" />Add Disbursement</Button>
             </div>
         </div>
     )
@@ -320,8 +324,8 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
                         <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Moratorium Period (in months)</FormLabel>
-                                <FormControl><Input type="number" placeholder="e.g., 6" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
-                                <FormMessage />
+                                <FormControl><Input type="number" placeholder="e.g., 6" {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage>{state?.errors?.moratoriumPeriod?.[0]}</FormMessage>
                             </FormItem>
                         )} />
                         {renderDisbursements()}
@@ -360,7 +364,7 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
                              <FormField control={form.control} name="emiAmount" render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Fixed Payment Amount</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g., 500" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
+                                    <FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ''} /></FormControl>
                                 </FormItem>
                             )} />
                         )}
@@ -380,8 +384,8 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
                                 <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Moratorium Period (in months)</FormLabel>
-                                        <FormControl><Input type="number" placeholder="e.g., 6" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
-                                        <FormMessage />
+                                        <FormControl><Input type="number" placeholder="e.g., 6" {...field} value={field.value ?? ''} /></FormControl>
+                                        <FormMessage>{state?.errors?.moratoriumPeriod?.[0]}</FormMessage>
                                     </FormItem>
                                 )} />
                                {renderDisbursements()}
@@ -397,8 +401,8 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
                     <FormField control={form.control} name="emisPaid" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Number of EMIs Already Paid (Optional)</FormLabel>
-                            <FormControl><Input type="number" placeholder="e.g., 12" {...field} onChange={e => field.onChange(e.target.valueAsNumber)} /></FormControl>
-                            <FormMessage />
+                            <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
+                            <FormMessage>{state?.errors?.emisPaid?.[0]}</FormMessage>
                         </FormItem>
                     )} />
                 )
@@ -415,7 +419,7 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form action={clientAction} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>
@@ -452,9 +456,9 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
                             <FormMessage className="text-center text-lg">{state.errors._global[0]}</FormMessage>
                          )}
                          
-                         {state?.type === 'error' && state.errors && (
+                         {state?.type === 'error' && state.errors && !(Object.keys(state.errors).length === 1 && state.errors._global) && (
                             <div className="text-destructive text-center text-sm">
-                                Please correct the errors above and try again.
+                                Please correct the errors highlighted above and try again.
                             </div>
                          )}
                         
@@ -467,5 +471,3 @@ export default function ExistingLoanForm({ formAction, state }: ExistingLoanForm
         </Card>
     );
 }
-
-    
