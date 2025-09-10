@@ -18,35 +18,6 @@ function ExistingLoanContent() {
   const [state, formAction] = useActionState(calculateOutstandingBalanceAction, null);
   const [formData, setFormData] = useState<ExistingLoanFormData | null>(null);
 
-  useEffect(() => {
-    if (state?.type === 'success' && state.data) {
-        // Need to get the form data that led to this success state
-        // This is tricky because the server action doesn't have it.
-        // A better approach might be to not clear the form, or pass data back.
-        // For now, we'll just handle the successful result.
-    }
-  }, [state]);
-
-
-  const handleCalculation = (data: ExistingLoanFormData) => {
-    // This function will be called by the form on submit.
-    // It will then trigger the server action.
-    const artificialFormData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-            if (Array.isArray(value)) {
-                artificialFormData.append(key, JSON.stringify(value));
-            } else if (value instanceof Date) {
-                artificialFormData.append(key, value.toISOString());
-            } else {
-                artificialFormData.append(key, String(value));
-            }
-        }
-    });
-    setFormData(data);
-    formAction(artificialFormData);
-  };
-  
   const handleBack = () => {
     // This will reset the state, causing the form to be shown again.
     (formAction as any)(null); // A bit of a hack to reset the action state
@@ -56,6 +27,39 @@ function ExistingLoanContent() {
   };
 
   const showResults = state?.type === 'success' && state.data && formData;
+  
+  const handleFormSubmit = (data: FormData) => {
+    const values = new FormData(data.currentTarget as HTMLFormElement);
+    const formValues = Object.fromEntries(values.entries());
+    
+    // This is a bit of a hack to get the form data for the results page
+    const tempFd = new FormData();
+    const currentData = new FormData(data.currentTarget as HTMLFormElement);
+    currentData.forEach((value, key) => {
+        tempFd.append(key, value);
+    });
+
+    const fData: any = {};
+     for (const [key, value] of tempFd.entries()) {
+        if (key.endsWith('Date')) {
+             fData[key] = new Date(value as string);
+        } else if (['disbursements', 'rateChanges', 'transactions'].includes(key)) {
+            fData[key] = JSON.parse(value as string).map((item: any) => ({
+                ...item,
+                date: new Date(item.date)
+            }));
+        } else if (value && typeof value === 'string' && !isNaN(parseFloat(value)) && isFinite(Number(value)) && !key.startsWith('$ACTION')) {
+            fData[key] = parseFloat(value);
+        } else {
+            if(!key.startsWith('$ACTION'))
+                fData[key] = value;
+        }
+    }
+    setFormData(fData);
+
+
+    formAction(data);
+  }
 
   return (
     <div className="container mx-auto max-w-4xl py-12 px-4">
@@ -78,7 +82,7 @@ function ExistingLoanContent() {
       </div>
       
       {!showResults ? (
-         <ExistingLoanForm formAction={handleCalculation} state={state} />
+         <ExistingLoanForm formAction={handleFormSubmit} state={state} />
       ) : (
         <ExistingLoanResults results={state.data as CalculationResult} formData={formData} onBack={handleBack}/>
       )}
@@ -95,3 +99,5 @@ export default function ExistingLoanPage() {
         </Suspense>
     )
 }
+
+    
