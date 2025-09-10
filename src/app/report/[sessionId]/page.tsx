@@ -11,12 +11,6 @@ import ReportTemplate from '@/app/calculator/report-template';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-interface ReportPageProps {
-    params: {
-        sessionId: string;
-    }
-}
-
 function ReportContent({ sessionId }: { sessionId: string }) {
   const [reportData, setReportData] = useState<ReportDataType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -251,10 +245,10 @@ function ReportContent({ sessionId }: { sessionId: string }) {
   );
 }
 
-export default function ReportPage({ params }: ReportPageProps) {
+export default function ReportPage({ params: { sessionId } }: { params: { sessionId: string } }) {
     return (
         <Suspense fallback={<div className="container mx-auto max-w-4xl py-12 px-4 flex items-center justify-center min-h-[60vh]"><Loader2 className="h-16 w-16 animate-spin text-primary" /></div>}>
-            <ReportContent sessionId={params.sessionId} />
+            <ReportContent sessionId={sessionId} />
         </Suspense>
     )
 }
