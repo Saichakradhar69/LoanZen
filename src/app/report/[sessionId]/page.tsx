@@ -6,16 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Download, Loader2, FileText, AlertCircle, Gift } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import type { CalculationResults as ReportDataType, NewLoanCalculationResults, ExistingLoanReportResults } from '@/app/api/stripe/webhook/route';
 import ReportTemplate from '@/app/calculator/report-template';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-function ThankYouContent() {
-  const searchParams = useSearchParams();
-  const sessionId = searchParams.get('session_id');
-  
+interface ReportPageProps {
+    params: {
+        sessionId: string;
+    }
+}
+
+function ReportContent({ sessionId }: { sessionId: string }) {
   const [reportData, setReportData] = useState<ReportDataType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -158,26 +160,36 @@ function ThankYouContent() {
     <div className="container mx-auto max-w-4xl py-12 px-4 flex flex-col items-center justify-center min-h-[60vh] gap-8">
       <Card className="text-center w-full shadow-lg">
         <CardHeader>
-          <div className="mx-auto bg-green-100 dark:bg-green-900 rounded-full h-16 w-16 flex items-center justify-center">
-            <CheckCircle className="h-10 w-10 text-green-500" />
-          </div>
-          <CardTitle className="text-3xl font-headline mt-4">Payment Successful!</CardTitle>
+          {isLoading ? (
+             <div className="mx-auto bg-gray-100 dark:bg-gray-800 rounded-full h-16 w-16 flex items-center justify-center">
+                <Loader2 className="h-10 w-10 text-primary animate-spin" />
+            </div>
+          ) : error ? (
+            <div className="mx-auto bg-destructive/10 rounded-full h-16 w-16 flex items-center justify-center">
+                <AlertCircle className="h-10 w-10 text-destructive" />
+            </div>
+          ) : (
+             <div className="mx-auto bg-green-100 dark:bg-green-900 rounded-full h-16 w-16 flex items-center justify-center">
+                <CheckCircle className="h-10 w-10 text-green-500" />
+            </div>
+          )}
+          <CardTitle className="text-3xl font-headline mt-4">
+             {isLoading ? 'Verifying Purchase...' : error ? 'Verification Failed' : 'Payment Successful!'}
+          </CardTitle>
           <CardDescription className="text-lg">
-            Thank you for your purchase. Your report is ready to download.
+             {isLoading ? 'Please wait while we retrieve your secure report.' : error ? 'Could not verify your purchase. Please contact support.' : 'Thank you for your purchase. Your report is ready to download.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {isLoading && (
             <div className="flex flex-col items-center gap-4 p-8">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
               <p className="text-muted-foreground">Retrieving your calculation data...</p>
             </div>
           )}
 
           {error && (
              <div className="flex flex-col items-center gap-4 p-8 bg-destructive/10 rounded-lg">
-              <AlertCircle className="h-12 w-12 text-destructive" />
-              <p className="text-destructive font-semibold">Could not load report data</p>
+              <p className="text-destructive font-semibold">Error Details</p>
               <p className="text-muted-foreground text-sm">{error}</p>
             </div>
           )}
@@ -239,10 +251,10 @@ function ThankYouContent() {
   );
 }
 
-export default function ThankYouPage() {
+export default function ReportPage({ params }: ReportPageProps) {
     return (
-        <Suspense fallback={<div>Loading...</div>}>
-            <ThankYouContent />
+        <Suspense fallback={<div className="container mx-auto max-w-4xl py-12 px-4 flex items-center justify-center min-h-[60vh]"><Loader2 className="h-16 w-16 animate-spin text-primary" /></div>}>
+            <ReportContent sessionId={params.sessionId} />
         </Suspense>
     )
 }

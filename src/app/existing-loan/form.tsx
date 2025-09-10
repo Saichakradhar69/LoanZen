@@ -1,7 +1,8 @@
 
+
 'use client';
 
-import { useFieldArray, useForm, useFormState } from 'react-hook-form';
+import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -122,6 +123,7 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
         }
     }, [initialState, form]);
     
+    const { getValues } = form;
 
     const loanType = form.watch('loanType');
     const rateType = form.watch('rateType');
@@ -130,12 +132,6 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
-
-    const onSubmit = (data: ExistingLoanFormData) => {
-        const formData = new FormData();
-        formData.append('form_data_json', JSON.stringify(data));
-        formAction(formData);
-    };
 
     const renderCommonFields = () => (
         <>
@@ -408,6 +404,17 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
                 return null;
         }
     }
+    
+    const handleFormAction = async () => {
+        const valid = await form.trigger();
+        if (valid) {
+            const data = getValues();
+            const formData = new FormData();
+            formData.append('form_data_json', JSON.stringify(data));
+            formAction(formData);
+        }
+    };
+
 
     return (
         <Card>
@@ -417,7 +424,7 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form action={formAction} onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                    <form action={handleFormAction} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>

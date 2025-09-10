@@ -10,7 +10,6 @@ import type { CalculationResults } from './page';
 import { ArrowLeft, Download, ExternalLink, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
 import Link from 'next/link';
 import type { FormData } from './form';
 
@@ -39,8 +38,6 @@ const interestRateTypeLabels: { [key: string]: string } = {
 };
 
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
-
 export default function CalculatorResults({ results, formData, onBack }: CalculatorResultsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +63,8 @@ export default function CalculatorResults({ results, formData, onBack }: Calcula
             },
             body: JSON.stringify({ 
                 appUrl: window.location.origin,
-                formData: formData 
+                formData: formData,
+                formType: 'new-loan',
             }),
         });
 
@@ -195,10 +193,10 @@ export default function CalculatorResults({ results, formData, onBack }: Calcula
                 </Button>
             ) : (
                 <Button size="lg" className="shadow-lg" asChild>
-                    <Link href={checkoutUrl} target="_blank">
+                    <a href={checkoutUrl} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="mr-2"/>
                         Proceed to Secure Payment
-                    </Link>
+                    </a>
                 </Button>
             )}
             {error && <p className="text-destructive text-center text-sm pt-4">{error}</p>}

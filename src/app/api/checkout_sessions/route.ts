@@ -37,7 +37,7 @@ export async function POST(request: Request) {
         },
       ],
       mode: 'payment',
-      success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${appUrl}/report/{CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/${formType === 'new-loan' ? 'calculator' : 'existing-loan'}?status=cancelled`,
       metadata: {
         formData: JSON.stringify(formData),

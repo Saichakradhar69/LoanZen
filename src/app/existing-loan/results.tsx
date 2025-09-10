@@ -9,7 +9,6 @@ import type { CalculationResult } from './actions';
 import { ArrowLeft, Download, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState } from 'react';
-import { loadStripe } from '@stripe/stripe-js';
 import Link from 'next/link';
 import type { ExistingLoanFormData } from './form';
 
@@ -38,8 +37,6 @@ const interestTypeLabels: { [key: string]: string } = {
   flat: 'Flat Rate',
 };
 
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 export default function ExistingLoanResults({ results, formData, onBack }: ExistingLoanResultsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -175,10 +172,10 @@ export default function ExistingLoanResults({ results, formData, onBack }: Exist
                 </Button>
             ) : (
                 <Button size="lg" className="shadow-lg" asChild>
-                    <Link href={checkoutUrl} target="_blank">
+                     <a href={checkoutUrl} target="_blank" rel="noopener noreferrer">
                         <ExternalLink className="mr-2"/>
                         Proceed to Secure Payment
-                    </Link>
+                    </a>
                 </Button>
             )}
             {error && <p className="text-destructive text-center text-sm pt-4">{error}</p>}
