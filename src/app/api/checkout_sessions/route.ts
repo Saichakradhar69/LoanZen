@@ -3,9 +3,17 @@
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
 import type { FormData as CalculatorFormData } from '@/app/calculator/form';
+import type { ExistingLoanFormData } from '@/app/existing-loan/form';
+
+
+type RequestBody = {
+    appUrl: string;
+    formData: CalculatorFormData | ExistingLoanFormData;
+    formType: 'new-loan' | 'existing-loan';
+}
 
 export async function POST(request: Request) {
-  const { appUrl, formData } = (await request.json()) as { appUrl: string, formData: CalculatorFormData };
+  const { appUrl, formData, formType } = (await request.json()) as RequestBody;
   const priceId = process.env.STRIPE_PRICE_ID;
 
   if (!priceId) {
@@ -16,8 +24,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Application URL was not provided by the client.' }, { status: 500 });
   }
   
-  if (!formData) {
-    return NextResponse.json({ error: 'Form data was not provided by the client.' }, { status: 500 });
+  if (!formData || !formType) {
+    return NextResponse.json({ error: 'Form data or type was not provided by the client.' }, { status: 500 });
   }
 
   try {
@@ -30,9 +38,10 @@ export async function POST(request: Request) {
       ],
       mode: 'payment',
       success_url: `${appUrl}/thank-you?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/calculator?status=cancelled`,
+      cancel_url: `${appUrl}/${formType === 'new-loan' ? 'calculator' : 'existing-loan'}?status=cancelled`,
       metadata: {
         formData: JSON.stringify(formData),
+        formType: formType,
       }
     });
 

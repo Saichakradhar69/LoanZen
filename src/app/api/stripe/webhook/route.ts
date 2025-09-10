@@ -5,6 +5,8 @@ import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import type { FormData as CalculatorFormData } from '@/app/calculator/form';
+import type { ExistingLoanFormData, CalculationResult as ExistingLoanCalculationResult } from '@/app/existing-loan/actions';
+import { performExistingLoanCalculations } from '@/app/existing-loan/calculations';
 
 // --- Data types needed for recalculation ---
 
@@ -27,7 +29,8 @@ export type ScenarioResult = {
   loanTerm: number;
 };
 
-export type CalculationResults = {
+export type NewLoanCalculationResults = {
+  formType: 'new-loan';
   loanName: string;
   loanType: string;
   interestRateType: string;
@@ -36,6 +39,16 @@ export type CalculationResults = {
   generatedAt: string;
   couponCode: string;
 };
+
+export type ExistingLoanReportResults = {
+    formType: 'existing-loan';
+    userEmail: string | null;
+    generatedAt: string;
+    couponCode: string;
+} & ExistingLoanCalculationResult;
+
+
+export type CalculationResults = NewLoanCalculationResults | ExistingLoanReportResults;
 
 // --- Calculation logic moved to the server ---
 
@@ -74,7 +87,7 @@ function calculateAmortization(loanAmount: number, annualInterestRate: number, l
   };
 }
 
-function performCalculations(formData: CalculatorFormData, userEmail: string | null): Omit<CalculationResults, 'couponCode' | 'generatedAt'> {
+function performNewLoanCalculations(formData: CalculatorFormData, userEmail: string | null): Omit<NewLoanCalculationResults, 'couponCode' | 'generatedAt' | 'formType'> {
     const calculatedScenarios = formData.scenarios.map((scenario) => {
       const { monthlyPayment, totalInterest, totalPayment, amortizationSchedule } = calculateAmortization(
         scenario.loanAmount,
@@ -148,24 +161,35 @@ async function handleGetRequest(req: NextRequest) {
     try {
         const session = await stripe.checkout.sessions.retrieve(sessionId);
         const formDataString = session.metadata?.formData;
+        const formType = session.metadata?.formType as 'new-loan' | 'existing-loan' | undefined;
         const userEmail = session.customer_details?.email || null;
 
-        if (!formDataString) {
-            return NextResponse.json({ error: 'Form data not found in session.' }, { status: 404 });
+        if (!formDataString || !formType) {
+            return NextResponse.json({ error: 'Form data or type not found in session.' }, { status: 404 });
         }
         
-        const formData: CalculatorFormData = JSON.parse(formDataString);
-        
-        // We perform the calculations on-demand here.
-        // In a real-world scenario, this data would be read from a database
-        // where it was stored by the webhook after payment confirmation.
-        const partialResults = performCalculations(formData, userEmail);
+        let finalResults: CalculationResults;
 
-        const finalResults: CalculationResults = {
-            ...partialResults,
-            generatedAt: new Date().toISOString(),
-            couponCode: generateCouponCode(),
-        };
+        if (formType === 'new-loan') {
+            const formData: CalculatorFormData = JSON.parse(formDataString);
+            const partialResults = performNewLoanCalculations(formData, userEmail);
+             finalResults = {
+                ...partialResults,
+                formType: 'new-loan',
+                generatedAt: new Date().toISOString(),
+                couponCode: generateCouponCode(),
+            };
+        } else { // existing-loan
+            const formData: ExistingLoanFormData = JSON.parse(formDataString);
+            const calculatedData = performExistingLoanCalculations(formData);
+            finalResults = {
+                ...calculatedData,
+                formType: 'existing-loan',
+                userEmail: userEmail,
+                generatedAt: new Date().toISOString(),
+                couponCode: generateCouponCode(),
+            };
+        }
 
         return NextResponse.json(finalResults);
 

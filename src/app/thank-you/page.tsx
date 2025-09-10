@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CheckCircle, Download, Loader2, FileText, AlertCircle, Gift } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import type { CalculationResults, ScenarioResult } from '@/app/api/stripe/webhook/route';
+import type { CalculationResults as ReportDataType, NewLoanCalculationResults, ExistingLoanReportResults } from '@/app/api/stripe/webhook/route';
 import ReportTemplate from '@/app/calculator/report-template';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -16,7 +16,7 @@ function ThankYouContent() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get('session_id');
   
-  const [reportData, setReportData] = useState<CalculationResults | null>(null);
+  const [reportData, setReportData] = useState<ReportDataType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +36,7 @@ function ThankYouContent() {
                 const errorData = await res.json();
                 throw new Error(errorData.error || 'Failed to fetch report data.');
             }
-            const data: CalculationResults = await res.json();
+            const data: ReportDataType = await res.json();
             setReportData(data);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -93,64 +93,51 @@ function ThankYouContent() {
   const handleDownloadCsv = () => {
     if (!reportData) return;
 
-    const lines: string[] = [];
+    let csvContent = '';
     const today = new Date().toISOString().split('T')[0];
 
-    // 1. Add Header and Metadata
-    lines.push('LoanZen - Amortization Data');
-    lines.push(`Generated: ${today} for ${reportData.userEmail || 'N/A'}`);
-    lines.push('');
+    if (reportData.formType === 'new-loan') {
+        const data = reportData as NewLoanCalculationResults;
+        const lines: string[] = [];
+        lines.push('LoanZen - New Loan Comparison Data');
+        lines.push(`Generated: ${today} for ${data.userEmail || 'N/A'}`);
+        lines.push('');
+        lines.push('[SUMMARY]');
+        lines.push('Scenario,Loan Amount,Interest Rate (%),Term (Years),Monthly Payment,Total Interest,Total Cost');
+        data.scenarios.forEach((s) => {
+            lines.push([`"${s.scenarioName.replace(/"/g, '""')}"`, s.loanAmount, s.interestRate, s.loanTerm, s.monthlyPayment, s.totalInterest, s.totalPayment].join(','));
+        });
+        lines.push('');
+        data.scenarios.forEach((s) => {
+            lines.push(`[AMORTIZATION_SCHEDULE: ${s.scenarioName.replace(/"/g, '""')}]`);
+            lines.push('Month,Payment,Principal,Interest,Remaining Balance');
+            s.amortizationSchedule.forEach(p => {
+                lines.push([p.month, p.monthlyPayment, p.principal, p.interest, p.remainingBalance].join(','));
+            });
+            lines.push('');
+        });
+        csvContent = lines.join('\n');
+    } else {
+        const data = reportData as ExistingLoanReportResults;
+         const lines: string[] = [];
+        lines.push('LoanZen - Existing Loan Statement');
+        lines.push(`Generated: ${today} for ${data.userEmail || 'N/A'}`);
+        lines.push('');
+        lines.push('[SUMMARY]');
+        lines.push('Metric,Value');
+        lines.push(`"Outstanding Balance",${data.outstandingBalance}`);
+        lines.push(`"Interest Paid to Date",${data.interestPaidToDate}`);
+        lines.push(`"Next EMI Date",${data.nextEmiDate ? new Date(data.nextEmiDate).toLocaleDateString() : 'N/A'}`);
+        lines.push(`"Original Loan Amount",${data.originalLoanAmount}`);
+        lines.push('');
+        lines.push('[TRANSACTION_HISTORY]');
+        lines.push('Date,Type,Amount,Principal,Interest,Ending Balance,Note');
+        data.schedule.forEach(t => {
+            lines.push([t.date, t.type, t.amount, t.principal, t.interest, t.endingBalance, `"${t.note || ''}"`].join(','));
+        });
+        csvContent = lines.join('\n');
+    }
 
-    // 2. Add Summary Section
-    lines.push('[SUMMARY]');
-    lines.push('Scenario,Loan Amount,Interest Rate (%),Term (Years),Monthly Payment,Total Interest,Total Cost');
-    reportData.scenarios.forEach((scenario) => {
-      lines.push(
-        [
-          `"${scenario.scenarioName.replace(/"/g, '""')}"`,
-          scenario.loanAmount,
-          scenario.interestRate,
-          scenario.loanTerm,
-          scenario.monthlyPayment,
-          scenario.totalInterest,
-          scenario.totalPayment,
-        ].join(',')
-      );
-    });
-    lines.push('');
-
-    // 3. Add Amortization Schedule for each Scenario
-    reportData.scenarios.forEach((scenario) => {
-      lines.push(`[AMORTIZATION_SCHEDULE: ${scenario.scenarioName.replace(/"/g, '""')}]`);
-      lines.push('Month,Payment Date,Beginning Balance,Payment,Principal,Interest,Ending Balance');
-      
-      let runningBalance = scenario.loanAmount;
-      const monthlyInterestRate = scenario.interestRate / 100 / 12;
-
-      scenario.amortizationSchedule.forEach((payment, monthIndex) => {
-        // Since we don't have a start date, we'll calculate from today.
-        let paymentDate = new Date();
-        paymentDate.setMonth(paymentDate.getMonth() + monthIndex + 1);
-        const dateString = paymentDate.toISOString().split('T')[0];
-        
-        const beginningBalance = payment.remainingBalance + payment.principal;
-
-        lines.push(
-          [
-            payment.month,
-            dateString,
-            beginningBalance.toFixed(2),
-            payment.monthlyPayment.toFixed(2),
-            payment.principal.toFixed(2),
-            payment.interest.toFixed(2),
-            payment.remainingBalance.toFixed(2),
-          ].join(',')
-        );
-      });
-      lines.push('');
-    });
-    
-    const csvContent = lines.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
 

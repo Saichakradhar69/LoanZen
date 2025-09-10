@@ -1,110 +1,180 @@
 
 // src/app/existing-loan/calculations.ts
 
-export type AmortizationData = {
-  month: number;
-  paymentDate: string;
-  beginningBalance: number;
-  payment: number;
-  principal: number;
-  interest: number;
-  endingBalance: number;
-};
+import { add, differenceInDays, format } from 'date-fns';
+import type { ExistingLoanFormData } from './form';
+import type { CalculationResult, Transaction } from './actions';
 
-export type CalculationResult = {
-  emi: number;
-  totalInterest: number;
-  totalRepayment: number;
-  schedule: AmortizationData[];
-};
+function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
+    let events: any[] = [];
 
-/**
- * Calculates EMI and amortization schedule for a flat-rate loan.
- * @param principal - The original loan amount.
- * @param annualRate - The annual interest rate in percent (e.g., 10 for 10%).
- * @param tenureYears - The loan term in years.
- * @returns An object with EMI, total interest, and the amortization schedule.
- */
-export function calculateFlatRate(principal: number, annualRate: number, tenureYears: number): CalculationResult {
-  const totalMonths = tenureYears * 12;
-  const totalInterest = principal * (annualRate / 100) * tenureYears;
-  const totalRepayment = principal + totalInterest;
-  const emi = totalRepayment / totalMonths;
-
-  const monthlyInterest = totalInterest / totalMonths;
-  const monthlyPrincipal = emi - monthlyInterest;
-
-  const schedule: AmortizationData[] = [];
-  let beginningBalance = principal;
-  let paymentDate = new Date();
-
-  for (let i = 1; i <= totalMonths; i++) {
-    paymentDate.setMonth(paymentDate.getMonth() + 1);
-    const endingBalance = beginningBalance - monthlyPrincipal;
-    
-    schedule.push({
-      month: i,
-      paymentDate: paymentDate.toISOString().split('T')[0],
-      beginningBalance: parseFloat(beginningBalance.toFixed(2)),
-      payment: parseFloat(emi.toFixed(2)),
-      principal: parseFloat(monthlyPrincipal.toFixed(2)),
-      interest: parseFloat(monthlyInterest.toFixed(2)),
-      endingBalance: parseFloat(Math.max(0, endingBalance).toFixed(2)),
+    // Initial Disbursement
+    events.push({
+        date: data.disbursementDate,
+        type: 'disbursement',
+        amount: data.originalLoanAmount,
     });
-    
-    beginningBalance = endingBalance;
-  }
 
-  return {
-    emi: parseFloat(emi.toFixed(2)),
-    totalInterest: parseFloat(totalInterest.toFixed(2)),
-    totalRepayment: parseFloat(totalRepayment.toFixed(2)),
-    schedule,
-  };
+    // Additional Disbursements
+    if (data.disbursements && data.disbursements.length > 0) {
+        events = data.disbursements.map(d => ({
+            date: d.date,
+            type: 'disbursement',
+            amount: d.amount
+        }));
+    }
+
+
+    // Rate Changes
+    if (data.rateChanges) {
+        data.rateChanges.forEach(rc => {
+            events.push({
+                date: rc.date,
+                type: 'rate-change',
+                rate: rc.rate,
+            });
+        });
+    }
+
+    // Repayments
+    if (data.paymentStructure === 'fixed' && data.emiAmount && data.emisPaid) {
+        let firstEmiDate = add(data.disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
+        for (let i = 0; i < data.emisPaid; i++) {
+            events.push({
+                date: add(firstEmiDate, { months: i }),
+                type: 'repayment',
+                amount: data.emiAmount,
+            });
+        }
+    } else if (data.paymentStructure === 'variable' && data.transactions) {
+         data.transactions.forEach(t => {
+            if (t.type === 'repayment') {
+                 events.push({ ...t });
+            }
+        });
+    }
+    
+    // Credit Line transactions
+    if (data.loanType === 'credit-line' && data.transactions) {
+        data.transactions.forEach(t => events.push({...t}));
+    }
+
+
+    return events.sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
-/**
- * Calculates EMI and amortization schedule for a reducing balance loan.
- * @param principal - The original loan amount.
- * @param annualRate - The annual interest rate in percent (e.g., 7.5 for 7.5%).
- * @param tenureYears - The loan term in years.
- * @returns An object with EMI, total interest, and the amortization schedule.
- */
-export function calculateReducingBalance(principal: number, annualRate: number, tenureYears: number): CalculationResult {
-  const monthlyRate = annualRate / 100 / 12;
-  const totalMonths = tenureYears * 12;
 
-  const emi = (principal * monthlyRate * Math.pow(1 + monthlyRate, totalMonths)) / (Math.pow(1 + monthlyRate, totalMonths) - 1);
-  const totalRepayment = emi * totalMonths;
-  const totalInterest = totalRepayment - principal;
-  
-  const schedule: AmortizationData[] = [];
-  let beginningBalance = principal;
-  let paymentDate = new Date();
+export function performExistingLoanCalculations(data: ExistingLoanFormData): CalculationResult {
+    // This is a complex logic that requires day-by-day calculation.
+    // The implementation below is a SIMPLIFIED version for demonstration.
+    // A production-ready version would require a more robust, battle-tested financial library.
 
-  for (let i = 1; i <= totalMonths; i++) {
-    paymentDate.setMonth(paymentDate.getMonth() + 1);
-    const interest = beginningBalance * monthlyRate;
-    const principalPaid = emi - interest;
-    const endingBalance = beginningBalance - principalPaid;
+    const events = sortAndCombineEvents(data);
+    const schedule: Transaction[] = [];
 
-    schedule.push({
-      month: i,
-      paymentDate: paymentDate.toISOString().split('T')[0],
-      beginningBalance: parseFloat(beginningBalance.toFixed(2)),
-      payment: parseFloat(emi.toFixed(2)),
-      principal: parseFloat(principalPaid.toFixed(2)),
-      interest: parseFloat(interest.toFixed(2)),
-      endingBalance: parseFloat(Math.max(0, endingBalance).toFixed(2)),
-    });
+    let balance = 0;
+    let interestPaid = 0;
+    let currentRate = data.interestRate;
+    let lastEventDate = events.length > 0 ? events[0].date : new Date();
 
-    beginningBalance = endingBalance;
-  }
+    if (data.interestType === 'flat') {
+        // Simplified Flat Rate Logic
+        let totalPrincipal = 0;
+        let totalRepayments = 0;
 
-  return {
-    emi: parseFloat(emi.toFixed(2)),
-    totalInterest: parseFloat(totalInterest.toFixed(2)),
-    totalRepayment: parseFloat(totalRepayment.toFixed(2)),
-    schedule,
-  };
+        events.forEach(e => {
+            if (e.type === 'disbursement') totalPrincipal += e.amount;
+            if (e.type === 'repayment') totalRepayments += e.amount;
+        });
+        
+        const daysElapsed = differenceInDays(new Date(), data.disbursementDate);
+        const yearsElapsed = daysElapsed / 365.25;
+
+        const totalInterestAccrued = data.originalLoanAmount * (data.interestRate / 100) * yearsElapsed;
+        
+        balance = totalPrincipal + totalInterestAccrued - totalRepayments;
+        interestPaid = Math.max(0, totalRepayments - totalPrincipal);
+
+    } else {
+        // Reducing Balance Logic
+        for (const event of events) {
+            const daysSinceLastEvent = differenceInDays(event.date, lastEventDate);
+            let accruedInterest = 0;
+            if (daysSinceLastEvent > 0 && balance > 0) {
+                 accruedInterest = (balance * (currentRate / 100) * daysSinceLastEvent) / 365.25;
+            }
+           
+            if (accruedInterest > 0) {
+                 balance += accruedInterest;
+                 schedule.push({
+                     date: format(event.date, 'yyyy-MM-dd'),
+                     type: 'interest',
+                     amount: accruedInterest,
+                     principal: 0,
+                     interest: parseFloat(accruedInterest.toFixed(2)),
+                     endingBalance: parseFloat(balance.toFixed(2)),
+                     note: `Interest accrued for ${daysSinceLastEvent} days @ ${currentRate}%`,
+                 });
+            }
+
+            let principalComponent = 0;
+            let interestComponent = 0;
+            
+            switch (event.type) {
+                case 'disbursement':
+                case 'withdrawal':
+                    balance += event.amount;
+                    principalComponent = event.amount;
+                    break;
+                case 'repayment':
+                    let interestPortion = Math.min(event.amount, accruedInterest);
+                    interestPaid += interestPortion;
+                    const principalPortion = event.amount - interestPortion;
+                    balance -= event.amount;
+                    interestComponent = interestPortion;
+                    principalComponent = -principalPortion;
+                    break;
+                case 'rate-change':
+                    currentRate = event.rate;
+                    break;
+            }
+
+             schedule.push({
+                date: format(event.date, 'yyyy-MM-dd'),
+                type: event.type,
+                amount: event.amount,
+                principal: parseFloat(principalComponent.toFixed(2)),
+                interest: parseFloat(interestComponent.toFixed(2)),
+                endingBalance: parseFloat(balance.toFixed(2)),
+                note: event.type === 'rate-change' ? `Rate changed to ${event.rate}%` : undefined
+            });
+
+            lastEventDate = event.date;
+        }
+
+        // Accrue interest from last event to today
+        const daysSinceLastEvent = differenceInDays(new Date(), lastEventDate);
+        if (daysSinceLastEvent > 0 && balance > 0) {
+             const finalInterest = (balance * (currentRate / 100) * daysSinceLastEvent) / 365.25;
+             balance += finalInterest;
+        }
+    }
+    
+    let firstEmiDate = add(data.disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
+    let nextEmiDate = firstEmiDate;
+    const today = new Date();
+    while(nextEmiDate < today) {
+        nextEmiDate = add(nextEmiDate, { months: 1 });
+    }
+
+    return {
+        outstandingBalance: Math.max(0, balance),
+        interestPaidToDate: interestPaid,
+        nextEmiDate: nextEmiDate.toISOString(),
+        originalLoanAmount: data.originalLoanAmount,
+        loanName: data.loanName,
+        loanType: data.loanType,
+        interestType: data.interestType,
+        schedule,
+    };
 }

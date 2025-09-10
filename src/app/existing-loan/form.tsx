@@ -17,10 +17,10 @@ import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useActionState, useState } from 'react';
-import { calculateOutstandingBalanceAction } from './actions';
+import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import type { CalculationResult } from './actions';
 
 
 const disbursementSchema = z.object({
@@ -77,9 +77,17 @@ function SubmitButton() {
     )
 }
 
+interface ExistingLoanFormProps {
+    formAction: (payload: FormData) => void;
+    state: {
+        type: string;
+        errors?: any;
+        data?: CalculationResult;
+    } | null;
+}
 
-export default function ExistingLoanForm() {
-    const [state, formAction] = useActionState(calculateOutstandingBalanceAction, null);
+
+export default function ExistingLoanForm({ formAction, state }: ExistingLoanFormProps) {
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
 
     const form = useForm<ExistingLoanFormData>({
@@ -110,21 +118,22 @@ export default function ExistingLoanForm() {
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
 
-    const onSubmit = (data: ExistingLoanFormData) => {
-        const formData = new FormData();
+    const clientAction = (formData: FormData) => {
+        const data = form.getValues();
         Object.entries(data).forEach(([key, value]) => {
-            if (value !== undefined && value !== null) {
-                if (value instanceof Date) {
-                    formData.append(key, value.toISOString());
-                } else if (Array.isArray(value)) {
+             if (value !== undefined && value !== null) {
+                if (Array.isArray(value)) {
                     formData.append(key, JSON.stringify(value));
+                } else if (value instanceof Date) {
+                    formData.append(key, value.toISOString());
                 } else {
                     formData.append(key, String(value));
                 }
             }
         });
         formAction(formData);
-    };
+    }
+
 
     const renderCommonFields = () => (
         <>
@@ -151,14 +160,14 @@ export default function ExistingLoanForm() {
                             <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
                         </PopoverContent>
                     </Popover>
-                    <FormMessage />
+                    <FormMessage>{state?.errors?.disbursementDate?.[0]}</FormMessage>
                 </FormItem>
             )} />
             <FormField control={form.control} name="interestRate" render={({ field }) => (
                 <FormItem>
                     <FormLabel>Current/Initial Interest Rate (%)</FormLabel>
                     <FormControl><Input type="number" step="0.01" placeholder="e.g., 8.5" {...field} value={field.value ?? ''} /></FormControl>
-                    <FormMessage />
+                     <FormMessage>{state?.errors?.interestRate?.[0]}</FormMessage>
                 </FormItem>
             )} />
              <FormField control={form.control} name="interestType" render={({ field }) => (
@@ -216,7 +225,7 @@ export default function ExistingLoanForm() {
                 <FormItem>
                     <FormLabel>Monthly Payment (EMI) Amount (Optional)</FormLabel>
                     <FormControl><Input type="number" placeholder="e.g., 1200" {...field} value={field.value ?? ''} /></FormControl>
-                    <FormMessage />
+                    <FormMessage>{state?.errors?.emiAmount?.[0]}</FormMessage>
                 </FormItem>
             )} />
         </>
@@ -406,7 +415,7 @@ export default function ExistingLoanForm() {
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                    <form action={clientAction} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>
@@ -439,19 +448,15 @@ export default function ExistingLoanForm() {
                             )}
                         </div>
                         
+                         {state?.type === 'error' && state.errors?._global && (
+                            <FormMessage className="text-center text-lg">{state.errors._global[0]}</FormMessage>
+                         )}
+                        
                         <div className="flex justify-end pt-4">
                            <SubmitButton />
                         </div>
                     </form>
                 </Form>
-                 {state?.type === 'success' && (
-                    <div className="mt-8 p-6 bg-secondary rounded-lg">
-                        <h3 className="text-xl font-bold text-primary">Calculation Result</h3>
-                        <p>Outstanding Balance: ${state.data.outstandingBalance.toFixed(2)}</p>
-                        <p>Interest Paid to Date: ${state.data.interestPaidToDate.toFixed(2)}</p>
-                        <p>Next EMI Date: {new Date(state.data.nextEmiDate).toLocaleDateString()}</p>
-                    </div>
-                 )}
             </CardContent>
         </Card>
     );

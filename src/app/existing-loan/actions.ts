@@ -3,7 +3,29 @@
 'use server';
 
 import { z } from 'zod';
-import { calculateFlatRate, calculateReducingBalance } from './calculations';
+import { performExistingLoanCalculations } from './calculations';
+import type { ExistingLoanFormData } from './form';
+
+export type Transaction = {
+    date: string;
+    type: 'disbursement' | 'repayment' | 'withdrawal' | 'interest' | 'rate-change';
+    amount: number;
+    principal: number;
+    interest: number;
+    endingBalance: number;
+    note?: string;
+}
+
+export type CalculationResult = {
+    outstandingBalance: number;
+    interestPaidToDate: number;
+    nextEmiDate: string | null;
+    originalLoanAmount: number;
+    loanName: string | undefined;
+    loanType: string;
+    interestType: 'reducing' | 'flat';
+    schedule: Transaction[];
+}
 
 const disbursementSchema = z.object({
   date: z.date({ required_error: 'Disbursement date is required.' }),
@@ -43,44 +65,47 @@ export async function calculateOutstandingBalanceAction(
   prevState: any,
   formData: FormData,
 ) {
-    // This is a placeholder for the real calculation logic which is complex.
-    // For now, we will just validate the input and return a success message.
-
-    // WARNING: A full implementation requires a detailed, date-aware, day-by-day 
-    // calculation loop, especially for floating rates and credit lines. 
-    // The functions in `calculations.ts` are simplified for this example.
-
-    const validatedFields = formSchema.safeParse({
-      loanType: formData.get('loanType'),
-      originalLoanAmount: formData.get('originalLoanAmount'),
-      disbursementDate: new Date(formData.get('disbursementDate') as string),
-      interestRate: formData.get('interestRate'),
-      interestType: formData.get('interestType'),
-      rateType: formData.get('rateType'),
-      moratoriumPeriod: formData.get('moratoriumPeriod'),
-      // ... and so on for all fields
-    });
+    const createObjectFromFormData = (formData: FormData) => {
+        const data: any = {};
+        for (const [key, value] of formData.entries()) {
+            if (key.endsWith('Date')) {
+                 data[key] = new Date(value as string);
+            } else if (['disbursements', 'rateChanges', 'transactions'].includes(key)) {
+                data[key] = JSON.parse(value as string).map((item: any) => ({
+                    ...item,
+                    date: new Date(item.date)
+                }));
+            } else if (typeof value === 'string' && !isNaN(parseFloat(value)) && isFinite(Number(value))) {
+                data[key] = parseFloat(value);
+            } else {
+                data[key] = value;
+            }
+        }
+        return data;
+    }
     
-    // This is a simplified validation for demonstration.
-    // A real implementation would need to parse all fields from formData.
-    if (formData.get('originalLoanAmount') === '0') {
+    const data = createObjectFromFormData(formData);
+
+    const validatedFields = formSchema.safeParse(data);
+    
+    if (!validatedFields.success) {
+      return {
+        type: 'error',
+        errors: validatedFields.error.flatten().fieldErrors,
+      };
+    }
+    
+    try {
+        const result = performExistingLoanCalculations(validatedFields.data as ExistingLoanFormData);
+        return {
+            type: 'success',
+            data: result
+        };
+    } catch (error) {
+        console.error("Calculation Error:", error);
          return {
             type: 'error',
-            errors: { originalLoanAmount: ['Loan amount must be greater than 0.'] },
+            errors: { _global: ['An unexpected error occurred during calculation. Please check your inputs.'] },
         };
     }
-
-    console.log("Form data received on server:", Object.fromEntries(formData.entries()));
-
-    // Here you would call your complex calculation logic based on interestType
-    // e.g. if (validatedFields.data.interestType === 'flat') { ... }
-
-    return {
-        type: 'success',
-        data: {
-            outstandingBalance: 12345.67, // Dummy data
-            interestPaidToDate: 2345.67, // Dummy data
-            nextEmiDate: new Date().toISOString(), // Dummy data
-        }
-    };
 }
