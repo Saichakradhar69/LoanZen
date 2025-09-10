@@ -17,10 +17,10 @@ import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useActionState, useState, startTransition } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import type { CalculationResult } from './actions';
+import { calculateOutstandingBalanceAction, CalculationResult } from './actions';
 
 
 const disbursementSchema = z.object({
@@ -79,19 +79,14 @@ function SubmitButton() {
 }
 
 interface ExistingLoanFormProps {
-    formAction: (prevState: any, formData: ExistingLoanFormData) => Promise<{ type: string; errors?: any; data?: CalculationResult; }>;
-    initialState: {
-        type: string;
-        errors?: any;
-        data?: CalculationResult;
-    } | null;
+    formAction: (payload: FormData) => void;
+    initialState: any;
 }
 
 
 export default function ExistingLoanForm({ formAction, initialState }: ExistingLoanFormProps) {
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-    const [state, dispatchFormAction] = useActionState(formAction, initialState);
-
+    
     const form = useForm<ExistingLoanFormData>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -102,15 +97,15 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
             disbursementDate: undefined,
             interestRate: '' as any,
             emiAmount: '' as any,
-            moratoriumPeriod: '' as any,
-            emisPaid: '' as any,
+            moratoriumPeriod: 0,
+            emisPaid: 0,
             loanName: '',
             paymentStructure: 'fixed',
             disbursements: [],
             rateChanges: [],
             transactions: []
         },
-        errors: state?.type === 'error' ? state.errors : undefined,
+        errors: initialState?.type === 'error' ? initialState.errors : undefined,
     });
 
     const loanType = form.watch('loanType');
@@ -120,12 +115,6 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
-    
-    const onSubmit = (data: ExistingLoanFormData) => {
-        startTransition(() => {
-            dispatchFormAction(data);
-        });
-    };
 
     const renderCommonFields = () => (
         <>
@@ -393,7 +382,7 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
                             <FormMessage />
                         </FormItem>
                     )} />
-                );
+                 );
             default:
                 return null;
         }
@@ -407,7 +396,7 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                    <form action={formAction} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>
@@ -440,11 +429,11 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
                             )}
                         </div>
                         
-                         {state?.type === 'error' && state.errors?._global && (
-                            <FormMessage className="text-center text-lg">{state.errors._global[0]}</FormMessage>
+                         {initialState?.type === 'error' && initialState.errors?._global && (
+                            <FormMessage className="text-center text-lg">{initialState.errors._global[0]}</FormMessage>
                          )}
                          
-                         {state?.type === 'error' && state.errors && !state.errors._global && (
+                         {initialState?.type === 'error' && initialState.errors && !initialState.errors._global && (
                             <div className="text-destructive text-center text-sm">
                                 Please correct the errors highlighted above and try again.
                             </div>

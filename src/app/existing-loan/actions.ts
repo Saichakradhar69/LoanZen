@@ -61,14 +61,90 @@ const formSchema = z.object({
     emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional().default(0)
 });
 
+function createObjectFromFormData(formData: FormData): ExistingLoanFormData {
+  const data: any = {};
+  const disbursements: any[] = [];
+  const rateChanges: any[] = [];
+  const transactions: any[] = [];
+
+  const disbursementIndices = new Set<string>();
+  const rateChangeIndices = new Set<string>();
+  const transactionIndices = new Set<string>();
+
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith('$ACTION_ID_')) continue;
+
+    const matchDisbursement = key.match(/disbursements\[(\d+)\]\.(date|amount)/);
+    if (matchDisbursement) {
+      disbursementIndices.add(matchDisbursement[1]);
+      continue;
+    }
+
+    const matchRateChange = key.match(/rateChanges\[(\d+)\]\.(date|rate)/);
+    if (matchRateChange) {
+      rateChangeIndices.add(matchRateChange[1]);
+      continue;
+    }
+
+    const matchTransaction = key.match(/transactions\[(\d+)\]\.(date|type|amount)/);
+    if (matchTransaction) {
+      transactionIndices.add(matchTransaction[1]);
+      continue;
+    }
+    
+    data[key] = value;
+  }
+  
+  disbursementIndices.forEach(index => {
+      const date = formData.get(`disbursements[${index}].date`);
+      const amount = formData.get(`disbursements[${index}].amount`);
+      if (date && amount) {
+        disbursements.push({ date: new Date(date as string), amount: parseFloat(amount as string) });
+      }
+  });
+
+  rateChangeIndices.forEach(index => {
+      const date = formData.get(`rateChanges[${index}].date`);
+      const rate = formData.get(`rateChanges[${index}].rate`);
+      if (date && rate) {
+        rateChanges.push({ date: new Date(date as string), rate: parseFloat(rate as string) });
+      }
+  });
+  
+  transactionIndices.forEach(index => {
+      const date = formData.get(`transactions[${index}].date`);
+      const type = formData.get(`transactions[${index}].type`);
+      const amount = formData.get(`transactions[${index}].amount`);
+      if(date && type && amount) {
+          transactions.push({ date: new Date(date as string), type, amount: parseFloat(amount as string) });
+      }
+  });
+
+
+  return {
+    ...data,
+    originalLoanAmount: parseFloat(data.originalLoanAmount),
+    disbursementDate: new Date(data.disbursementDate),
+    interestRate: parseFloat(data.interestRate),
+    emiAmount: data.emiAmount ? parseFloat(data.emiAmount) : undefined,
+    moratoriumPeriod: data.moratoriumPeriod ? parseInt(data.moratoriumPeriod, 10) : undefined,
+    emisPaid: data.emisPaid ? parseInt(data.emisPaid, 10) : undefined,
+    disbursements: disbursements.length > 0 ? disbursements : undefined,
+    rateChanges: rateChanges.length > 0 ? rateChanges : undefined,
+    transactions: transactions.length > 0 ? transactions : undefined,
+  }
+}
+
 
 export async function calculateOutstandingBalanceAction(
   prevState: any,
-  data: ExistingLoanFormData | null,
+  formData: FormData,
 ) {
-    if (!data) {
-        return null;
+    if (!formData.has('loanType')) {
+        return { type: 'initial' };
     }
+
+    const data = createObjectFromFormData(formData);
     
     const validatedFields = formSchema.safeParse(data);
     
@@ -83,7 +159,10 @@ export async function calculateOutstandingBalanceAction(
         const result = performExistingLoanCalculations(validatedFields.data as ExistingLoanFormData);
         return {
             type: 'success',
-            data: result
+            data: {
+                ...result,
+                formData: validatedFields.data // Pass validated data for checkout
+            }
         };
     } catch (error) {
         console.error("Calculation Error:", error);
