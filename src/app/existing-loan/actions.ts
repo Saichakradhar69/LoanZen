@@ -57,6 +57,7 @@ export async function calculateOutstandingBalanceAction(
       interestRate: formData.get('interestRate'),
       interestType: formData.get('interestType'),
       rateType: formData.get('rateType'),
+      moratoriumPeriod: formData.get('moratoriumPeriod'),
       // ... and so on for all fields
     });
     

@@ -233,7 +233,7 @@ export default function ExistingLoanForm() {
                         <FormItem className="flex flex-col"><FormLabel>Effective Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
                     )} />
                     <FormField control={form.control} name={`rateChanges.${index}.rate`} render={({ field }) => (
-                            <FormItem><FormLabel>New Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 9.2" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>New Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 9.2" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <Button type="button" variant="destructive" size="icon" onClick={() => removeRateChange(index)}><Trash2 className="h-4 w-4" /></Button>
                 </div>
@@ -259,7 +259,7 @@ export default function ExistingLoanForm() {
                         )} />
                         )}
                         <FormField control={form.control} name={`transactions.${index}.amount`} render={({ field }) => (
-                            <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} /></FormControl><FormMessage /></FormItem>
+                            <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <Button type="button" variant="destructive" size="icon" onClick={() => removeTransaction(index)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
@@ -292,7 +292,7 @@ export default function ExistingLoanForm() {
                             </FormItem>
                         )} />
                         <FormField control={form.control} name={`disbursements.${index}.amount`} render={({ field }) => (
-                             <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 25000" {...field} /></FormControl><FormMessage /></FormItem>
+                             <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 25000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                         )} />
                         <Button type="button" variant="destructive" size="icon" onClick={() => removeDisbursement(index)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
@@ -368,6 +368,13 @@ export default function ExistingLoanForm() {
                                 </Button>
                             </CollapsibleTrigger>
                             <CollapsibleContent className="space-y-6 pt-4 animate-in fade-in-0">
+                                <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Moratorium Period (in months)</FormLabel>
+                                        <FormControl><Input type="number" placeholder="e.g., 6" {...field} value={field.value ?? ''} /></FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
                                {renderDisbursements()}
                                {renderFloatingRateHistory()}
                             </CollapsibleContent>
@@ -449,5 +456,3 @@ export default function ExistingLoanForm() {
         </Card>
     );
 }
-
-    
