@@ -17,10 +17,9 @@ import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { calculateOutstandingBalanceAction, CalculationResult } from './actions';
 
 
 const disbursementSchema = z.object({
@@ -115,6 +114,12 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
+
+    const onSubmit = (data: ExistingLoanFormData) => {
+        const formData = new FormData();
+        formData.append('form_data_json', JSON.stringify(data));
+        formAction(formData);
+    };
 
     const renderCommonFields = () => (
         <>
@@ -396,7 +401,7 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form action={formAction} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>
