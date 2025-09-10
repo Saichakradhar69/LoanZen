@@ -65,9 +65,16 @@ export async function calculateOutstandingBalanceAction(
   prevState: any,
   formData: FormData,
 ) {
+    // This is called with empty FormData to reset the state, so we handle it gracefully.
+    if (!formData.has('loanType')) {
+        return null;
+    }
+
     const createObjectFromFormData = (formData: FormData) => {
         const data: any = {};
         for (const [key, value] of formData.entries()) {
+            if (key.startsWith('$ACTION_ID_')) continue;
+
             if (key.endsWith('Date')) {
                  data[key] = new Date(value as string);
             } else if (['disbursements', 'rateChanges', 'transactions'].includes(key)) {
