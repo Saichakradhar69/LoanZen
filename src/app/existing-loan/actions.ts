@@ -43,6 +43,7 @@ const transactionSchema = z.object({
     amount: z.coerce.number().positive('Amount must be positive.')
 });
 
+// This schema is used for server-side validation.
 const formSchema = z.object({
     loanType: z.string({ required_error: 'Please select a loan type.' }),
     loanName: z.string().optional(),
@@ -52,46 +53,52 @@ const formSchema = z.object({
     interestType: z.enum(['reducing', 'flat']),
     rateType: z.enum(['fixed', 'floating']),
     paymentStructure: z.enum(['fixed', 'variable']).optional(),
-    emiAmount: z.coerce.number().optional(),
-    moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
+    emiAmount: z.coerce.number().optional().default(0),
+    moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional().default(0),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
-    emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional()
+    emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional().default(0)
 });
+
+
+function buildObjectFromFormData(formData: FormData): Record<string, any> {
+  const data: Record<string, any> = {};
+  
+  // A more robust way to reconstruct the object, especially for nested arrays.
+  for (const [key, value] of formData.entries()) {
+    if (key.includes('.')) {
+      const [outerKey, index, innerKey] = key.split(/[[.\]]/).filter(Boolean);
+      if (!data[outerKey]) data[outerKey] = [];
+      if (!data[outerKey][Number(index)]) data[outerKey][Number(index)] = {};
+      
+      data[outerKey][Number(index)][innerKey] = value;
+    } else {
+      data[key] = value;
+    }
+  }
+
+  // Coerce date strings to Date objects for validation
+  if (data.disbursementDate) data.disbursementDate = new Date(data.disbursementDate);
+  ['disbursements', 'rateChanges', 'transactions'].forEach(key => {
+    if (data[key]) {
+      data[key] = data[key].map((item: any) => ({ ...item, date: new Date(item.date) }));
+    }
+  });
+
+  return data;
+}
 
 
 export async function calculateOutstandingBalanceAction(
   prevState: any,
   formData: FormData,
 ) {
-    // This is called with empty FormData to reset the state, so we handle it gracefully.
-    if (!formData || !formData.has('loanType')) {
+    if (!formData.has('loanType')) {
         return null;
     }
-
-    const createObjectFromFormData = (formData: FormData) => {
-        const data: any = {};
-        for (const [key, value] of formData.entries()) {
-            if (key.startsWith('$ACTION_ID_')) continue;
-
-            if (key.endsWith('Date')) {
-                 data[key] = new Date(value as string);
-            } else if (['disbursements', 'rateChanges', 'transactions'].includes(key)) {
-                data[key] = JSON.parse(value as string).map((item: any) => ({
-                    ...item,
-                    date: new Date(item.date)
-                }));
-            } else if (typeof value === 'string' && !isNaN(parseFloat(value)) && isFinite(Number(value))) {
-                data[key] = parseFloat(value);
-            } else {
-                data[key] = value;
-            }
-        }
-        return data;
-    }
     
-    const data = createObjectFromFormData(formData);
+    const data = buildObjectFromFormData(formData);
 
     const validatedFields = formSchema.safeParse(data);
     
