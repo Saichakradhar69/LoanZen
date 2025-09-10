@@ -44,7 +44,7 @@ function ExistingLoanContent() {
       </div>
       
       {!showResults ? (
-         <ExistingLoanForm formAction={formAction} initialState={state} />
+         <ExistingLoanForm formAction={formAction} serverState={state} />
       ) : (
         <ExistingLoanResults results={state.data} formData={state.data.formData} onBack={handleBack}/>
       )}

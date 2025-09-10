@@ -80,11 +80,11 @@ function SubmitButton() {
 
 interface ExistingLoanFormProps {
     formAction: (payload: FormData) => void;
-    initialState: any;
+    serverState: any;
 }
 
 
-export default function ExistingLoanForm({ formAction, initialState }: ExistingLoanFormProps) {
+export default function ExistingLoanForm({ formAction, serverState }: ExistingLoanFormProps) {
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
     
     const form = useForm<ExistingLoanFormData>({
@@ -105,13 +105,13 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
             rateChanges: [],
             transactions: []
         },
-        errors: initialState?.type === 'error' ? initialState.errors : undefined,
+        errors: serverState?.type === 'error' ? serverState.errors : undefined,
     });
     
     // This effect will sync server-side errors with the form's state
     useEffect(() => {
-        if (initialState?.type === 'error' && initialState.errors) {
-            const fieldErrors = initialState.errors;
+        if (serverState?.type === 'error' && serverState.errors) {
+            const fieldErrors = serverState.errors;
             for (const fieldName in fieldErrors) {
                 if (Object.prototype.hasOwnProperty.call(fieldErrors, fieldName)) {
                     form.setError(fieldName as any, {
@@ -121,7 +121,7 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
                 }
             }
         }
-    }, [initialState, form]);
+    }, [serverState, form]);
     
     const { getValues } = form;
 
@@ -404,17 +404,6 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
                 return null;
         }
     }
-    
-    const handleFormAction = async () => {
-        const valid = await form.trigger();
-        if (valid) {
-            const data = getValues();
-            const formData = new FormData();
-            formData.append('form_data_json', JSON.stringify(data));
-            formAction(formData);
-        }
-    };
-
 
     return (
         <Card>
@@ -424,7 +413,12 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form action={handleFormAction} className="space-y-8">
+                    <form action={formAction} className="space-y-8">
+                         <input
+                            type="hidden"
+                            {...form.register('form_data_json' as any)}
+                            value={JSON.stringify(getValues())}
+                        />
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>
@@ -457,11 +451,11 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
                             )}
                         </div>
                         
-                         {initialState?.type === 'error' && initialState.errors?._global && (
-                            <FormMessage className="text-center text-lg">{initialState.errors._global[0]}</FormMessage>
+                         {serverState?.type === 'error' && serverState.errors?._global && (
+                            <FormMessage className="text-center text-lg">{serverState.errors._global[0]}</FormMessage>
                          )}
                          
-                         {initialState?.type === 'error' && initialState.errors && !initialState.errors._global && (
+                         {serverState?.type === 'error' && serverState.errors && !serverState.errors._global && (
                             <div className="text-destructive text-center text-sm">
                                 Please correct the errors highlighted above and try again.
                             </div>
