@@ -64,7 +64,7 @@ function ExistingLoanContent() {
             <AlertTitle>Payment Cancelled</AlertTitle>
             <AlertDescription>
                 Your payment was not processed. You can try again at any time.
-            </Aler tDescription>
+            </AlertDescription>
         </Alert>
       )}
       <div className="text-center mb-10">
