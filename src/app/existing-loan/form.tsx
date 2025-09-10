@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useFieldArray, useForm } from 'react-hook-form';
+import { useFieldArray, useForm, useFormState } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
@@ -106,6 +106,22 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
         },
         errors: initialState?.type === 'error' ? initialState.errors : undefined,
     });
+    
+    // This effect will sync server-side errors with the form's state
+    useEffect(() => {
+        if (initialState?.type === 'error' && initialState.errors) {
+            const fieldErrors = initialState.errors;
+            for (const fieldName in fieldErrors) {
+                if (Object.prototype.hasOwnProperty.call(fieldErrors, fieldName)) {
+                    form.setError(fieldName as any, {
+                        type: 'server',
+                        message: fieldErrors[fieldName][0]
+                    });
+                }
+            }
+        }
+    }, [initialState, form]);
+    
 
     const loanType = form.watch('loanType');
     const rateType = form.watch('rateType');
@@ -401,7 +417,7 @@ export default function ExistingLoanForm({ formAction, initialState }: ExistingL
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                    <form action={formAction} onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>

@@ -17,6 +17,7 @@ function ExistingLoanContent() {
   const [state, formAction] = useActionState(calculateOutstandingBalanceAction, { type: 'initial' });
 
   const handleBack = () => {
+    // Pass a form with no 'form_data_json' to reset the state
     formAction(new FormData());
   };
 
