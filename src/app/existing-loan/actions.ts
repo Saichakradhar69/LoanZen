@@ -24,6 +24,7 @@ export type CalculationResult = {
     loanName: string | undefined;
     loanType: string;
     interestType: 'reducing' | 'flat';
+    interestRate: number;
     schedule: Transaction[];
 }
 

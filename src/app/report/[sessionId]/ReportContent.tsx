@@ -128,6 +128,7 @@ function ReportContent({ sessionId }: { sessionId: string }) {
         lines.push(`"Interest Paid to Date",${data.interestPaidToDate}`);
         lines.push(`"Next EMI Date",${data.nextEmiDate ? new Date(data.nextEmiDate).toLocaleDateString() : 'N/A'}`);
         lines.push(`"Original Loan Amount",${data.originalLoanAmount}`);
+        lines.push(`"Interest Rate",${data.interestRate}`);
         lines.push('');
         lines.push('[TRANSACTION_HISTORY]');
         lines.push('Date,Type,Amount,Principal,Interest,Ending Balance,Note');
@@ -241,7 +242,7 @@ function ReportContent({ sessionId }: { sessionId: string }) {
       {/* Hidden component used for PDF generation */}
       <div className="fixed -top-[20000px] left-0 -z-50 opacity-1" aria-hidden="true">
         <div ref={reportRef}>
-            {reportData && <ReportTemplate reportData={reportData} sessionId={sessionId} />}
+            {reportData && <ReportTemplate reportData={reportData} />}
         </div>
       </div>
     </div>

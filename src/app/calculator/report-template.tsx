@@ -10,7 +10,6 @@ import Image from 'next/image';
 
 interface ReportTemplateProps {
   reportData: ReportDataType;
-  sessionId: string;
 }
 
 const formatCurrency = (value: number) => {
@@ -26,6 +25,37 @@ const loanTypeLabels: { [key: string]: string } = {
   'credit-line': 'Credit Line',
   other: 'Other',
 };
+
+// Helper function for what-if scenarios
+function calculateWhatIf(
+    principal: number, 
+    monthlyPayment: number,
+    annualRate: number,
+    extraMonthly: number = 0,
+    lumpSum: number = 0
+) {
+    const monthlyRate = annualRate / 12 / 100;
+    let balance = principal - lumpSum;
+    let months = 0;
+    let totalInterest = 0;
+
+    const fullPayment = monthlyPayment + extraMonthly;
+
+    while (balance > 0) {
+        const interest = balance * monthlyRate;
+        const principalPaid = fullPayment - interest;
+        
+        if (principalPaid <= 0) return { months: Infinity, totalInterest: Infinity }; // Payment doesn't cover interest
+
+        balance -= principalPaid;
+        totalInterest += interest;
+        months++;
+        if (months > 1200) return { months: Infinity, totalInterest: Infinity }; // Safety break for > 100 years
+    }
+    
+    return { months, totalInterest };
+}
+
 
 const ProgressRing = ({ progress }: { progress: number }) => {
     const strokeWidth = 12;
@@ -64,11 +94,34 @@ const ProgressRing = ({ progress }: { progress: number }) => {
             </svg>
             <div className="absolute flex flex-col items-center justify-center">
                  <span className="text-4xl font-bold text-gray-700">{`${Math.round(progress)}%`}</span>
-                 <span className="text-lg text-gray-500">Paid</span>
+                 <span className="text-lg text-gray-500">Paid Off</span>
             </div>
         </div>
     );
 };
+
+const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: number, scenarios: { name: string, months: number }[] }) => {
+    const data = [{
+        name: 'Terms',
+        "Original Term": originalTerm,
+        ...scenarios.reduce((acc, s) => ({ ...acc, [s.name]: s.months }), {})
+    }];
+
+    return (
+        <ResponsiveContainer width="100%" height={150}>
+            <BarChart data={data} layout="vertical" barCategoryGap="20%">
+                <XAxis type="number" domain={[0, dataMax => Math.ceil(dataMax / 12) * 12]} tickFormatter={(val) => `${val / 12}y`} />
+                <YAxis type="category" dataKey="name" hide />
+                <Tooltip formatter={(value) => `${value} months`} />
+                <Legend />
+                <Bar dataKey="Original Term" fill="#3F51B5" name="Original Term (Months)" />
+                {scenarios.map((s, i) => (
+                   <Bar key={s.name} dataKey={s.name} fill={['#10B981', '#FFAB40'][i]} name={`${s.name} (Months)`} />
+                ))}
+            </BarChart>
+        </ResponsiveContainer>
+    )
+}
 
 
 const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }) => {
@@ -78,39 +131,16 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
     const worstScenario = hasMultipleScenarios ? [...scenarios].sort((a, b) => b.totalPayment - a.totalPayment)[0] : scenarios[0];
     const savings = worstScenario.totalInterest - bestScenario.totalInterest;
 
-    // Data for charts
-    const totalCostData = scenarios.map(s => ({
-        name: s.scenarioName,
-        'Total Cost': s.totalPayment,
-    }));
-
-    const firstYearAmortization = bestScenario.amortizationSchedule.slice(0, 12).map(a => ({
-        month: `M${a.month}`,
-        Principal: a.principal,
-        Interest: a.interest,
-    }));
-
-    const paydownData = scenarios.slice(0, 2).map(s => {
-        return s.amortizationSchedule
-            .filter(a => a.month % 12 === 0 || a.month === 1)
-            .map(a => ({
-                year: Math.floor(a.month / 12),
-                [s.scenarioName]: a.remainingBalance
-            }));
-    }).reduce((acc, current) => {
-        current.forEach(d => {
-            const existing = acc.find(item => item.year === d.year);
-            if (existing) {
-                Object.assign(existing, d);
-            } else {
-                acc.push(d);
-            }
-        });
-        return acc;
-    }, [] as any[]);
+    // What-if scenarios for the best option
+    const baseMonths = bestScenario.loanTerm * 12;
+    const whatIf50 = calculateWhatIf(bestScenario.loanAmount, bestScenario.monthlyPayment, bestScenario.interestRate, 50);
+    const whatIf100 = calculateWhatIf(bestScenario.loanAmount, bestScenario.monthlyPayment, bestScenario.interestRate, 100);
+    
+    const savings50 = bestScenario.totalInterest - whatIf50.totalInterest;
+    const savings100 = bestScenario.totalInterest - whatIf100.totalInterest;
 
 
-     return (
+    return (
         <>
             {/* Page 2: Executive Summary */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white">
@@ -125,7 +155,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                     </div>
                 )}
                 
-                <div className="grid grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {hasMultipleScenarios && (
                          <div className="bg-gray-50 p-6 rounded-lg border">
                             <h3 className="text-xl font-semibold mb-4 text-center">Winner Comparison</h3>
@@ -152,64 +182,55 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                          </ul>
                     </div>
                 </div>
+                 <div className="bg-blue-50 p-6 rounded-lg border border-blue-200 mt-8">
+                    <h3 className="text-xl font-semibold mb-4 text-center text-blue-800">What-If Scenarios</h3>
+                    <p className="text-center text-sm text-blue-700 mb-4">See how you can pay off your loan even faster.</p>
+                    <div className="text-center space-y-2">
+                        <p>If you pay an extra <strong>{formatCurrency(50)}/month</strong>, you will be debt-free <strong>{baseMonths - whatIf50.months} months sooner</strong> and save <strong>{formatCurrency(savings50)}</strong> in interest.</p>
+                         <p>If you pay an extra <strong>{formatCurrency(100)}/month}</strong>, you will be debt-free <strong>{baseMonths - whatIf100.months} months sooner</strong> and save <strong>{formatCurrency(savings100)}</strong> in interest.</p>
+                    </div>
+                </div>
             </div>
 
             {/* Page 3: Visual Comparison */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white">
               <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Visual Breakdown of Your Options</h2>
-              
-              {hasMultipleScenarios && (
-                <div className="mb-12">
-                  <h3 className="text-2xl font-semibold text-center mb-6">Total Cost Comparison</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <BarChart data={totalCostData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" />
-                      <YAxis tickFormatter={(val) => formatCurrency(val as number)}/>
-                      <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                      <Bar dataKey="Total Cost">
-                         {totalCostData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.name === bestScenario.scenarioName ? '#10B981' : '#3F51B5'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                  <div>
-                    <h3 className="text-2xl font-semibold text-center mb-6">Monthly Payment Breakdown (First Year)</h3>
-                     <ResponsiveContainer width="100%" height={300}>
-                         <BarChart data={firstYearAmortization} layout="vertical">
+                    <h3 className="text-2xl font-semibold text-center mb-6">Paydown Timeline</h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                        <LineChart data={bestScenario.amortizationSchedule.filter(a => a.month % 12 === 0 || a.month === 1).map(a => ({ year: Math.floor(a.month / 12), balance: a.remainingBalance }))}>
                             <CartesianGrid strokeDasharray="3 3" />
-                             <XAxis type="number" hide />
-                             <YAxis type="category" dataKey="month" />
+                            <XAxis dataKey="year" label={{ value: 'Years', position: 'insideBottom', offset: -5 }} />
+                            <YAxis tickFormatter={(val) => formatCurrency(val as number)}/>
                             <Tooltip formatter={(val) => formatCurrency(val as number)}/>
                             <Legend />
-                            <Bar dataKey="Principal" stackId="a" fill="#2563EB" />
-                            <Bar dataKey="Interest" stackId="a" fill="#FFAB40" />
+                            <Line type="monotone" dataKey="balance" name="Remaining Balance" stroke='#10B981' strokeWidth={3} />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+                 <div>
+                    <h3 className="text-2xl font-semibold text-center mb-6">First Year: Principal vs. Interest</h3>
+                     <ResponsiveContainer width="100%" height={300}>
+                         <BarChart data={bestScenario.amortizationSchedule.slice(0, 12)} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" />
+                             <XAxis type="number" hide />
+                             <YAxis type="category" dataKey="month" tickFormatter={(val) => `M${val}`} />
+                            <Tooltip formatter={(val) => formatCurrency(val as number)}/>
+                            <Legend />
+                            <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
+                            <Bar dataKey="interest" name="Interest" stackId="a" fill="#FFAB40" />
                          </BarChart>
                      </ResponsiveContainer>
                 </div>
-                {hasMultipleScenarios && (
-                     <div>
-                        <h3 className="text-2xl font-semibold text-center mb-6">Paydown Timeline</h3>
-                         <ResponsiveContainer width="100%" height={300}>
-                             <LineChart data={paydownData}>
-                                 <CartesianGrid strokeDasharray="3 3" />
-                                 <XAxis dataKey="year" label={{ value: 'Years', position: 'insideBottom', offset: -5 }} />
-                                 <YAxis tickFormatter={(val) => formatCurrency(val as number)}/>
-                                <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                                <Legend />
-                                 {scenarios.slice(0, 2).map((s, i) => (
-                                    <Line key={s.scenarioName} type="monotone" dataKey={s.scenarioName} stroke={['#10B981', '#3F51B5'][i]} strokeWidth={3} />
-                                 ))}
-                             </LineChart>
-                         </ResponsiveContainer>
-                    </div>
-                )}
               </div>
+                <div className="mt-8">
+                     <h3 className="text-2xl font-semibold text-center mb-6">Amortization Timeline with Extra Payments</h3>
+                     <AmortizationTimelineChart originalTerm={baseMonths} scenarios={[
+                         { name: '+ $50/mo', months: whatIf50.months},
+                         { name: '+ $100/mo', months: whatIf100.months}
+                     ]} />
+                </div>
             </div>
         </>
      )
@@ -217,73 +238,93 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
 
 
 const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResults }) => {
-    const { originalLoanAmount, outstandingBalance, interestPaidToDate, nextEmiDate, schedule } = reportData;
+    const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate } = reportData;
     const paidAmount = originalLoanAmount - outstandingBalance;
     const paidPercentage = (paidAmount / originalLoanAmount) * 100;
-    const remainingPercentage = 100 - paidPercentage;
+    
+    // Find the last actual payment to use as a basis
+    const lastRepayment = [...schedule].reverse().find(s => s.type === 'repayment');
+    const baseMonthlyPayment = lastRepayment ? lastRepayment.amount : (outstandingBalance > 0 ? outstandingBalance : originalLoanAmount / 120); // Fallback
+
+    // Projections
+    const baseScenario = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate);
+    const totalInterestFromNow = baseScenario.totalInterest;
+    const projectedPayoffDate = new Date();
+    projectedPayoffDate.setMonth(projectedPayoffDate.getMonth() + baseScenario.months);
+
+    // What-if
+    const whatIf50 = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, 50);
+    const whatIf100 = calculateWhatif(outstandingBalance, baseMonthlyPayment, interestRate, 100);
+    const whatIf500Lump = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, 0, 500);
+
+    const savings50 = totalInterestFromNow - whatIf50.totalInterest;
+    const savings100 = totalInterestFromNow - whatIf100.totalInterest;
+    const savings500Lump = totalInterestFromNow - whatIf500Lump.totalInterest;
 
     const interestPieData = [
-        { name: 'Original Principal', value: originalLoanAmount },
-        { name: 'Interest Paid to Date', value: interestPaidToDate },
+        { name: 'Principal Paid', value: paidAmount },
+        { name: 'Interest Paid', value: interestPaidToDate },
+        { name: 'Remaining Principal', value: outstandingBalance },
     ];
-    
-    // Simplified payoff date projection
-    const lastPayment = [...schedule].reverse().find(s => s.type === 'repayment');
-    let projectedPayoffDate = 'N/A';
-    if(lastPayment && outstandingBalance > 0) {
-        const monthsRemaining = outstandingBalance / lastPayment.amount;
-        projectedPayoffDate = new Date(new Date().setMonth(new Date().getMonth() + monthsRemaining)).toLocaleDateString('en-US', { year: 'numeric', month: 'short'});
-    }
-
 
     return (
         <>
-             {/* Page 2: Executive Summary */}
+            {/* Page 2: Loan Health Dashboard */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white">
-                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Loan Health Snapshot</h2>
-                 <div className="text-center bg-blue-50/50 p-6 rounded-lg mb-8">
-                    <p className="text-xl text-blue-800">Your current outstanding balance is:</p>
-                    <p className="text-6xl font-bold text-blue-600 my-2">{formatCurrency(outstandingBalance)}</p>
-                </div>
-                 <h3 className="text-2xl font-semibold mb-4 text-center">Loan Health Dashboard</h3>
-                 <div className="grid grid-cols-2 gap-8 items-center">
+                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Loan Health Dashboard</h2>
+                <div className="grid grid-cols-2 gap-8 items-center">
                     <div className="flex justify-center">
-                         <ProgressRing progress={paidPercentage} />
+                        <ProgressRing progress={paidPercentage} />
                     </div>
-                    <div className="h-[250px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
-                                    {interestPieData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={['#3F51B5', '#FFAB40'][index % 2]} />
-                                    ))}
-                                </Pie>
-                                <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                                <Legend />
-                            </PieChart>
-                        </ResponsiveContainer>
+                    <div className="bg-gray-50 p-6 rounded-lg border">
+                        <h3 className="text-xl font-semibold mb-4">Loan Snapshot</h3>
+                        <ul className="space-y-2">
+                           <li><strong>Original Amount:</strong> {formatCurrency(originalLoanAmount)}</li>
+                           <li><strong>Outstanding Balance:</strong> <span className="font-bold text-red-600">{formatCurrency(outstandingBalance)}</span></li>
+                           <li><strong>Interest Rate (APR):</strong> {interestRate.toFixed(2)}%</li>
+                           <li><strong>Minimum Monthly Payment:</strong> {formatCurrency(baseMonthlyPayment)}</li>
+                           <li><strong>Projected Payoff Date:</strong> {projectedPayoffDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short' })}</li>
+                           <li><strong>Total Interest (from now):</strong> {formatCurrency(totalInterestFromNow)}</li>
+                        </ul>
                     </div>
-                 </div>
-                 <div className="grid grid-cols-3 gap-6 mt-8">
-                     <div className="bg-gray-100 p-4 rounded-lg text-center">
-                         <p className="text-sm text-gray-500">Total Interest Paid</p>
-                         <p className="text-2xl font-bold">{formatCurrency(interestPaidToDate)}</p>
+                </div>
+                <div className="mt-8">
+                     <h3 className="text-2xl font-semibold text-center mb-6">Impact of Extra Payments</h3>
+                     <AmortizationTimelineChart originalTerm={baseScenario.months} scenarios={[
+                         { name: '+ $50/mo', months: whatIf50.months},
+                         { name: '+ $100/mo', months: whatIf100.months}
+                     ]} />
+                </div>
+            </div>
+
+            {/* Page 3: Actionable Insights */}
+            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white">
+                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Actionable Insights & Projections</h2>
+                 <div className="text-center bg-blue-50/50 p-6 rounded-lg mb-8">
+                    <p className="text-xl text-blue-800">Paying more than the minimum can save you thousands. Here's how:</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+                        <h3 className="text-xl font-semibold mb-4 text-green-800">Extra Monthly Payments</h3>
+                        <div className="space-y-4">
+                            <p>Paying an extra <strong>{formatCurrency(50)} per month</strong> will get you debt-free <strong>{baseScenario.months - whatIf50.months} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(savings50)}</strong> in interest.</p>
+                             <hr/>
+                            <p>Paying an extra <strong>{formatCurrency(100)} per month</strong> will get you debt-free <strong>{baseScenario.months - whatIf100.months} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(savings100)}</strong> in interest.</p>
+                        </div>
                     </div>
-                     <div className="bg-gray-100 p-4 rounded-lg text-center">
-                         <p className="text-sm text-gray-500">Projected Payoff</p>
-                         <p className="text-2xl font-bold">{projectedPayoffDate}</p>
+                     <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
+                        <h3 className="text-xl font-semibold mb-4 text-orange-800">Lump-Sum Payment</h3>
+                        <div className="space-y-4">
+                             <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{baseScenario.months - whatIf500Lump.months} months</strong> and save you <strong className="text-orange-600">{formatCurrency(savings500Lump)}</strong> in interest.</p>
+                        </div>
                     </div>
-                     <div className="bg-gray-100 p-4 rounded-lg text-center">
-                         <p className="text-sm text-gray-500">Next Payment Due</p>
-                         <p className="text-2xl font-bold">{nextEmiDate ? new Date(nextEmiDate).toLocaleDateString() : 'N/A'}</p>
-                    </div>
-                 </div>
+                </div>
             </div>
         </>
     )
 }
 
-export default function ReportTemplate({ reportData, sessionId }: ReportTemplateProps) {
+export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     if (!reportData) return null;
 
     const { formType, userEmail, generatedAt } = reportData;
@@ -309,7 +350,6 @@ export default function ReportTemplate({ reportData, sessionId }: ReportTemplate
             </div>
             <div className="mt-24 text-sm text-gray-500">
               <p><strong>Date of Generation:</strong> {new Date(generatedAt).toLocaleString()}</p>
-              <p><strong>Report ID:</strong> {sessionId}</p>
             </div>
           </div>
           <p className="text-center text-xs text-gray-400 pb-4">
@@ -324,8 +364,8 @@ export default function ReportTemplate({ reportData, sessionId }: ReportTemplate
         
         {/* Page 5: The Upsell */}
         <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white">
-             <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Journey to Debt-Free Isn't Over</h2>
-             <p className="text-center text-xl text-gray-600 mb-8">Turn this plan into reality with LoanZen Tracker.</p>
+             <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">You're on your way! Here's how to get there faster.</h2>
+             <p className="text-center text-xl text-gray-600 mb-8">This static report is a great start. Turn these insights into action with the LoanZen Tracker Pro.</p>
              
              <div className="px-8">
                 <Image 
@@ -340,23 +380,24 @@ export default function ReportTemplate({ reportData, sessionId }: ReportTemplate
              
              <div className="mt-12 grid grid-cols-2 gap-8 text-lg">
                 <ul className="space-y-4">
-                    <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Track all your loans in one place.</span></li>
-                    <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>See your payoff progress on interactive charts.</span></li>
-                    <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Get alerts before payments are due.</span></li>
-                    <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Model how extra payments save you money.</span></li>
+                    <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Track all your loans in one dynamic dashboard.</span></li>
+                    <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Visualize your payoff progress with interactive charts.</span></li>
+                    <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Get smart alerts before payments are due.</span></li>
+                    <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Model how extra payments save you money in real-time.</span></li>
                 </ul>
                 <div className="bg-blue-50 border-l-4 border-blue-500 p-6">
-                    <p className="text-xl italic text-blue-800">"I paid off my loan 2 years early using the tracker's advice. Seeing the numbers visually made all the difference."</p>
+                    <p className="text-xl italic text-blue-800">"This report was the eye-opener. The Tracker app was the game-changer. I paid off my loan 2 years early."</p>
                     <p className="text-right font-bold mt-2">- Alex T.</p>
                 </div>
              </div>
              
              <div className="text-center mt-16 bg-gray-100 p-6 rounded-lg">
-                <p className="text-2xl font-bold">Your exclusive offer is in your email.</p>
-                <p className="text-xl mt-2">Start your 14-day free trial now!</p>
+                <p className="text-2xl font-bold">Your exclusive upgrade offer is in your email.</p>
+                <p className="text-xl mt-2">Use your personal code to start a 14-day free trial now!</p>
              </div>
         </div>
 
       </div>
     );
 }
+

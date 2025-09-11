@@ -17,11 +17,13 @@ function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
 
     // Additional Disbursements
     if (data.disbursements && data.disbursements.length > 0) {
-        events = data.disbursements.map(d => ({
-            date: d.date,
-            type: 'disbursement',
-            amount: d.amount
-        }));
+        data.disbursements.forEach(d => {
+            events.push({
+                date: d.date,
+                type: 'disbursement',
+                amount: d.amount
+            });
+        });
     }
 
 
@@ -60,7 +62,7 @@ function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
     }
 
 
-    return events.sort((a, b) => a.date.getTime() - b.date.getTime());
+    return events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 }
 
 
@@ -79,11 +81,14 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
 
     if (data.interestType === 'flat') {
         // Simplified Flat Rate Logic
-        let totalPrincipal = 0;
-        let totalRepayments = 0;
+        let totalPrincipal = data.originalLoanAmount;
+        if(data.disbursements && data.disbursements.length > 0) {
+            totalPrincipal = data.disbursements.reduce((acc, d) => acc + d.amount, 0);
+        }
 
+        let totalRepayments = 0;
+        
         events.forEach(e => {
-            if (e.type === 'disbursement') totalPrincipal += e.amount;
             if (e.type === 'repayment') totalRepayments += e.amount;
         });
         
@@ -98,7 +103,8 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
     } else {
         // Reducing Balance Logic
         for (const event of events) {
-            const daysSinceLastEvent = differenceInDays(event.date, lastEventDate);
+            const eventDate = new Date(event.date);
+            const daysSinceLastEvent = differenceInDays(eventDate, lastEventDate);
             let accruedInterest = 0;
             if (daysSinceLastEvent > 0 && balance > 0) {
                  accruedInterest = (balance * (currentRate / 100) * daysSinceLastEvent) / 365.25;
@@ -107,7 +113,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
             if (accruedInterest > 0) {
                  balance += accruedInterest;
                  schedule.push({
-                     date: format(event.date, 'yyyy-MM-dd'),
+                     date: format(eventDate, 'yyyy-MM-dd'),
                      type: 'interest',
                      amount: accruedInterest,
                      principal: 0,
@@ -127,7 +133,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
                     principalComponent = event.amount;
                     break;
                 case 'repayment':
-                    let interestPortion = Math.min(event.amount, accruedInterest);
+                    let interestPortion = Math.min(event.amount, accruedInterest > 0 ? accruedInterest : 0);
                     interestPaid += interestPortion;
                     const principalPortion = event.amount - interestPortion;
                     balance -= event.amount;
@@ -140,7 +146,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
             }
 
              schedule.push({
-                date: format(event.date, 'yyyy-MM-dd'),
+                date: format(eventDate, 'yyyy-MM-dd'),
                 type: event.type,
                 amount: event.amount,
                 principal: parseFloat(principalComponent.toFixed(2)),
@@ -149,7 +155,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
                 note: event.type === 'rate-change' ? `Rate changed to ${event.rate}%` : undefined
             });
 
-            lastEventDate = event.date;
+            lastEventDate = eventDate;
         }
 
         // Accrue interest from last event to today
@@ -160,7 +166,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
         }
     }
     
-    let firstEmiDate = add(data.disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
+    let firstEmiDate = add(new Date(data.disbursementDate), { months: 1 + (data.moratoriumPeriod || 0) });
     let nextEmiDate = firstEmiDate;
     const today = new Date();
     while(nextEmiDate < today) {
@@ -171,10 +177,11 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
         outstandingBalance: Math.max(0, balance),
         interestPaidToDate: interestPaid,
         nextEmiDate: nextEmiDate.toISOString(),
-        originalLoanAmount: data.originalLoanAmount,
+        originalLoanAmount: data.disbursements && data.disbursements.length > 0 ? data.disbursements.reduce((acc,d) => acc + d.amount, data.originalLoanAmount) : data.originalLoanAmount,
         loanName: data.loanName,
         loanType: data.loanType,
         interestType: data.interestType,
+        interestRate: currentRate,
         schedule,
     };
 }
