@@ -378,17 +378,13 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
                 />
              </div>
              
-             <div className="mt-12 grid grid-cols-2 gap-8 text-lg">
+             <div className="mt-12 grid grid-cols-1 gap-8 text-lg">
                 <ul className="space-y-4">
                     <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Track all your loans in one dynamic dashboard.</span></li>
                     <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Visualize your payoff progress with interactive charts.</span></li>
                     <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Get smart alerts before payments are due.</span></li>
                     <li className="flex gap-3"><Check className="text-green-500 w-7 h-7 shrink-0" /> <span>Model how extra payments save you money in real-time.</span></li>
                 </ul>
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-6">
-                    <p className="text-xl italic text-blue-800">"This report was the eye-opener. The Tracker app was the game-changer. I paid off my loan 2 years early."</p>
-                    <p className="text-right font-bold mt-2">- Alex T.</p>
-                </div>
              </div>
              
              <div className="text-center mt-16 bg-gray-100 p-6 rounded-lg">
@@ -400,3 +396,5 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
       </div>
     );
 }
+
+    
