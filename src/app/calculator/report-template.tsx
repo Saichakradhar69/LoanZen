@@ -254,7 +254,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
 
     // What-if
     const whatIf50 = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, 50);
-    const whatIf100 = calculateWhatif(outstandingBalance, baseMonthlyPayment, interestRate, 100);
+    const whatIf100 = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, 100);
     const whatIf500Lump = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, 0, 500);
 
     const savings50 = totalInterestFromNow - whatIf50.totalInterest;
@@ -400,4 +400,3 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
       </div>
     );
 }
-
