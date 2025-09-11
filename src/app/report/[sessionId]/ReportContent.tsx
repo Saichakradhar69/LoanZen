@@ -56,6 +56,8 @@ function ReportContent({ sessionId }: { sessionId: string }) {
         
         for (let i = 0; i < pageElements.length; i++) {
             const pageElement = pageElements[i];
+            await new Promise(resolve => setTimeout(resolve, 100)); // Short delay for rendering
+            
             const canvas = await html2canvas(pageElement, {
                 scale: 2,
                 useCORS: true,
@@ -63,7 +65,9 @@ function ReportContent({ sessionId }: { sessionId: string }) {
                 width: pageElement.offsetWidth,
                 height: pageElement.offsetHeight,
                 windowWidth: pageElement.scrollWidth,
-                windowHeight: pageElement.scrollHeight
+                windowHeight: pageElement.scrollHeight,
+                scrollX: 0,
+                scrollY: -window.scrollY
             });
 
             const imgData = canvas.toDataURL('image/png');
@@ -72,7 +76,7 @@ function ReportContent({ sessionId }: { sessionId: string }) {
             if (i > 0) {
                 pdf.addPage();
             }
-            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
         }
 
         pdf.save('LoanZen-Report.pdf');
@@ -235,9 +239,9 @@ function ReportContent({ sessionId }: { sessionId: string }) {
 
 
       {/* Hidden component used for PDF generation */}
-      <div className="fixed top-0 left-0 -z-50 opacity-0" aria-hidden="true">
+      <div className="fixed -top-[20000px] left-0 -z-50 opacity-1" aria-hidden="true">
         <div ref={reportRef}>
-            {reportData && <ReportTemplate reportData={reportData} />}
+            {reportData && <ReportTemplate reportData={reportData} sessionId={sessionId} />}
         </div>
       </div>
     </div>
