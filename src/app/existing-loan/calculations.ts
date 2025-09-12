@@ -1,7 +1,7 @@
 
 // src/app/existing-loan/calculations.ts
 
-import { add, differenceInDays, differenceInMonths, format } from 'date-fns';
+import { add, differenceInDays, format } from 'date-fns';
 import type { ExistingLoanFormData } from './form';
 import type { CalculationResult, Transaction } from './actions';
 
@@ -100,7 +100,7 @@ function calculateCreditLineBalance(
                 principalComponent = event.amount;
                 break;
             case 'repayment':
-                let interestPortion = Math.min(balance, accruedInterest); // Interest portion is capped by the payment amount and accrued interest
+                let interestPortion = Math.min(event.amount, accruedInterest);
                 interestPaid += interestPortion;
                 balance -= event.amount;
                 interestComponent = interestPortion;
@@ -130,6 +130,15 @@ function calculateCreditLineBalance(
          const dailyRate = currentRate / 365.25 / 100;
          const finalInterest = balance * dailyRate * daysSinceLastEvent;
          balance += finalInterest;
+         schedule.push({
+            date: format(new Date(), 'yyyy-MM-dd'),
+            type: 'interest',
+            amount: finalInterest,
+            principal: 0,
+            interest: parseFloat(finalInterest.toFixed(2)),
+            endingBalance: parseFloat(balance.toFixed(2)),
+            note: `Interest accrued for ${daysSinceLastEvent} days @ ${currentRate}%`,
+        });
     }
     
     return { balance, interestPaid, schedule, currentRate };
@@ -141,13 +150,15 @@ function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
     const disbursementDate = new Date(data.disbursementDate);
 
     // Initial Disbursement is the first event
-    events.push({
-        date: disbursementDate,
-        type: 'disbursement',
-        amount: data.originalLoanAmount,
-    });
+    if (data.originalLoanAmount > 0 && (!data.disbursements || data.disbursements.length === 0)) {
+        events.push({
+            date: disbursementDate,
+            type: 'disbursement',
+            amount: data.originalLoanAmount,
+        });
+    }
 
-    // Additional Disbursements for education loans
+    // Additional Disbursements for education loans or custom loans
     if (data.disbursements && data.disbursements.length > 0) {
         data.disbursements.forEach(d => {
             events.push({
@@ -165,6 +176,7 @@ function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
                 date: new Date(rc.date),
                 type: 'rate-change',
                 rate: rc.rate,
+                amount: 0 // rate changes don't have an amount
             });
         });
     }
@@ -207,8 +219,9 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
 
     // Use transactional calculation for credit lines, custom loans with variable payments, or floating rates
     const useEffectiveTransactional = data.loanType === 'credit-line' ||
-                                     data.loanType === 'custom' && data.paymentStructure === 'variable' ||
-                                     data.rateType === 'floating';
+                                     (data.loanType === 'custom' && data.paymentStructure === 'variable') ||
+                                     data.rateType === 'floating' ||
+                                     (data.loanType === 'education' && (data.disbursements && data.disbursements.length > 0));
 
 
     if (useEffectiveTransactional) {
@@ -236,9 +249,8 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
             originalLoanAmount = principal; // Update original amount to reflect capitalized interest
         }
         
-        // Determine tenure. This part is tricky without user input for total tenure.
-        // We'll estimate tenure based on emiAmount if available.
-        if (data.emiAmount && data.emiAmount > 0) {
+        // Estimate tenure based on emiAmount if available.
+        if (data.emiAmount && data.emiAmount > 0 && data.interestRate > 0) {
             const R = data.interestRate / 12 / 100;
             // Formula for N (tenure): N = -log(1 - (P * R) / EMI) / log(1 + R)
             tenureMonths = -Math.log(1 - (principal * R) / data.emiAmount) / Math.log(1 + R);

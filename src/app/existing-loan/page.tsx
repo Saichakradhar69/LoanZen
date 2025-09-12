@@ -17,7 +17,6 @@ function ExistingLoanContent() {
   const [state, formAction] = useActionState(calculateOutstandingBalanceAction, { type: 'initial' });
 
   const handleBack = () => {
-    // Wrap the state update in a transition to avoid errors
     startTransition(() => {
       formAction(new FormData());
     });

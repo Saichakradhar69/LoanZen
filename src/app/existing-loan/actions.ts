@@ -48,7 +48,7 @@ const transactionSchema = z.object({
 const formSchema = z.object({
     loanType: z.string({ required_error: 'Please select a loan type.' }),
     loanName: z.string().optional(),
-    originalLoanAmount: z.coerce.number().positive('Original loan amount is required.'),
+    originalLoanAmount: z.coerce.number().optional(),
     disbursementDate: z.coerce.date({ required_error: 'Disbursement date is required.' }),
     interestRate: z.coerce.number().positive('Interest rate must be positive.').max(100, "Rate seems too high."),
     interestType: z.enum(['reducing', 'flat']),
@@ -60,6 +60,13 @@ const formSchema = z.object({
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
     emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional()
+}).refine(data => {
+    if (data.loanType === 'education' && data.disbursements && data.disbursements.length > 0) return true;
+    if (data.loanType === 'credit-line') return true;
+    return data.originalLoanAmount && data.originalLoanAmount > 0;
+}, {
+    message: "Original loan amount is required unless you are providing multiple disbursements.",
+    path: ["originalLoanAmount"],
 });
 
 

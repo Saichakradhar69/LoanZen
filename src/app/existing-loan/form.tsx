@@ -43,7 +43,7 @@ const transactionSchema = z.object({
 const formSchema = z.object({
     loanType: z.string({ required_error: 'Please select a loan type.' }),
     loanName: z.string().optional(),
-    originalLoanAmount: z.coerce.number().positive('Original loan amount is required.'),
+    originalLoanAmount: z.coerce.number().optional(),
     disbursementDate: z.date({ required_error: 'Disbursement date is required.' }),
     interestRate: z.coerce.number().positive('Interest rate must be positive.').max(100, "Rate seems too high."),
     interestType: z.enum(['reducing', 'flat']),
@@ -55,6 +55,13 @@ const formSchema = z.object({
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
     emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional()
+}).refine(data => {
+    if (data.loanType === 'education' && data.disbursements && data.disbursements.length > 0) return true;
+    if (data.loanType === 'credit-line') return true; // Amount not needed for credit line
+    return data.originalLoanAmount && data.originalLoanAmount > 0;
+}, {
+    message: "Original loan amount is required.",
+    path: ["originalLoanAmount"],
 });
 
 export type ExistingLoanFormData = z.infer<typeof formSchema>;
@@ -93,10 +100,10 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
             loanType: 'personal',
             interestType: 'reducing',
             rateType: 'fixed',
-            originalLoanAmount: '' as any,
+            originalLoanAmount: undefined,
             disbursementDate: undefined,
-            interestRate: '' as any,
-            emiAmount: '' as any,
+            interestRate: undefined,
+            emiAmount: undefined,
             moratoriumPeriod: 0,
             emisPaid: 0,
             loanName: '',
@@ -105,7 +112,6 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
             rateChanges: [],
             transactions: []
         },
-        errors: serverState?.type === 'error' ? serverState.errors : undefined,
     });
     
     // This effect will sync server-side errors with the form's state
@@ -122,26 +128,36 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
             }
         }
     }, [serverState, form]);
-    
-    const { getValues } = form;
 
     const loanType = form.watch('loanType');
     const rateType = form.watch('rateType');
     const paymentStructure = form.watch('paymentStructure');
+    const disbursements = form.watch('disbursements');
     
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
 
+    const handleFormAction = (data: ExistingLoanFormData) => {
+        const formData = new FormData();
+        formData.append('form_data_json', JSON.stringify(data));
+        formAction(formData);
+    };
+
+    const isOriginalAmountDisabled = loanType === 'education' && disbursements && disbursements.length > 0;
+    const showOriginalAmount = loanType !== 'credit-line';
+
     const renderCommonFields = () => (
         <>
-            <FormField control={form.control} name="originalLoanAmount" render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Original Loan Amount</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} /></FormControl>
-                    <FormMessage />
-                </FormItem>
-            )} />
+            {showOriginalAmount && (
+                <FormField control={form.control} name="originalLoanAmount" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Original Loan Amount</FormLabel>
+                        <FormControl><Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} disabled={isOriginalAmountDisabled} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+            )}
              <FormField control={form.control} name="disbursementDate" render={({ field }) => (
                 <FormItem className="flex flex-col">
                     <FormLabel>First Disbursement Date</FormLabel>
@@ -221,8 +237,9 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
             )} />
              <FormField control={form.control} name="emiAmount" render={({ field }) => (
                 <FormItem>
-                    <FormLabel>Monthly Payment (EMI) Amount (Optional)</FormLabel>
+                    <FormLabel>Monthly Payment (EMI) Amount</FormLabel>
                     <FormControl><Input type="number" placeholder="e.g., 1200" {...field} value={field.value ?? ''} /></FormControl>
+                     <FormDescription>Required for standard loans to calculate tenure.</FormDescription>
                     <FormMessage />
                 </FormItem>
             )} />
@@ -278,8 +295,8 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
 
     const renderDisbursements = () => (
          <div>
-             <Label>Disbursements (if more than one)</Label>
-             <CardDescription>If your loan was paid out in multiple parts, add them here. If you do, the "Original Loan Amount" field above will be ignored.</CardDescription>
+             <Label>Disbursements</Label>
+             <CardDescription>If your loan was paid out in multiple parts, add each one here. The "Original Loan Amount" field will be ignored if you add any.</CardDescription>
              <div className="space-y-4 mt-2">
                 {disbursementFields.map((field, index) => (
                     <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
@@ -317,7 +334,7 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
                     <div className="space-y-6">
                         <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Moratorium Period (in months)</FormLabel>
+                                <FormLabel>Moratorium Period (in months, optional)</FormLabel>
                                 <FormControl><Input type="number" placeholder="e.g., 6" {...field} value={field.value ?? ''} /></FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -355,12 +372,20 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
                         )} />
                        
                         {paymentStructure === 'fixed' && (
-                             <FormField control={form.control} name="emiAmount" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Fixed Payment Amount</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ''} /></FormControl>
-                                </FormItem>
-                            )} />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                <FormField control={form.control} name="emiAmount" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Fixed Payment Amount</FormLabel>
+                                        <FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ''} /></FormControl>
+                                    </FormItem>
+                                )} />
+                                <FormField control={form.control} name="emisPaid" render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Number of Payments Made</FormLabel>
+                                        <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
+                                    </FormItem>
+                                )} />
+                            </div>
                         )}
                         {paymentStructure === 'variable' && (
                             renderTransactionHistory(true)
@@ -369,9 +394,8 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
                         <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
                             <CollapsibleTrigger asChild>
                                 <Button type="button" variant="link" className="p-0">
-                                    <Plus className="mr-2"/>
-                                    Add more details (optional)
-                                    <ChevronDown className="ml-2 h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                                    <ChevronDown className="mr-2 h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+                                    Advanced Options (Moratorium, Multiple Disbursements, etc.)
                                 </Button>
                             </CollapsibleTrigger>
                             <CollapsibleContent className="space-y-6 pt-4 animate-in fade-in-0">
@@ -383,7 +407,7 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
                                     </FormItem>
                                 )} />
                                {renderDisbursements()}
-                               {renderFloatingRateHistory()}
+                               {rateType === 'floating' && renderFloatingRateHistory()}
                             </CollapsibleContent>
                         </Collapsible>
                     </div>
@@ -394,7 +418,7 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
                  return (
                     <FormField control={form.control} name="emisPaid" render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Number of EMIs Already Paid (Optional)</FormLabel>
+                            <FormLabel>Number of EMIs Already Paid</FormLabel>
                             <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
                             <FormMessage />
                         </FormItem>
@@ -413,12 +437,7 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form action={formAction} className="space-y-8">
-                         <input
-                            type="hidden"
-                            {...form.register('form_data_json' as any)}
-                            value={JSON.stringify(getValues())}
-                        />
+                    <form onSubmit={form.handleSubmit(handleFormAction)} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>
@@ -430,7 +449,7 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
                                         <SelectItem value="home">Home Loan</SelectItem>
                                         <SelectItem value="education">Education Loan</SelectItem>
                                         <SelectItem value="credit-line">Credit Line</SelectItem>
-                                        <SelectItem value="custom">Custom Loan</SelectItem>
+                                        <SelectItem value="custom">Custom Loan (Advanced)</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -444,7 +463,7 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
                         <div className="space-y-6 pt-4 border-t">
                             <h3 className="text-lg font-medium text-primary">Loan-Specific Details</h3>
                             {renderLoanSpecificFields()}
-                             {rateType === 'floating' && loanType !== 'custom' && (
+                             {rateType === 'floating' && loanType !== 'custom' && loanType !== 'credit-line' && (
                                 <div className="pt-6 border-t">
                                     {renderFloatingRateHistory()}
                                 </div>
