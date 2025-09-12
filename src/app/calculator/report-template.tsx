@@ -3,7 +3,7 @@
 
 import { Bar, BarChart, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Line, ComposedChart, Area, LineChart } from 'recharts';
 import type { CalculationResults as ReportDataType, NewLoanCalculationResults, ExistingLoanReportResults } from '@/app/api/stripe/webhook/route';
-import { Banknote, CalendarCheck, Check, Lightbulb, TrendingUp } from 'lucide-react';
+import { Banknote, CalendarCheck, Check, Gift, Lightbulb, TrendingUp } from 'lucide-react';
 import Logo from '@/components/logo';
 import Image from 'next/image';
 
@@ -366,17 +366,6 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
         <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white">
              <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">You're on your way! Here's how to get there faster.</h2>
              <p className="text-center text-xl text-gray-600 mb-8">This static report is a great start. Turn these insights into action with the LoanZen Tracker Pro.</p>
-             
-             <div className="px-8">
-                <Image 
-                    src="https://picsum.photos/seed/report-mockup/700/400"
-                    width={700}
-                    height={400}
-                    alt="Dashboard Mockup"
-                    className="rounded-lg shadow-2xl border-4 border-gray-200"
-                    data-ai-hint="financial dashboard chart"
-                />
-             </div>
              
              <div className="mt-12 grid grid-cols-1 gap-8 text-lg">
                 <ul className="space-y-4">
