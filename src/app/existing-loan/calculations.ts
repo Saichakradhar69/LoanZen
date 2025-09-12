@@ -66,19 +66,23 @@ function calculateCreditLineBalance(
     let balance = 0;
     let interestPaid = 0;
     let currentRate = initialRate;
-    let lastEventDate = events.length > 0 ? new Date(events[0].date) : new Date();
+    
+    if (events.length === 0) {
+        return { balance: 0, interestPaid: 0, schedule: [], currentRate };
+    }
+
+    let lastEventDate = new Date(events[0].date);
 
     for (const event of events) {
         const eventDate = new Date(event.date);
         const daysSinceLastEvent = differenceInDays(eventDate, lastEventDate);
         let accruedInterest = 0;
+
         if (daysSinceLastEvent > 0 && balance > 0) {
              const dailyRate = currentRate / 365.25 / 100;
              accruedInterest = balance * dailyRate * daysSinceLastEvent;
-        }
-       
-        if (accruedInterest > 0) {
              balance += accruedInterest;
+
              schedule.push({
                  date: format(eventDate, 'yyyy-MM-dd'),
                  type: 'interest',
@@ -86,10 +90,10 @@ function calculateCreditLineBalance(
                  principal: 0,
                  interest: parseFloat(accruedInterest.toFixed(2)),
                  endingBalance: parseFloat(balance.toFixed(2)),
-                 note: `Interest accrued for ${daysSinceLastEvent} days @ ${currentRate}%`,
+                 note: `Interest accrued for ${daysSinceLastEvent} days @ ${currentRate.toFixed(2)}%`,
              });
         }
-
+       
         let principalComponent = 0;
         let interestComponent = 0;
         
@@ -125,19 +129,20 @@ function calculateCreditLineBalance(
     }
 
     // Accrue interest from last event to today
-    const daysSinceLastEvent = differenceInDays(new Date(), lastEventDate);
+    const today = new Date();
+    const daysSinceLastEvent = differenceInDays(today, lastEventDate);
     if (daysSinceLastEvent > 0 && balance > 0) {
          const dailyRate = currentRate / 365.25 / 100;
          const finalInterest = balance * dailyRate * daysSinceLastEvent;
          balance += finalInterest;
          schedule.push({
-            date: format(new Date(), 'yyyy-MM-dd'),
+            date: format(today, 'yyyy-MM-dd'),
             type: 'interest',
             amount: finalInterest,
             principal: 0,
             interest: parseFloat(finalInterest.toFixed(2)),
             endingBalance: parseFloat(balance.toFixed(2)),
-            note: `Interest accrued for ${daysSinceLastEvent} days @ ${currentRate}%`,
+            note: `Interest accrued for ${daysSinceLastEvent} days @ ${currentRate.toFixed(2)}% (to date)`,
         });
     }
     
@@ -147,12 +152,11 @@ function calculateCreditLineBalance(
 
 function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
     let events: any[] = [];
-    const disbursementDate = new Date(data.disbursementDate);
-
+    
     // Initial Disbursement is the first event
-    if (data.originalLoanAmount > 0 && (!data.disbursements || data.disbursements.length === 0)) {
+    if (data.originalLoanAmount && data.originalLoanAmount > 0 && (!data.disbursements || data.disbursements.length === 0)) {
         events.push({
-            date: disbursementDate,
+            date: new Date(data.disbursementDate),
             type: 'disbursement',
             amount: data.originalLoanAmount,
         });
@@ -183,7 +187,7 @@ function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
 
     // Repayments (EMIs)
     if (data.paymentStructure === 'fixed' && data.emiAmount && data.emisPaid && data.emisPaid > 0) {
-        let firstEmiDate = add(disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
+        let firstEmiDate = add(new Date(data.disbursementDate), { months: 1 + (data.moratoriumPeriod || 0) });
         for (let i = 0; i < data.emisPaid; i++) {
             events.push({
                 date: add(firstEmiDate, { months: i }),
@@ -215,13 +219,15 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
     let interestPaidToDate = 0;
     let schedule: Transaction[] = [];
     let currentRate = data.interestRate;
-    let originalLoanAmount = data.originalLoanAmount;
+    let originalLoanAmount = data.originalLoanAmount || 0;
 
     // Use transactional calculation for credit lines, custom loans with variable payments, or floating rates
     const useEffectiveTransactional = data.loanType === 'credit-line' ||
                                      (data.loanType === 'custom' && data.paymentStructure === 'variable') ||
                                      data.rateType === 'floating' ||
-                                     (data.loanType === 'education' && (data.disbursements && data.disbursements.length > 0));
+                                     (data.loanType === 'education' && (data.disbursements && data.disbursements.length > 0)) ||
+                                     // Use transactional if simple fields are missing
+                                     (!data.emiAmount || !data.emisPaid);
 
 
     if (useEffectiveTransactional) {
@@ -236,7 +242,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
 
     } else {
         // --- For Standard, Flat, or Moratorium Loans ---
-        let principal = data.originalLoanAmount;
+        let principal = data.originalLoanAmount || 0;
         let tenureMonths = 0;
         let paymentsMade = data.emisPaid || 0;
         
