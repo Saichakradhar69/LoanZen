@@ -86,12 +86,12 @@ function SubmitButton() {
 }
 
 interface ExistingLoanFormProps {
-    formAction: (payload: FormData) => void;
+    onCalculate: (data: ExistingLoanFormData) => void;
     serverState: any;
 }
 
 
-export default function ExistingLoanForm({ formAction, serverState }: ExistingLoanFormProps) {
+export default function ExistingLoanForm({ onCalculate, serverState }: ExistingLoanFormProps) {
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
     
     const form = useForm<ExistingLoanFormData>({
@@ -137,12 +137,6 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
-
-    const handleFormAction = (data: ExistingLoanFormData) => {
-        const formData = new FormData();
-        formData.append('form_data_json', JSON.stringify(data));
-        formAction(formData);
-    };
 
     const isOriginalAmountDisabled = loanType === 'education' && disbursements && disbursements.length > 0;
     const showOriginalAmount = loanType !== 'credit-line';
@@ -437,7 +431,7 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleFormAction)} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(onCalculate)} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>
@@ -481,7 +475,10 @@ export default function ExistingLoanForm({ formAction, serverState }: ExistingLo
                          )}
                         
                         <div className="flex justify-end pt-4">
-                           <SubmitButton />
+                           <Button type="submit" size="lg">
+                                <Zap className="mr-2" />
+                                Calculate My Outstanding Balance
+                           </Button>
                         </div>
                     </form>
                 </Form>

@@ -9,6 +9,7 @@ import { Terminal } from 'lucide-react';
 import { calculateOutstandingBalanceAction } from './actions';
 import ExistingLoanForm from './form';
 import ExistingLoanResults from './results';
+import type { ExistingLoanFormData } from './form';
 
 function ExistingLoanContent() {
   const searchParams = useSearchParams();
@@ -19,6 +20,14 @@ function ExistingLoanContent() {
   const handleBack = () => {
     startTransition(() => {
       formAction(new FormData());
+    });
+  };
+
+  const handleCalculate = (data: ExistingLoanFormData) => {
+    const formData = new FormData();
+    formData.append('form_data_json', JSON.stringify(data));
+    startTransition(() => {
+        formAction(formData);
     });
   };
 
@@ -45,7 +54,7 @@ function ExistingLoanContent() {
       </div>
       
       {!showResults ? (
-         <ExistingLoanForm formAction={formAction} serverState={state} />
+         <ExistingLoanForm onCalculate={handleCalculate} serverState={state} />
       ) : (
         <ExistingLoanResults results={state.data} formData={state.data.formData} onBack={handleBack}/>
       )}
