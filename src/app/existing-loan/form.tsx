@@ -66,32 +66,13 @@ const formSchema = z.object({
 
 export type ExistingLoanFormData = z.infer<typeof formSchema>;
 
-function SubmitButton() {
-    const { pending } = useFormStatus();
-    return (
-        <Button type="submit" size="lg" disabled={pending}>
-            {pending ? (
-                <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Calculating...
-                </>
-            ) : (
-                <>
-                    <Zap className="mr-2" />
-                    Calculate My Outstanding Balance
-                </>
-            )}
-        </Button>
-    )
-}
-
 interface ExistingLoanFormProps {
-    onCalculate: (data: ExistingLoanFormData) => void;
+    onSubmit: (data: ExistingLoanFormData) => void;
     serverState: any;
 }
 
 
-export default function ExistingLoanForm({ onCalculate, serverState }: ExistingLoanFormProps) {
+export default function ExistingLoanForm({ onSubmit, serverState }: ExistingLoanFormProps) {
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
     
     const form = useForm<ExistingLoanFormData>({
@@ -243,7 +224,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
     const renderFloatingRateHistory = () => (
         <div>
             <Label>Floating Rate History</Label>
-            <CardDescription>If your interest rate has changed over time, add each change here.</CardDescription>
+            <FormDescription>If your interest rate has changed over time, add each change here.</FormDescription>
             <div className="space-y-4 mt-2">
             {rateChangeFields.map((field, index) => (
                 <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
@@ -264,7 +245,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
     const renderTransactionHistory = (isRepaymentOnly = false) => (
         <div>
              <Label>{isRepaymentOnly ? 'Variable Payments' : 'Transaction History'}</Label>
-              <CardDescription>{isRepaymentOnly ? 'Add each payment you have made.' : 'Add all withdrawals and repayments you have made.'}</CardDescription>
+              <FormDescription>{isRepaymentOnly ? 'Add each payment you have made.' : 'Add all withdrawals and repayments you have made.'}</FormDescription>
              <div className="space-y-4 mt-2">
                 {transactionFields.map((field, index) => (
                     <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
@@ -290,7 +271,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
     const renderDisbursements = () => (
          <div>
              <Label>Disbursements</Label>
-             <CardDescription>If your loan was paid out in multiple parts, add each one here. The "Original Loan Amount" field will be ignored if you add any.</CardDescription>
+             <FormDescription>If your loan was paid out in multiple parts, add each one here. The "Original Loan Amount" field will be ignored if you add any.</FormDescription>
              <div className="space-y-4 mt-2">
                 {disbursementFields.map((field, index) => (
                     <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
@@ -431,7 +412,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onCalculate)} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>
@@ -475,10 +456,10 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                          )}
                         
                         <div className="flex justify-end pt-4">
-                           <Button type="submit" size="lg">
-                                <Zap className="mr-2" />
-                                Calculate My Outstanding Balance
-                           </Button>
+                            <Button type="submit" size="lg">
+                                 <Zap className="mr-2" />
+                                 Calculate My Outstanding Balance
+                            </Button>
                         </div>
                     </form>
                 </Form>
