@@ -67,12 +67,12 @@ const formSchema = z.object({
 export type ExistingLoanFormData = z.infer<typeof formSchema>;
 
 interface ExistingLoanFormProps {
-    onSubmit: (data: ExistingLoanFormData) => void;
+    onCalculate: (data: ExistingLoanFormData) => void;
     serverState: any;
 }
 
 
-export default function ExistingLoanForm({ onSubmit, serverState }: ExistingLoanFormProps) {
+export default function ExistingLoanForm({ onCalculate, serverState }: ExistingLoanFormProps) {
     const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
     
     const form = useForm<ExistingLoanFormData>({
@@ -412,7 +412,7 @@ export default function ExistingLoanForm({ onSubmit, serverState }: ExistingLoan
             </CardHeader>
             <CardContent>
                 <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(onCalculate)} className="space-y-8">
                         <FormField control={form.control} name="loanType" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Loan Type</FormLabel>
