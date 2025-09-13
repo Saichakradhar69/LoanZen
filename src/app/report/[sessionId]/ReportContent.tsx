@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
@@ -31,7 +32,9 @@ function ReportContent({ sessionId }: { sessionId: string }) {
                 const errorData = await res.json();
                 throw new Error(errorData.error || 'Failed to fetch report data.');
             }
-            const data: ReportDataType = await res.json();
+            let data: ReportDataType = await res.json();
+            // Inject session ID into data for the report
+            (data as any).sessionId = sessionId;
             setReportData(data);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -67,7 +70,8 @@ function ReportContent({ sessionId }: { sessionId: string }) {
                 windowWidth: pageElement.scrollWidth,
                 windowHeight: pageElement.scrollHeight,
                 scrollX: 0,
-                scrollY: -window.scrollY
+                scrollY: 0, // Set scrollY to 0
+                backgroundColor: null, // Use element's background
             });
 
             const imgData = canvas.toDataURL('image/png');
