@@ -76,7 +76,7 @@ const ProgressRing = ({ progress }: { progress: number }) => {
                 className="-rotate-90"
             >
                 <circle
-                    className="text-gray-200 dark:text-gray-700"
+                    className="text-gray-200"
                     stroke="currentColor"
                     strokeWidth={strokeWidth}
                     fill="transparent"
@@ -97,8 +97,8 @@ const ProgressRing = ({ progress }: { progress: number }) => {
                 />
             </svg>
             <div className="absolute flex flex-col items-center justify-center">
-                 <span className="text-4xl font-bold text-gray-700 dark:text-gray-200">{`${Math.round(progress)}%`}</span>
-                 <span className="text-lg text-gray-500 dark:text-gray-400">Paid Off</span>
+                 <span className="text-4xl font-bold text-gray-700">{`${Math.round(progress)}%`}</span>
+                 <span className="text-lg text-gray-500">Paid Off</span>
             </div>
         </div>
     );
@@ -152,35 +152,35 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
     return (
         <>
             {/* Page 2: Executive Summary */}
-            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white dark:bg-gray-900">
-                <h2 className="text-3xl font-bold text-blue-900 dark:text-blue-300 border-b-2 border-blue-800 dark:border-blue-400 pb-2 mb-8 font-headline">
+            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">
                     {hasMultipleScenarios ? "Your Recommended Path" : "Your Loan Health Snapshot"}
                 </h2>
                 {hasMultipleScenarios && (
-                    <div className="text-center bg-green-50/50 dark:bg-green-900/20 p-6 rounded-lg mb-8">
-                        <p className="text-xl text-green-800 dark:text-green-300">Based on our analysis, you will save:</p>
-                        <p className="text-6xl font-bold text-green-600 dark:text-green-400 my-2">{formatCurrency(savings)}</p>
-                        <p className="text-xl text-green-800 dark:text-green-300">by choosing the "{bestScenario.scenarioName}" option.</p>
+                    <div className="text-center bg-green-50/50 p-6 rounded-lg mb-8">
+                        <p className="text-xl text-green-800">Based on our analysis, you will save:</p>
+                        <p className="text-6xl font-bold text-green-600 my-2">{formatCurrency(savings)}</p>
+                        <p className="text-xl text-green-800">by choosing the "{bestScenario.scenarioName}" option.</p>
                     </div>
                 )}
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     {hasMultipleScenarios && (
-                         <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
+                         <div className="bg-gray-50 p-6 rounded-lg border">
                             <h3 className="text-xl font-semibold mb-4 text-center">Winner Comparison</h3>
                             <div className="space-y-4">
-                                <div className="p-4 bg-white dark:bg-gray-700 rounded-md border-2 border-green-500">
+                                <div className="p-4 bg-white rounded-md border-2 border-green-500">
                                      <p className="font-bold flex items-center gap-2"><TrendingUp className="text-green-500" /> Best Option: {bestScenario.scenarioName} @ {bestScenario.interestRate}%</p>
                                      <p className="text-2xl font-semibold mt-1">Total Cost: {formatCurrency(bestScenario.totalPayment)}</p>
                                 </div>
-                                 <div className="p-4 bg-white dark:bg-gray-700 rounded-md border dark:border-gray-600">
+                                 <div className="p-4 bg-white rounded-md border">
                                      <p className="font-bold flex items-center gap-2"><Banknote className="text-blue-500" /> Other Option: {worstScenario.scenarioName} @ {worstScenario.interestRate}%</p>
                                      <p className="text-2xl font-semibold mt-1">Total Cost: {formatCurrency(worstScenario.totalPayment)}</p>
                                 </div>
                             </div>
                         </div>
                     )}
-                    <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
+                    <div className="bg-gray-50 p-6 rounded-lg border">
                          <h3 className="text-xl font-semibold mb-4 text-center">Key Insights</h3>
                          <ul className="space-y-3">
                             {hasMultipleScenarios && (
@@ -191,9 +191,9 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                          </ul>
                     </div>
                 </div>
-                 <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-lg border border-blue-200 dark:border-blue-700 mt-8">
-                    <h3 className="text-xl font-semibold mb-4 text-center text-blue-800 dark:text-blue-300">What-If Scenarios</h3>
-                    <p className="text-center text-sm text-blue-700 dark:text-blue-400 mb-4">See how you can pay off your loan even faster.</p>
+                 <div className="bg-blue-50 p-6 rounded-lg border border-blue-200 mt-8">
+                    <h3 className="text-xl font-semibold mb-4 text-center text-blue-800">What-If Scenarios</h3>
+                    <p className="text-center text-sm text-blue-700 mb-4">See how you can pay off your loan even faster.</p>
                     <div className="text-center space-y-2">
                         <p>If you pay an extra <strong>{formatCurrency(50)}/month</strong>, you will be debt-free <strong>{baseMonths - whatIf50.months} months sooner</strong> and save <strong>{formatCurrency(savings50)}</strong> in interest.</p>
                          <p>If you pay an extra <strong>{formatCurrency(100)}/month</strong>, you will be debt-free <strong>{baseMonths - whatIf100.months} months sooner</strong> and save <strong>{formatCurrency(savings100)}</strong> in interest.</p>
@@ -202,8 +202,8 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
             </div>
 
             {/* Page 3: Visual Comparison */}
-            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white dark:bg-gray-900">
-              <h2 className="text-3xl font-bold text-blue-900 dark:text-blue-300 border-b-2 border-blue-800 dark:border-blue-400 pb-2 mb-8 font-headline">Visual Breakdown of Your Options</h2>
+            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+              <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Visual Breakdown of Your Options</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                  <div>
                     <h3 className="text-2xl font-semibold text-center mb-6">Paydown Timeline</h3>
@@ -284,17 +284,17 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
     return (
         <>
             {/* Page 2: Loan Health Dashboard */}
-            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white dark:bg-gray-900">
-                <h2 className="text-3xl font-bold text-blue-900 dark:text-blue-300 border-b-2 border-blue-800 dark:border-blue-400 pb-2 mb-8 font-headline">Your Loan Health at a Glance</h2>
+            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Loan Health at a Glance</h2>
                 <div className="grid grid-cols-2 gap-8 items-center">
                     <div className="flex justify-center">
                         <ProgressRing progress={paidPercentage} />
                     </div>
-                    <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700">
+                    <div className="bg-gray-50 p-6 rounded-lg border">
                         <h3 className="text-xl font-semibold mb-4">Loan Snapshot</h3>
                         <ul className="space-y-2">
                            <li><strong>Original Amount:</strong> {formatCurrency(originalLoanAmount)}</li>
-                           <li className="text-lg"><strong>Outstanding Balance:</strong> <span className="font-bold text-red-600 dark:text-red-400">{formatCurrency(outstandingBalance)}</span></li>
+                           <li className="text-lg"><strong>Outstanding Balance:</strong> <span className="font-bold text-red-600">{formatCurrency(outstandingBalance)}</span></li>
                            <li><strong>Interest Paid to Date:</strong> {formatCurrency(interestPaidToDate)}</li>
                            <li><strong>Current Interest Rate:</strong> {interestRate.toFixed(2)}%</li>
                            <li><strong>Projected Payoff Date:</strong> {isFinite(baseScenario.months) ? projectedPayoffDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'N/A'}</li>
@@ -303,7 +303,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                 </div>
                  <div className="mt-8">
                      <h3 className="text-2xl font-semibold text-center mb-6">How Your Payments Are Applied</h3>
-                     <p className="text-center text-sm text-muted-foreground -mt-4 mb-4">First 12 months of payments</p>
+                     <p className="text-center text-sm text-gray-500 -mt-4 mb-4">First 12 months of payments</p>
                      <ResponsiveContainer width="100%" height={250}>
                          <BarChart data={schedule.slice(0, 12)} layout="vertical">
                             <CartesianGrid strokeDasharray="3 3" />
@@ -319,22 +319,22 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
             </div>
             
              {/* Page 3: Actionable Insights */}
-            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white dark:bg-gray-900">
-                 <h2 className="text-3xl font-bold text-blue-900 dark:text-blue-300 border-b-2 border-blue-800 dark:border-blue-400 pb-2 mb-8 font-headline">Take Control of Your Debt</h2>
-                 <p className="text-center text-gray-600 dark:text-gray-400 mb-8 -mt-4">See how extra payments can accelerate your journey to being debt-free.</p>
+            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Take Control of Your Debt</h2>
+                 <p className="text-center text-gray-600 mb-8 -mt-4">See how extra payments can accelerate your journey to being debt-free.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="bg-green-50 dark:bg-green-900/20 p-6 rounded-lg border border-green-200 dark:border-green-700">
-                        <h3 className="text-xl font-semibold mb-4 text-green-800 dark:text-green-300">Extra Monthly Payments</h3>
+                    <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+                        <h3 className="text-xl font-semibold mb-4 text-green-800">Extra Monthly Payments</h3>
                         <div className="space-y-4">
-                            <p>Paying an extra <strong>{formatCurrency(50)} per month</strong> will get you debt-free <strong>{isFinite(whatIf50.months) ? baseScenario.months - whatIf50.months : 0} months sooner</strong> and save you <strong className="text-green-600 dark:text-green-400">{formatCurrency(savings50)}</strong> in interest.</p>
-                             <hr className="dark:border-gray-600"/>
-                            <p>Paying an extra <strong>{formatCurrency(100)} per month</strong> will get you debt-free <strong>{isFinite(whatIf100.months) ? baseScenario.months - whatIf100.months : 0} months sooner</strong> and save you <strong className="text-green-600 dark:text-green-400">{formatCurrency(savings100)}</strong> in interest.</p>
+                            <p>Paying an extra <strong>{formatCurrency(50)} per month</strong> will get you debt-free <strong>{isFinite(whatIf50.months) ? baseScenario.months - whatIf50.months : 0} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(savings50)}</strong> in interest.</p>
+                             <hr className="border-gray-300"/>
+                            <p>Paying an extra <strong>{formatCurrency(100)} per month</strong> will get you debt-free <strong>{isFinite(whatIf100.months) ? baseScenario.months - whatIf100.months : 0} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(savings100)}</strong> in interest.</p>
                         </div>
                     </div>
-                     <div className="bg-orange-50 dark:bg-orange-900/20 p-6 rounded-lg border border-orange-200 dark:border-orange-700">
-                        <h3 className="text-xl font-semibold mb-4 text-orange-800 dark:text-orange-300">Lump-Sum Payment</h3>
+                     <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
+                        <h3 className="text-xl font-semibold mb-4 text-orange-800">Lump-Sum Payment</h3>
                         <div className="space-y-4">
-                             <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{isFinite(whatIf500Lump.months) ? baseScenario.months - whatIf500Lump.months : 0} months</strong> and save you <strong className="text-orange-600 dark:text-orange-400">{formatCurrency(savings500Lump)}</strong> in interest.</p>
+                             <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{isFinite(whatIf500Lump.months) ? baseScenario.months - whatIf500Lump.months : 0} months</strong> and save you <strong className="text-orange-600">{formatCurrency(savings500Lump)}</strong> in interest.</p>
                         </div>
                     </div>
                 </div>
@@ -348,10 +348,10 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
             </div>
 
             {/* Page 4: Action Plan & Upsell */}
-            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white dark:bg-gray-900">
-                <h2 className="text-3xl font-bold text-blue-900 dark:text-blue-300 border-b-2 border-blue-800 dark:border-blue-400 pb-2 mb-8 font-headline">Your Recommended Action Plan</h2>
+            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Recommended Action Plan</h2>
 
-                <div className="bg-gray-50 dark:bg-gray-800 p-6 rounded-lg border dark:border-gray-700 mb-12">
+                <div className="bg-gray-50 p-6 rounded-lg border mb-12">
                     <ul className="space-y-4 text-lg">
                         <li className="flex gap-3"><Lightbulb className="text-yellow-400 w-6 h-6 shrink-0 mt-1" /><span>Based on your current rate, you are on track to pay off your loan on <strong>{isFinite(baseScenario.months) ? projectedPayoffDate.toLocaleDateString() : "N/A"}</strong>.</span></li>
                         <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>By paying an extra <strong>{formatCurrency(100)} per month</strong>, you could be debt-free <strong>{isFinite(whatIf100.months) ? baseScenario.months - whatIf100.months : 0} months sooner</strong> and save <strong className="text-green-500">{formatCurrency(savings100)}</strong> in interest.</span></li>
@@ -360,10 +360,10 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                 </div>
                 
                  <div className="text-center mt-auto pt-8">
-                     <h3 className="text-2xl font-bold font-headline text-primary dark:text-primary-foreground">From Insight to Action: Stop Calculating and Start Tracking</h3>
-                     <p className="text-gray-600 dark:text-gray-400 mt-2 max-w-2xl mx-auto">Track your progress in real-time, get payment reminders, and run unlimited 'what-if' scenarios with your LoanZen Tracker Pro dashboard.</p>
+                     <h3 className="text-2xl font-bold font-headline text-primary">From Insight to Action: Stop Calculating and Start Tracking</h3>
+                     <p className="text-gray-600 mt-2 max-w-2xl mx-auto">Track your progress in real-time, get payment reminders, and run unlimited 'what-if' scenarios with your LoanZen Tracker Pro dashboard.</p>
                      
-                     <div className="mt-6 bg-gray-100 dark:bg-gray-800/50 p-6 rounded-lg border dark:border-gray-700">
+                     <div className="mt-6 bg-gray-100 p-6 rounded-lg border">
                         <p className="text-xl font-bold">Your exclusive upgrade offer is in your email.</p>
                         <p className="text-lg mt-2">Use your personal code to start a 14-day free trial now!</p>
                      </div>
@@ -377,7 +377,6 @@ export default function ReportTemplate({ reportData }: ReportDataType) {
     if (!reportData) return null;
 
     const { formType, userEmail, generatedAt } = reportData;
-    const sessionId = (reportData as any).sessionId || 'N/A';
     
     // Find the first disbursement date
     let disbursementDate = 'N/A';
@@ -389,30 +388,29 @@ export default function ReportTemplate({ reportData }: ReportDataType) {
     }
     
     return (
-        <div className="bg-gray-100 text-gray-800 dark:text-gray-200 font-body" style={{width: '800px'}}>
+        <div className="bg-gray-100 text-gray-800 font-body" style={{width: '800px'}}>
         
         {/* Page 1: Cover */}
-        <div className="pdf-page h-full flex flex-col justify-between p-10 bg-white dark:bg-gray-900" style={{
+        <div className="pdf-page h-full flex flex-col justify-between p-10 bg-white text-gray-800" style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='800' height='1120' viewBox='0 0 800 1120' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop stop-color='%23F0F9FF' offset='0%25'/%3E%3Cstop stop-color='white' offset='100%25'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g)' width='800' height='1120'/%3E%3C/svg%3E")`,
             backgroundSize: 'cover'
         }}>
-          <div className="text-center pt-24">
-            <div className="inline-block">
+          <div className="text-center pt-32">
+             <div className="inline-block">
                 <Logo />
             </div>
-            <p className="text-5xl font-semibold mt-16 font-headline text-blue-900 dark:text-blue-300">
-              {formType === 'new-loan' ? 'Loan Comparison Report' : 'Loan Health Statement'}
+            <p className="text-5xl font-semibold mt-24 font-headline text-blue-900">
+              Loan Analysis Report
             </p>
-             <div className="mt-12 text-lg text-gray-600 dark:text-gray-400">
+             <div className="mt-16 text-lg text-gray-600">
               <p className="text-2xl">Prepared Exclusively for</p>
-              <p className="font-bold text-3xl text-blue-800 dark:text-blue-200 mt-2">{userEmail || 'Valued Customer'}</p>
+              <p className="font-bold text-3xl text-blue-800 mt-2">{userEmail || 'Valued Customer'}</p>
             </div>
-             <div className="mt-16 text-sm text-gray-500 dark:text-gray-400 space-y-1">
+             <div className="mt-24 text-sm text-gray-500 space-y-1">
                 {formType === 'existing-loan' && (
                     <p><strong>Statement Period:</strong> {disbursementDate} to {new Date(generatedAt).toLocaleDateString()}</p>
                 )}
-                <p><strong>Date Generated:</strong> {new Date(generatedAt).toLocaleString()}</p>
-                <p><strong>Report ID:</strong> {sessionId}</p>
+                <p><strong>Date of Generation:</strong> {new Date(generatedAt).toLocaleString()}</p>
             </div>
           </div>
           <p className="text-center text-xs text-gray-400 pb-4">
