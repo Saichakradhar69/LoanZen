@@ -329,6 +329,11 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
       { name: '+ $100/mo', months: whatIf100.months}
     ].filter(s => isFinite(s.months));
 
+    // Data for the paydown timeline chart
+    const timelineData = schedule.filter(s => s.type === 'disbursement' || s.type === 'repayment' || s.type === 'interest')
+        .map(s => ({ date: s.date, balance: s.endingBalance }));
+
+
     return (
         <>
             {/* Page 2: Loan Health Dashboard */}
@@ -384,7 +389,22 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
              {/* Page 3: Actionable Insights */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
                  <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Take Control of Your Debt</h2>
-                 <p className="text-center text-gray-600 mb-8 -mt-4">See how extra payments can accelerate your journey to being debt-free.</p>
+                 
+                 <div className="mb-8">
+                     <h3 className="text-2xl font-semibold text-center mb-4">Your Paydown Timeline</h3>
+                     <ResponsiveContainer width="100%" height={300}>
+                         <LineChart data={timelineData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'short'})} />
+                            <YAxis tickFormatter={(val) => formatCurrency(val as number)} />
+                            <Tooltip formatter={(val) => formatCurrency(val as number)} />
+                            <Legend />
+                            <Line type="monotone" dataKey="balance" name="Remaining Balance" stroke="#8884d8" strokeWidth={2} dot={false}/>
+                        </LineChart>
+                     </ResponsiveContainer>
+                 </div>
+
+                 <p className="text-center text-gray-600 mb-8">See how extra payments can accelerate your journey to being debt-free.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="bg-green-50 p-6 rounded-lg border border-green-200">
                         <h3 className="text-xl font-semibold mb-4 text-green-800">Extra Monthly Payments</h3>
@@ -489,6 +509,8 @@ export default function ReportTemplate({ reportData, aiActionPlan }: ReportTempl
       </div>
     );
 }
+
+    
 
     
 
