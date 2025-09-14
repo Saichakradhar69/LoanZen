@@ -9,6 +9,7 @@ import Logo from '@/components/logo';
 
 interface ReportTemplateProps {
   reportData: ReportDataType;
+  aiActionPlan?: string[];
 }
 
 const formatCurrency = (value: number) => {
@@ -35,6 +36,9 @@ function calculateWhatIf(
     extraMonthly: number = 0,
     lumpSum: number = 0
 ) {
+    if (principal <= 0) {
+        return { months: 0, totalInterest: 0, years: 0, monthsSaved: baseMonths, interestSaved: baseInterest };
+    }
     const monthlyRate = annualRate / 12 / 100;
     let balance = principal - lumpSum;
     let months = 0;
@@ -45,14 +49,15 @@ function calculateWhatIf(
     if (lumpSum > 0 && balance <=0) { // Paid off with lump sum
          return { months: 0, totalInterest: 0, years: 0, monthsSaved: baseMonths, interestSaved: baseInterest };
     }
+    
+    // If the monthly payment is less than or equal to the interest, it will never be paid off.
+    if (fullPayment <= balance * monthlyRate) {
+        return { months: Infinity, totalInterest: Infinity, years: Infinity, monthsSaved: 0, interestSaved: 0 };
+    }
+
 
     while (balance > 0) {
         const interest = balance * monthlyRate;
-
-        if (fullPayment <= interest) {
-             return { months: Infinity, totalInterest: Infinity, years: Infinity, monthsSaved: 0, interestSaved: 0 };
-        }
-
         const principalPaid = fullPayment - interest;
 
         balance -= principalPaid;
@@ -113,8 +118,8 @@ const ProgressRing = ({ progress }: { progress: number }) => {
 };
 
 const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: number, scenarios: { name: string, months: number }[] }) => {
-    // Filter out scenarios with non-finite months
-    const validScenarios = scenarios.filter(s => isFinite(s.months));
+    // Filter out scenarios with non-finite months or no change
+    const validScenarios = scenarios.filter(s => isFinite(s.months) && s.months < originalTerm);
 
     const data = [{
         name: 'Terms',
@@ -142,7 +147,7 @@ const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: 
                             position="right" 
                             offset={8}
                             className="fill-gray-600 font-semibold"
-                            formatter={(value: number) => isFinite(value) && value > 0 ? `${value} months` : (value === 0 ? 'Paid' : '')}
+                            formatter={(value: number) => isFinite(value) && value > 0 ? `${value} months` : (value === 0 ? 'Paid Off' : '')}
                         />
                     </Bar>
                 ))}
@@ -152,7 +157,7 @@ const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: 
 }
 
 
-const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }) => {
+const NewLoanReport = ({ reportData, aiActionPlan }: { reportData: NewLoanCalculationResults, aiActionPlan?: string[] }) => {
     const { scenarios } = reportData;
     const hasMultipleScenarios = scenarios.length > 1;
     const bestScenario = [...scenarios].sort((a, b) => a.totalPayment - b.totalPayment)[0];
@@ -179,7 +184,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                 </h2>
                 {hasMultipleScenarios && (
                     <div className="text-center bg-green-50/50 p-6 rounded-lg mb-8">
-                        <p className="text-xl text-green-800">Based on our analysis, you will save:</p>
+                        <p className="text-xl text-green-800">Based on our analysis, you could save:</p>
                         <p className="text-6xl font-bold text-green-600 my-2">{formatCurrency(savings)}</p>
                         <p className="text-xl text-green-800">by choosing the "{bestScenario.scenarioName}" option.</p>
                     </div>
@@ -216,8 +221,8 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                     <h3 className="text-xl font-semibold mb-4 text-center text-blue-800">What-If Scenarios</h3>
                     <p className="text-center text-sm text-blue-700 mb-4">See how you can pay off your loan even faster.</p>
                     <div className="text-center space-y-2">
-                        {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(50)}/month</strong>, you will be debt-free <strong>{whatIf50.monthsSaved} months sooner</strong> and save <strong>{formatCurrency(whatIf50.interestSaved)}</strong> in interest.</p>}
-                        {isFinite(whatIf100.months) && whatIf100.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(100)}/month</strong>, you will be debt-free <strong>{whatIf100.monthsSaved} months sooner</strong> and save <strong>{formatCurrency(whatIf100.interestSaved)}</strong> in interest.</p>}
+                        {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(50)}/month</strong>, you will be debt-free <strong>{whatIf50.monthsSaved.toFixed(0)} months sooner</strong> and save <strong>{formatCurrency(whatIf50.interestSaved)}</strong> in interest.</p>}
+                        {isFinite(whatIf100.months) && whatIf100.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(100)}/month</strong>, you will be debt-free <strong>{whatIf100.monthsSaved.toFixed(0)} months sooner</strong> and save <strong>{formatCurrency(whatIf100.interestSaved)}</strong> in interest.</p>}
                     </div>
                 </div>
             </div>
@@ -259,12 +264,37 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                      <AmortizationTimelineChart originalTerm={baseMonths} scenarios={whatIfScenarios} />
                 </div>
             </div>
+
+             {/* Page 4: Action Plan & Upsell */}
+            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Recommended Action Plan</h2>
+
+                <div className="bg-gray-50 p-6 rounded-lg border mb-12">
+                    <ul className="space-y-4 text-lg">
+                        {aiActionPlan ? aiActionPlan.map((item, index) => (
+                             <li key={index} className="flex gap-3"><Lightbulb className="text-yellow-400 w-6 h-6 shrink-0 mt-1" /><span>{item}</span></li>
+                        )) : (
+                            <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Your report is ready! Explore the data to find the best savings opportunities for you.</span></li>
+                        )}
+                    </ul>
+                </div>
+                
+                 <div className="text-center mt-auto pt-8">
+                     <h3 className="text-2xl font-bold font-headline text-primary">From Insight to Action: Stop Calculating and Start Tracking</h3>
+                     <p className="text-gray-600 mt-2 max-w-2xl mx-auto">Track your progress in real-time, get payment reminders, and run unlimited 'what-if' scenarios with your LoanZen Tracker Pro dashboard.</p>
+                     
+                     <div className="mt-6 bg-gray-100 p-6 rounded-lg border">
+                        <p className="text-xl font-bold">Your exclusive upgrade offer is in your email.</p>
+                        <p className="text-lg mt-2">Use your personal code to start a 14-day free trial now!</p>
+                     </div>
+                 </div>
+            </div>
         </>
      )
 }
 
 
-const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResults }) => {
+const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: ExistingLoanReportResults, aiActionPlan?: string[] }) => {
     const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate } = reportData;
     const paidAmount = originalLoanAmount - outstandingBalance;
     const paidPercentage = (paidAmount / originalLoanAmount) * 100;
@@ -344,15 +374,15 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                     <div className="bg-green-50 p-6 rounded-lg border border-green-200">
                         <h3 className="text-xl font-semibold mb-4 text-green-800">Extra Monthly Payments</h3>
                         <div className="space-y-4">
-                            {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <p>Paying an extra <strong>{formatCurrency(50)} per month</strong> will get you debt-free <strong>{whatIf50.monthsSaved} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(whatIf50.interestSaved)}</strong> in interest.</p>}
+                            {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <p>Paying an extra <strong>{formatCurrency(50)} per month</strong> will get you debt-free <strong>{whatIf50.monthsSaved.toFixed(0)} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(whatIf50.interestSaved)}</strong> in interest.</p>}
                             {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <hr className="border-gray-300"/>}
-                            {isFinite(whatIf100.months) && whatIf100.monthsSaved > 0 && <p>Paying an extra <strong>{formatCurrency(100)} per month</strong> will get you debt-free <strong>{whatIf100.monthsSaved} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(whatIf100.interestSaved)}</strong> in interest.</p>}
+                            {isFinite(whatIf100.months) && whatIf100.monthsSaved > 0 && <p>Paying an extra <strong>{formatCurrency(100)} per month</strong> will get you debt-free <strong>{whatIf100.monthsSaved.toFixed(0)} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(whatIf100.interestSaved)}</strong> in interest.</p>}
                         </div>
                     </div>
                      <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
                         <h3 className="text-xl font-semibold mb-4 text-orange-800">Lump-Sum Payment</h3>
                         <div className="space-y-4">
-                             {isFinite(whatIf500Lump.months) && whatIf500Lump.monthsSaved > 0 && <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{whatIf500Lump.monthsSaved} months</strong> and save you <strong className="text-orange-600">{formatCurrency(whatIf500Lump.interestSaved)}</strong> in interest.</p>}
+                             {isFinite(whatIf500Lump.months) && whatIf500Lump.monthsSaved > 0 && <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{whatIf500Lump.monthsSaved.toFixed(0)} months</strong> and save you <strong className="text-orange-600">{formatCurrency(whatIf500Lump.interestSaved)}</strong> in interest.</p>}
                         </div>
                     </div>
                 </div>
@@ -368,9 +398,11 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
 
                 <div className="bg-gray-50 p-6 rounded-lg border mb-12">
                     <ul className="space-y-4 text-lg">
-                        <li className="flex gap-3"><Lightbulb className="text-yellow-400 w-6 h-6 shrink-0 mt-1" /><span>Based on your current rate, you are on track to pay off your loan on <strong>{isFinite(totalMonthsFromNow) ? projectedPayoffDate.toLocaleDateString() : "N/A"}</strong>.</span></li>
-                        {isFinite(whatIf100.months) && whatIf100.monthsSaved > 0 && <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>By paying an extra <strong>{formatCurrency(100)} per month</strong>, you could be debt-free <strong>{whatIf100.monthsSaved} months sooner</strong> and save <strong className="text-green-500">{formatCurrency(whatIf100.interestSaved)}</strong> in interest.</span></li>}
-                        <li className="flex gap-3"><Banknote className="text-blue-500 w-6 h-6 shrink-0 mt-1" /><span>Consider applying any bonuses or tax returns directly to your principal balance to maximize savings.</span></li>
+                         {aiActionPlan ? aiActionPlan.map((item, index) => (
+                             <li key={index} className="flex gap-3"><Lightbulb className="text-yellow-400 w-6 h-6 shrink-0 mt-1" /><span>{item}</span></li>
+                        )) : (
+                            <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Your report is ready! Explore the data to find the best savings opportunities for you.</span></li>
+                        )}
                     </ul>
                 </div>
                 
@@ -388,7 +420,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
     )
 }
 
-export default function ReportTemplate({ reportData }: ReportDataType) {
+export default function ReportTemplate({ reportData, aiActionPlan }: ReportTemplateProps) {
     if (!reportData) return null;
 
     const { formType, userEmail, generatedAt } = reportData;
@@ -400,6 +432,9 @@ export default function ReportTemplate({ reportData }: ReportDataType) {
         if (firstDisbursement) {
             disbursementDate = new Date(firstDisbursement.date).toLocaleDateString();
         }
+    } else {
+        // For new loans, we can assume the generation date is close enough for a "Statement Period"
+        disbursementDate = new Date(generatedAt).toLocaleDateString();
     }
     
     return (
@@ -415,16 +450,14 @@ export default function ReportTemplate({ reportData }: ReportDataType) {
                 <Logo />
             </div>
             <p className="text-5xl font-semibold mt-24 font-headline text-blue-900">
-              Loan Analysis Report
+              {formType === 'new-loan' ? 'Loan Comparison Report' : 'Loan Health Statement'}
             </p>
              <div className="mt-16 text-lg text-gray-600">
               <p className="text-2xl">Prepared Exclusively for</p>
               <p className="font-bold text-3xl text-blue-800 mt-2">{userEmail || 'Valued Customer'}</p>
             </div>
              <div className="mt-24 text-sm text-gray-500 space-y-1">
-                {formType === 'existing-loan' && (
-                    <p><strong>Statement Period:</strong> {disbursementDate} to {new Date(generatedAt).toLocaleDateString()}</p>
-                )}
+                <p><strong>Statement Period:</strong> {disbursementDate} to {new Date(generatedAt).toLocaleDateString()}</p>
                 <p><strong>Date of Generation:</strong> {new Date(generatedAt).toLocaleString()}</p>
             </div>
           </div>
@@ -434,8 +467,8 @@ export default function ReportTemplate({ reportData }: ReportDataType) {
         </div>
 
         {formType === 'new-loan' 
-            ? <NewLoanReport reportData={reportData as NewLoanCalculationResults} />
-            : <ExistingLoanReport reportData={reportData as ExistingLoanReportResults} />
+            ? <NewLoanReport reportData={reportData as NewLoanCalculationResults} aiActionPlan={aiActionPlan} />
+            : <ExistingLoanReport reportData={reportData as ExistingLoanReportResults} aiActionPlan={aiActionPlan} />
         }
         
       </div>
