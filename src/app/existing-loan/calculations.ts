@@ -97,7 +97,6 @@ function calculateCreditLineBalance(
        
         let principalComponent = 0;
         let interestComponent = 0;
-        let currentBalanceBeforeEvent = balance;
         
         // Capitalize any outstanding interest before applying the new event
         balance += accruedInterest;
@@ -213,6 +212,20 @@ function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
                  events.push({ ...t, date: new Date(t.date) });
             }
         });
+    } else if (data.loanType !== 'credit-line' && data.emiAmount && data.emisPaid && data.emisPaid > 0) {
+        // This is the fallback for loan types like personal, car, home, and now education.
+        let firstEmiDate = add(new Date(data.disbursementDate), { months: 1 + (data.moratoriumPeriod || 0) });
+        for (let i = 0; i < data.emisPaid; i++) {
+            const paymentDate = add(firstEmiDate, { months: i });
+            // Don't add payments that are in the future
+            if (paymentDate <= new Date()) {
+                events.push({
+                    date: paymentDate,
+                    type: 'repayment',
+                    amount: data.emiAmount,
+                });
+            }
+        }
     }
     
     // Credit Line specific transactions
