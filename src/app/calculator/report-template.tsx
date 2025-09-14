@@ -304,7 +304,7 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
 
     const baseScenario = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, 0, 0); // Base case to get months and interest from now
     const totalInterestFromNow = isFinite(baseScenario.totalInterest) ? baseScenario.totalInterest : 0;
-    const totalMonthsFromNow = isFinite(baseScenario.months) ? baseScenario.months : 0;
+    const totalMonthsFromNow = isFinite(baseScenario.months) && isFinite(baseScenario.months) ? baseScenario.months : 0;
     
     const projectedPayoffDate = new Date();
     if (isFinite(totalMonthsFromNow)) {
@@ -319,8 +319,8 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
     const interestPieData = [
         { name: 'Principal Paid', value: paidAmount },
         { name: 'Interest Paid', value: interestPaidToDate },
-        { name: 'Remaining Principal', value: outstandingBalance },
     ];
+    const principalPaidToDate = originalLoanAmount - outstandingBalance;
     
     const nextSixPayments = schedule.filter(s => new Date(s.date) > new Date()).slice(0, 6);
 
@@ -339,30 +339,45 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
                         <ProgressRing progress={paidPercentage} />
                     </div>
                     <div className="bg-gray-50 p-6 rounded-lg border">
-                        <h3 className="text-xl font-semibold mb-4">Loan Snapshot</h3>
+                        <h3 className="text-xl font-semibold mb-4">Key Stats</h3>
                         <ul className="space-y-2">
-                           <li><strong>Original Amount:</strong> {formatCurrency(originalLoanAmount)}</li>
+                           <li><strong>Original Loan Amount:</strong> {formatCurrency(originalLoanAmount)}</li>
                            <li className="text-lg"><strong>Outstanding Balance:</strong> <span className="font-bold text-red-600">{formatCurrency(outstandingBalance)}</span></li>
+                           <li><strong>Principal Paid to Date:</strong> {formatCurrency(principalPaidToDate)}</li>
                            <li><strong>Interest Paid to Date:</strong> {formatCurrency(interestPaidToDate)}</li>
                            <li><strong>Current Interest Rate:</strong> {interestRate.toFixed(2)}%</li>
                            <li><strong>Projected Payoff Date:</strong> {isFinite(totalMonthsFromNow) ? projectedPayoffDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'N/A'}</li>
                         </ul>
                     </div>
                 </div>
-                 <div className="mt-8">
-                     <h3 className="text-2xl font-semibold text-center mb-6">How Your Payments Are Applied</h3>
-                     <p className="text-center text-sm text-gray-500 -mt-4 mb-4">First 12 months of payments</p>
-                     <ResponsiveContainer width="100%" height={250}>
-                         <BarChart data={schedule.slice(0, 12)} layout="vertical">
-                            <CartesianGrid strokeDasharray="3 3" />
-                             <XAxis type="number" hide />
-                             <YAxis type="category" dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', {month: 'short'})} />
-                            <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                            <Legend />
-                            <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
-                            <Bar dataKey="interest" name="Interest" stackId="a" fill="#FFAB40" />
-                         </BarChart>
-                     </ResponsiveContainer>
+                 <div className="mt-8 grid grid-cols-2 gap-8">
+                     <div>
+                        <h3 className="text-2xl font-semibold text-center mb-4">Where Your Money Has Gone</h3>
+                        <ResponsiveContainer width="100%" height={250}>
+                            <PieChart>
+                                <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                    <Cell fill="#2563EB" />
+                                    <Cell fill="#FFAB40" />
+                                </Pie>
+                                <Tooltip formatter={(val) => formatCurrency(val as number)} />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                     </div>
+                     <div>
+                        <h3 className="text-2xl font-semibold text-center mb-4">First 12 Payments</h3>
+                         <ResponsiveContainer width="100%" height={250}>
+                             <BarChart data={schedule.slice(0, 12)} layout="vertical" margin={{left: 20}}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                 <XAxis type="number" hide />
+                                 <YAxis type="category" dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', {month: 'short'})} />
+                                <Tooltip formatter={(val) => formatCurrency(val as number)}/>
+                                <Legend />
+                                <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
+                                <Bar dataKey="interest" name="Interest" stackId="a" fill="#FFAB40" />
+                             </BarChart>
+                         </ResponsiveContainer>
+                     </div>
                 </div>
             </div>
             
@@ -474,5 +489,7 @@ export default function ReportTemplate({ reportData, aiActionPlan }: ReportTempl
       </div>
     );
 }
+
+    
 
     
