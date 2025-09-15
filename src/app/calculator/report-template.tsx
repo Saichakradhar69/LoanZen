@@ -110,9 +110,9 @@ const ProgressRing = ({ progress }: { progress: number }) => {
                     cy={radius}
                 />
             </svg>
-            <div className="absolute flex flex-col items-center justify-center">
+            <div className="absolute flex flex-col items-center justify-center text-center">
                  <span className="text-4xl font-bold text-gray-700">{`${Math.round(progress)}%`}</span>
-                 <span className="text-lg text-gray-500">Paid Off</span>
+                 <span className="text-base text-gray-500 max-w-[100px] leading-tight">% of Principal Paid</span>
             </div>
         </div>
     );
@@ -386,14 +386,14 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                     </div>
                 </div>
                 <div className="mt-8">
-                    <h3 className="text-xl font-semibold text-center mb-4">Total Cost Breakdown</h3>
+                    <h3 className="text-xl font-semibold text-center mb-4">Total Lifetime Cost Breakdown</h3>
                      <div className="bg-gray-50 p-6 rounded-lg border">
                          <div className="flex justify-between mb-2 text-sm">
                            <span>Paid to Date: {formatCurrency(totalPaidToDate)}</span>
-                           <span>Total Projected Cost: {formatCurrency(totalProjectedCost)}</span>
+                           <span>Total Projected Cost (Principal + Interest): {formatCurrency(totalProjectedCost)}</span>
                          </div>
                          <Progress value={totalCostProgress} />
-                         <p className="text-center text-sm text-gray-500 mt-2">{totalCostProgress.toFixed(1)}% of total cost paid</p>
+                         <p className="text-center text-sm text-gray-500 mt-2">{totalCostProgress.toFixed(1)}% of total lifetime cost paid</p>
                      </div>
                 </div>
             </div>
@@ -582,3 +582,4 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     
 
     
+
