@@ -399,3 +399,6 @@ function calculateFixedEmiLoan(
     return { balance: Math.max(0, balance), interestPaid, schedule };
 }
 
+
+
+    
