@@ -465,7 +465,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                      <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
                         <h3 className="text-xl font-semibold mb-4 text-orange-800">Lump-Sum Payment</h3>
                         <div className="space-y-4">
-                             {isFinite(whatIf500Lump.months) && whatIf500Lump.monthsSaved > 0 && <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{whatIf500Lump.monthsSaved.toFixed(0)} months</strong> and save you <strong className="text-orange-600">{formatcurrency(whatIf500Lump.interestSaved)}</strong> in interest.</p>}
+                             {isFinite(whatIf500Lump.months) && whatIf500Lump.monthsSaved > 0 && <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{whatIf500Lump.monthsSaved.toFixed(0)} months</strong> and save you <strong className="text-orange-600">{formatCurrency(whatIf500Lump.interestSaved)}</strong> in interest.</p>}
                         </div>
                     </div>
                 </div>
@@ -556,3 +556,4 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
       </div>
     );
 }
+
