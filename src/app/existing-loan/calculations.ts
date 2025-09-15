@@ -251,9 +251,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
 
     // --- CALCULATION ROUTER ---
     if (useTransactionalCalculator) {
-        console.log(`[DEBUG] Using transactional calculator for loan type: ${data.loanType}`);
         const events = sortAndCombineEvents(data);
-        // Pass the full data object to the transactional calculator
         const result = calculateCreditLineBalance(events, data.interestRate, data);
         outstandingBalance = result.balance;
         interestPaidToDate = result.interestPaid;
@@ -261,7 +259,6 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
         currentRate = result.currentRate;
 
     } else { // Standard loans (personal, car, home) with fixed EMIs
-        console.log(`[DEBUG] Using fixed EMI calculator for loan type: ${data.loanType}`);
         const result = calculateFixedEmiLoan(data);
         outstandingBalance = result.balance;
         interestPaidToDate = result.interestPaid;
