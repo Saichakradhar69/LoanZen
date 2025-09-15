@@ -25,6 +25,7 @@ export type CalculationResult = {
     loanType: string;
     interestType: 'reducing' | 'flat';
     interestRate: number;
+    perDayInterest: number;
     schedule: Transaction[];
 }
 
@@ -55,6 +56,7 @@ const formSchema = z.object({
     rateType: z.enum(['fixed', 'floating']),
     paymentStructure: z.enum(['fixed', 'variable']).optional(),
     emiAmount: z.coerce.number().optional(),
+    paymentDueDay: z.coerce.number().min(1).max(31).optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),

@@ -117,6 +117,14 @@ export default function ExistingLoanResults({ results, formData, onBack }: Exist
                         <p className="text-sm text-muted-foreground">Total Interest Paid to Date</p>
                         <p className="text-4xl font-bold">{formatCurrency(results.interestPaidToDate)}</p>
                     </div>
+                     <div className="p-6 bg-secondary rounded-lg">
+                        <p className="text-sm text-muted-foreground">Per Day Interest</p>
+                        <p className="text-4xl font-bold">{formatCurrency(results.perDayInterest)}</p>
+                    </div>
+                     <div className="p-6 bg-secondary rounded-lg">
+                        <p className="text-sm text-muted-foreground">Next Payment Due</p>
+                        <p className="text-4xl font-bold">{results.nextEmiDate ? new Date(results.nextEmiDate).toLocaleDateString() : 'N/A'}</p>
+                    </div>
                 </div>
             </TabsContent>
             <TabsContent value="schedule">

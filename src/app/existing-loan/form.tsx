@@ -50,6 +50,7 @@ const formSchema = z.object({
     rateType: z.enum(['fixed', 'floating']),
     paymentStructure: z.enum(['fixed', 'variable']).optional(),
     emiAmount: z.coerce.number().optional(),
+    paymentDueDay: z.coerce.number().min(1).max(31).optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
@@ -85,6 +86,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             disbursementDate: undefined,
             interestRate: undefined,
             emiAmount: undefined,
+            paymentDueDay: 1,
             moratoriumPeriod: 0,
             emisPaid: 0,
             loanName: '',
@@ -214,7 +216,15 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                 <FormItem>
                     <FormLabel>Monthly Payment (EMI) Amount</FormLabel>
                     <FormControl><Input type="number" placeholder="e.g., 1200" {...field} value={field.value ?? ''} /></FormControl>
-                     <FormDescription>Required for standard loans to calculate tenure.</FormDescription>
+                     <FormDescription>The amount you pay each month.</FormDescription>
+                    <FormMessage />
+                </FormItem>
+            )} />
+             <FormField control={form.control} name="paymentDueDay" render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Payment Due Day of Month</FormLabel>
+                    <FormControl><Input type="number" min="1" max="31" placeholder="e.g., 5" {...field} value={field.value ?? ''} /></FormControl>
+                     <FormDescription>The day your EMI is due each month.</FormDescription>
                     <FormMessage />
                 </FormItem>
             )} />
@@ -307,6 +317,13 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             case 'education':
                 return (
                     <div className="space-y-6">
+                        <FormField control={form.control} name="emisPaid" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Number of EMIs Already Paid (Optional)</FormLabel>
+                                <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
                         <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Moratorium Period (in months, optional)</FormLabel>

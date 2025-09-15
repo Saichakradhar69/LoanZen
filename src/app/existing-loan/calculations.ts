@@ -2,61 +2,10 @@
 
 // src/app/existing-loan/calculations.ts
 
-import { add, differenceInDays, format } from 'date-fns';
+import { add, differenceInDays, format, setDate } from 'date-fns';
 import type { ExistingLoanFormData } from './form';
 import type { CalculationResult, Transaction } from './actions';
 
-// --- Standard Fixed-Rate Loan (Reducing Balance) ---
-function calculateStandardFixedLoan(
-    principal: number,
-    annualRate: number,
-    tenureMonths: number,
-    paymentsMade: number
-): { outstandingBalance: number, emi: number } {
-    if (tenureMonths <= 0) return { outstandingBalance: principal, emi: 0 };
-    
-    const R = annualRate / 12 / 100; // Monthly interest rate
-    const P = principal;
-    const N = tenureMonths;
-    const k = paymentsMade;
-
-    if (R === 0) {
-        const emi = P / N;
-        const outstandingBalance = P - (emi * k);
-        return { outstandingBalance, emi };
-    }
-
-    const emi = P * R * Math.pow(1 + R, N) / (Math.pow(1 + R, N) - 1);
-    
-    if (k >= N) {
-        return { outstandingBalance: 0, emi: emi };
-    }
-
-    const outstandingBalance = P * (Math.pow(1 + R, N) - Math.pow(1 + R, k)) / (Math.pow(1 + R, N) - 1);
-    
-    return { outstandingBalance: Math.max(0, outstandingBalance), emi };
-}
-
-
-// --- Flat Rate Loan ---
-function calculateFlatRateLoan(
-    principal: number,
-    annualRate: number,
-    tenureMonths: number,
-    paymentsMade: number
-): { outstandingBalance: number, emi: number } {
-    if (tenureMonths <= 0) return { outstandingBalance: principal, emi: 0 };
-    const N = tenureMonths;
-    const k = paymentsMade;
-    
-    const totalInterest = principal * (annualRate / 100) * (N / 12);
-    const totalRepayable = principal + totalInterest;
-    const emi = totalRepayable / N;
-    
-    const outstandingBalance = totalRepayable - (emi * k);
-
-    return { outstandingBalance: Math.max(0, outstandingBalance), emi };
-}
 
 // --- Credit Line / Irregular Payments (Transactional) ---
 function calculateCreditLineBalance(
@@ -83,7 +32,6 @@ function calculateCreditLineBalance(
              const dailyRate = currentRate / 365.25 / 100;
              accruedInterest = balance * dailyRate * daysSinceLastEvent;
              // Don't add to balance yet, it's just calculated for payment breakdown
-
              schedule.push({
                  date: format(eventDate, 'yyyy-MM-dd'),
                  type: 'interest',
@@ -160,10 +108,12 @@ function calculateCreditLineBalance(
 function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
     let events: any[] = [];
     
+    const disbursementDate = new Date(data.disbursementDate);
+
     // Initial Disbursement is the first event, if not using multi-disbursement
     if (data.originalLoanAmount && data.originalLoanAmount > 0 && (!data.disbursements || data.disbursements.length === 0)) {
         events.push({
-            date: new Date(data.disbursementDate),
+            date: disbursementDate,
             type: 'disbursement',
             amount: data.originalLoanAmount,
         });
@@ -193,8 +143,12 @@ function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
     }
 
     // Repayments (EMIs or variable)
+    const paymentDueDay = data.paymentDueDay || disbursementDate.getDate();
+
     if (data.paymentStructure === 'fixed' && data.emiAmount && data.emisPaid && data.emisPaid > 0) {
-        let firstEmiDate = add(new Date(data.disbursementDate), { months: 1 + (data.moratoriumPeriod || 0) });
+        let firstEmiDate = add(disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
+        firstEmiDate = setDate(firstEmiDate, paymentDueDay);
+        
         for (let i = 0; i < data.emisPaid; i++) {
             const paymentDate = add(firstEmiDate, { months: i });
             // Don't add payments that are in the future
@@ -212,9 +166,10 @@ function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
                  events.push({ ...t, date: new Date(t.date) });
             }
         });
-    } else if (data.loanType !== 'credit-line' && data.emiAmount && data.emisPaid && data.emisPaid > 0) {
-        // This is the fallback for loan types like personal, car, home, and now education.
-        let firstEmiDate = add(new Date(data.disbursementDate), { months: 1 + (data.moratoriumPeriod || 0) });
+    } else if (['personal', 'car', 'home', 'education'].includes(data.loanType) && data.emiAmount && data.emisPaid && data.emisPaid > 0) {
+         let firstEmiDate = add(disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
+         firstEmiDate = setDate(firstEmiDate, paymentDueDay);
+
         for (let i = 0; i < data.emisPaid; i++) {
             const paymentDate = add(firstEmiDate, { months: i });
             // Don't add payments that are in the future
@@ -273,12 +228,19 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
         }
     }
     
-    let firstEmiDate = add(new Date(data.disbursementDate), { months: 1 + (data.moratoriumPeriod || 0) });
+    const disbursementDate = new Date(data.disbursementDate);
+    const paymentDueDay = data.paymentDueDay || disbursementDate.getDate();
+
+    let firstEmiDate = add(disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
+    firstEmiDate = setDate(firstEmiDate, paymentDueDay);
+
     let nextEmiDate = firstEmiDate;
     const today = new Date();
     while(nextEmiDate < today && outstandingBalance > 0) {
         nextEmiDate = add(nextEmiDate, { months: 1 });
     }
+
+    const perDayInterest = outstandingBalance > 0 ? (outstandingBalance * (currentRate / 100)) / 365.25 : 0;
 
     return {
         outstandingBalance: Math.max(0, outstandingBalance),
@@ -289,6 +251,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
         loanType: data.loanType,
         interestType: data.interestType,
         interestRate: currentRate,
+        perDayInterest: perDayInterest,
         schedule,
     };
 }
