@@ -10,17 +10,12 @@ import type { CalculationResults as ReportDataType, NewLoanCalculationResults, E
 import ReportTemplate from '@/app/calculator/report-template';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { getReportInsights, ReportInsightsInput } from '@/ai/flows/report-insights';
-
 
 function ReportContent({ sessionId }: { sessionId: string }) {
   const [reportData, setReportData] = useState<ReportDataType | null>(null);
-  const [aiActionPlan, setAiActionPlan] = useState<string[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -51,74 +46,6 @@ function ReportContent({ sessionId }: { sessionId: string }) {
 
     fetchData();
   }, [sessionId]);
-
-   // Effect to fetch AI insights after reportData is loaded
-  useEffect(() => {
-    if (!reportData) return;
-
-    const fetchAiInsights = async () => {
-      setIsLoadingAi(true);
-      setAiError(null);
-      try {
-        let insightsInput: ReportInsightsInput;
-
-        if (reportData.formType === 'new-loan') {
-          const data = reportData as NewLoanCalculationResults;
-          const bestScenario = [...data.scenarios].sort((a, b) => a.totalPayment - b.totalPayment)[0];
-          const worstScenario = [...data.scenarios].sort((a, b) => b.totalPayment - a.totalPayment)[0];
-          
-          const baseMonths = bestScenario.loanTerm * 12;
-          const whatIf50 = calculateWhatIf(bestScenario.loanAmount, bestScenario.monthlyPayment, bestScenario.interestRate, baseMonths, bestScenario.totalInterest, 50);
-          const whatIf100 = calculateWhatIf(bestScenario.loanAmount, bestScenario.monthlyPayment, bestScenario.interestRate, baseMonths, bestScenario.totalInterest, 100);
-
-          insightsInput = {
-            loanType: 'new-loan',
-            bestScenarioName: bestScenario.scenarioName,
-            savingsComparedToWorst: worstScenario.totalInterest - bestScenario.totalInterest,
-            whatIfScenarios: [
-              { name: '+ $50/mo', monthsSaved: whatIf50.monthsSaved, interestSaved: whatIf50.interestSaved },
-              { name: '+ $100/mo', monthsSaved: whatIf100.monthsSaved, interestSaved: whatIf100.interestSaved },
-            ].filter(s => s.monthsSaved > 0),
-          };
-        } else { // 'existing-loan'
-          const data = reportData as ExistingLoanReportResults;
-          const lastRepayment = [...data.schedule].reverse().find(s => s.type === 'repayment');
-          const baseMonthlyPayment = lastRepayment ? lastRepayment.amount : (data.outstandingBalance > 0 ? data.outstandingBalance / 120 : data.originalLoanAmount / 120); 
-          const baseScenario = calculateWhatIf(data.outstandingBalance, baseMonthlyPayment, data.interestRate, 0, 0);
-          const totalMonthsFromNow = isFinite(baseScenario.months) ? baseScenario.months : 0;
-          const totalInterestFromNow = isFinite(baseScenario.totalInterest) ? baseScenario.totalInterest : 0;
-          
-          const projectedPayoffDate = new Date();
-           if (isFinite(totalMonthsFromNow)) {
-                projectedPayoffDate.setMonth(projectedPayoffDate.getMonth() + totalMonthsFromNow);
-           }
-
-          const whatIf50 = calculateWhatIf(data.outstandingBalance, baseMonthlyPayment, data.interestRate, totalMonthsFromNow, totalInterestFromNow, 50);
-          const whatIf100 = calculateWhatIf(data.outstandingBalance, baseMonthlyPayment, data.interestRate, totalMonthsFromNow, totalInterestFromNow, 100);
-          
-          insightsInput = {
-            loanType: 'existing-loan',
-            projectedPayoffDate: isFinite(totalMonthsFromNow) ? projectedPayoffDate.toLocaleDateString() : 'N/A',
-            whatIfScenarios: [
-              { name: '+ $50/mo', monthsSaved: whatIf50.monthsSaved, interestSaved: whatIf50.interestSaved },
-              { name: '+ $100/mo', monthsSaved: whatIf100.monthsSaved, interestSaved: whatIf100.interestSaved },
-            ].filter(s => s.monthsSaved > 0),
-          };
-        }
-
-        const result = await getReportInsights(insightsInput);
-        setAiActionPlan(result.actionPlan);
-      } catch (err) {
-        console.error("AI Insights Error:", err);
-        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred while generating AI insights.";
-        setAiError(errorMessage);
-      } finally {
-        setIsLoadingAi(false);
-      }
-    };
-
-    fetchAiInsights();
-  }, [reportData]);
 
 
   const handleDownloadPdf = async () => {
@@ -231,27 +158,6 @@ function ReportContent({ sessionId }: { sessionId: string }) {
     }
   };
   
-// Helper function for "what-if" calculations, needed for AI prompt
-function calculateWhatIf(principal: number, monthlyPayment: number, annualRate: number, baseMonths: number, baseInterest: number, extraMonthly: number = 0) {
-    if (principal <= 0) return { months: 0, totalInterest: 0, monthsSaved: baseMonths, interestSaved: baseInterest };
-    const monthlyRate = annualRate / 12 / 100;
-    let balance = principal;
-    let months = 0;
-    let totalInterest = 0;
-    const fullPayment = monthlyPayment + extraMonthly;
-
-    if (fullPayment <= balance * monthlyRate) return { months: Infinity, totalInterest: Infinity, monthsSaved: 0, interestSaved: 0 };
-
-    while (balance > 0) {
-        const interest = balance * monthlyRate;
-        const principalPaid = fullPayment - interest;
-        balance -= principalPaid;
-        totalInterest += interest;
-        months++;
-        if (months > 1200) return { months: Infinity, totalInterest: Infinity, monthsSaved: 0, interestSaved: 0 };
-    }
-    return { months, totalInterest, monthsSaved: baseMonths - months, interestSaved: baseInterest - totalInterest };
-}
 
   return (
     <div className="container mx-auto max-w-4xl py-12 px-4 flex flex-col items-center justify-center min-h-[60vh] gap-8">
@@ -306,19 +212,6 @@ function calculateWhatIf(principal: number, monthlyPayment: number, annualRate: 
                         Download CSV
                     </Button>
                 </div>
-                 {isLoadingAi && (
-                    <div className="flex items-center justify-center pt-4 text-muted-foreground">
-                        <Lightbulb className="mr-2 h-4 w-4 animate-pulse" />
-                        Generating your personalized AI insights...
-                    </div>
-                )}
-                 {aiError && (
-                    <div className="mt-4 p-4 bg-destructive/10 rounded-lg text-destructive text-sm">
-                        <p className="font-bold flex items-center gap-2"><AlertCircle /> Could not generate AI recommendations.</p>
-                        <p className="mt-2 text-xs">This might be due to a missing or invalid Gemini API key. Please check your `.env` file and try again.</p>
-                        <p className="font-mono text-xs mt-2 bg-black/20 p-2 rounded">Details: {aiError}</p>
-                    </div>
-                )}
             </div>
           )}
 
@@ -354,7 +247,7 @@ function calculateWhatIf(principal: number, monthlyPayment: number, annualRate: 
       {/* Hidden component used for PDF generation */}
       <div className="fixed -top-[20000px] left-0 -z-50 opacity-1" aria-hidden="true">
         <div ref={reportRef}>
-            {reportData && <ReportTemplate reportData={reportData} aiActionPlan={aiActionPlan || undefined} />}
+            {reportData && <ReportTemplate reportData={reportData} />}
         </div>
       </div>
     </div>
@@ -362,5 +255,3 @@ function calculateWhatIf(principal: number, monthlyPayment: number, annualRate: 
 }
 
 export default ReportContent;
-
-    

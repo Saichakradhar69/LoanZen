@@ -2,7 +2,7 @@
 
 'use client'
 
-import { Bar, BarChart, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Line, ComposedChart, Area, LineChart, LabelList } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Line, ComposedChart, Area, LabelList } from 'recharts';
 import type { CalculationResults as ReportDataType, NewLoanCalculationResults, ExistingLoanReportResults } from '@/app/api/stripe/webhook/route';
 import { Banknote, CalendarCheck, Check, Gift, Lightbulb, TrendingUp } from 'lucide-react';
 import Logo from '@/components/logo';
@@ -10,7 +10,6 @@ import Logo from '@/components/logo';
 
 interface ReportTemplateProps {
   reportData: ReportDataType;
-  aiActionPlan?: string[];
 }
 
 const formatCurrency = (value: number) => {
@@ -158,7 +157,7 @@ const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: 
 }
 
 
-const NewLoanReport = ({ reportData, aiActionPlan }: { reportData: NewLoanCalculationResults, aiActionPlan?: string[] }) => {
+const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }) => {
     const { scenarios } = reportData;
     const hasMultipleScenarios = scenarios.length > 1;
     const bestScenario = [...scenarios].sort((a, b) => a.totalPayment - b.totalPayment)[0];
@@ -173,7 +172,7 @@ const NewLoanReport = ({ reportData, aiActionPlan }: { reportData: NewLoanCalcul
     const whatIfScenarios = [
       { name: '+ $50/mo', months: whatIf50.months},
       { name: '+ $100/mo', months: whatIf100.months}
-    ].filter(s => isFinite(s.months));
+    ].filter(s => isFinite(s.months) && s.months > 0);
 
 
     return (
@@ -280,11 +279,7 @@ const NewLoanReport = ({ reportData, aiActionPlan }: { reportData: NewLoanCalcul
 
                 <div className="bg-gray-50 p-6 rounded-lg border mb-12">
                     <ul className="space-y-4 text-lg">
-                        {aiActionPlan ? aiActionPlan.map((item, index) => (
-                             <li key={index} className="flex gap-3"><Lightbulb className="text-yellow-400 w-6 h-6 shrink-0 mt-1" /><span>{item}</span></li>
-                        )) : (
-                            <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Your report is ready! Explore the data to find the best savings opportunities for you.</span></li>
-                        )}
+                        <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Your report is ready! Explore the data to find the best savings opportunities for you.</span></li>
                     </ul>
                 </div>
                 
@@ -303,7 +298,7 @@ const NewLoanReport = ({ reportData, aiActionPlan }: { reportData: NewLoanCalcul
 }
 
 
-const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: ExistingLoanReportResults, aiActionPlan?: string[] }) => {
+const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResults }) => {
     const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate } = reportData;
     const paidAmount = originalLoanAmount - outstandingBalance;
     const paidPercentage = originalLoanAmount > 0 ? (paidAmount / originalLoanAmount) * 100 : 0;
@@ -313,7 +308,7 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
 
     const baseScenario = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, 0, 0); // Base case to get months and interest from now
     const totalInterestFromNow = isFinite(baseScenario.totalInterest) ? baseScenario.totalInterest : 0;
-    const totalMonthsFromNow = isFinite(baseScenario.months) && isFinite(baseScenario.months) ? baseScenario.months : 0;
+    const totalMonthsFromNow = isFinite(baseScenario.months) ? baseScenario.months : 0;
     
     const projectedPayoffDate = new Date();
     if (isFinite(totalMonthsFromNow)) {
@@ -336,8 +331,6 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
     ];
     const principalPaidToDate = originalLoanAmount - outstandingBalance;
     
-    const nextSixPayments = schedule.filter(s => new Date(s.date) > new Date()).slice(0, 6);
-
     const whatIfScenarios = [
       { name: '+ $50/mo', months: whatIf50.months},
       { name: '+ $100/mo', months: whatIf100.months}
@@ -472,7 +465,7 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
                      <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
                         <h3 className="text-xl font-semibold mb-4 text-orange-800">Lump-Sum Payment</h3>
                         <div className="space-y-4">
-                             {isFinite(whatIf500Lump.months) && whatIf500Lump.monthsSaved > 0 && <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{whatIf500Lump.monthsSaved.toFixed(0)} months</strong> and save you <strong className="text-orange-600">{formatCurrency(whatIf500Lump.interestSaved)}</strong> in interest.</p>}
+                             {isFinite(whatIf500Lump.months) && whatIf500Lump.monthsSaved > 0 && <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{whatIf500Lump.monthsSaved.toFixed(0)} months</strong> and save you <strong className="text-orange-600">{formatcurrency(whatIf500Lump.interestSaved)}</strong> in interest.</p>}
                         </div>
                     </div>
                 </div>
@@ -491,11 +484,7 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
 
                 <div className="bg-gray-50 p-6 rounded-lg border mb-12">
                     <ul className="space-y-4 text-lg">
-                         {aiActionPlan ? aiActionPlan.map((item, index) => (
-                             <li key={index} className="flex gap-3"><Lightbulb className="text-yellow-400 w-6 h-6 shrink-0 mt-1" /><span>{item}</span></li>
-                        )) : (
-                            <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Your report is ready! Explore the data to find the best savings opportunities for you.</span></li>
-                        )}
+                        <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Your report is ready! Explore the data to find the best savings opportunities for you.</span></li>
                     </ul>
                 </div>
                 
@@ -513,7 +502,7 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
     )
 }
 
-export default function ReportTemplate({ reportData, aiActionPlan }: ReportTemplateProps) {
+export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     if (!reportData) return null;
 
     const { formType, userEmail, generatedAt } = reportData;
@@ -560,17 +549,10 @@ export default function ReportTemplate({ reportData, aiActionPlan }: ReportTempl
         </div>
 
         {formType === 'new-loan' 
-            ? <NewLoanReport reportData={reportData as NewLoanCalculationResults} aiActionPlan={aiActionPlan} />
-            : <ExistingLoanReport reportData={reportData as ExistingLoanReportResults} aiActionPlan={aiActionPlan} />
+            ? <NewLoanReport reportData={reportData as NewLoanCalculationResults} />
+            : <ExistingLoanReport reportData={reportData as ExistingLoanReportResults} />
         }
         
       </div>
     );
 }
-
-    
-
-    
-
-    
-
