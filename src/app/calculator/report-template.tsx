@@ -290,7 +290,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
 
 
 const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResults }) => {
-    const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate } = reportData;
+    const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate, perDayInterest } = reportData;
     const paidAmount = originalLoanAmount - outstandingBalance;
     const paidPercentage = originalLoanAmount > 0 ? (paidAmount / originalLoanAmount) * 100 : 0;
     
@@ -379,7 +379,8 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                            <li className="text-lg"><strong>Outstanding Balance:</strong> <span className="font-bold text-red-600">{formatCurrency(outstandingBalance)}</span></li>
                            <li><strong>Principal Paid to Date:</strong> {formatCurrency(principalPaidToDate)}</li>
                            <li><strong>Interest Paid to Date:</strong> {formatCurrency(interestPaidToDate)}</li>
-                           <li><strong>Current Interest Rate:</strong> {interestRate.toFixed(2)}%</li>
+                           <li><strong>Per Day Interest:</strong> {formatCurrency(perDayInterest)}</li>
+                           <li><strong>Next EMI Date:</strong> {nextEmiDate ? new Date(nextEmiDate).toLocaleDateString() : 'N/A'}</li>
                            <li><strong>Projected Payoff Date:</strong> {isFinite(totalMonthsFromNow) ? projectedPayoffDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'N/A'}</li>
                         </ul>
                     </div>
