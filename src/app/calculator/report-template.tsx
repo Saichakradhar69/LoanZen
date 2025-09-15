@@ -1,4 +1,5 @@
 
+
 'use client'
 
 import { Bar, BarChart, CartesianGrid, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, Line, ComposedChart, Area, LineChart, LabelList } from 'recharts';
@@ -297,7 +298,7 @@ const NewLoanReport = ({ reportData, aiActionPlan }: { reportData: NewLoanCalcul
 const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: ExistingLoanReportResults, aiActionPlan?: string[] }) => {
     const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate } = reportData;
     const paidAmount = originalLoanAmount - outstandingBalance;
-    const paidPercentage = (paidAmount / originalLoanAmount) * 100;
+    const paidPercentage = originalLoanAmount > 0 ? (paidAmount / originalLoanAmount) * 100 : 0;
     
     const lastRepayment = [...schedule].reverse().find(s => s.type === 'repayment');
     const baseMonthlyPayment = lastRepayment ? lastRepayment.amount : (outstandingBalance > 0 ? outstandingBalance / 120 : originalLoanAmount / 120); 
@@ -311,6 +312,11 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
         projectedPayoffDate.setMonth(projectedPayoffDate.getMonth() + totalMonthsFromNow);
     }
     
+    const firstDisbursement = reportData.schedule.find(t => t.type === 'disbursement');
+    const loanStartDate = firstDisbursement ? new Date(firstDisbursement.date) : new Date(reportData.generatedAt);
+    
+    const loanTenureYears = Math.ceil(totalMonthsFromNow / 12) + Math.floor((new Date().getTime() - loanStartDate.getTime()) / (1000 * 3600 * 24 * 365.25));
+
     // What-if scenarios
     const whatIf50 = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, totalMonthsFromNow, totalInterestFromNow, 50);
     const whatIf100 = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, totalMonthsFromNow, totalInterestFromNow, 100);
@@ -339,6 +345,32 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
             {/* Page 2: Loan Health Dashboard */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Loan Health at a Glance</h2>
+                 <div className="grid grid-cols-2 gap-4 border-b pb-4 mb-4">
+                    <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Loan Type</p>
+                        <p className="font-semibold">{loanTypeLabels[reportData.loanType] || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Loan Amount</p>
+                        <p className="font-semibold">{formatCurrency(reportData.originalLoanAmount)}</p>
+                    </div>
+                     <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Interest Rate</p>
+                        <p className="font-semibold">{reportData.interestRate.toFixed(2)}%</p>
+                    </div>
+                     <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Loan Tenure</p>
+                        <p className="font-semibold">{loanTenureYears > 0 ? `${loanTenureYears} Years` : 'N/A'}</p>
+                    </div>
+                     <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Monthly Payment (EMI)</p>
+                        <p className="font-semibold">{baseMonthlyPayment > 0 ? formatCurrency(baseMonthlyPayment) : 'N/A'}</p>
+                    </div>
+                     <div className="space-y-1">
+                        <p className="text-sm text-gray-500">Loan Period</p>
+                        <p className="font-semibold">{loanStartDate.toLocaleDateString()} - {isFinite(totalMonthsFromNow) ? projectedPayoffDate.toLocaleDateString() : 'N/A'}</p>
+                    </div>
+                </div>
                 <div className="grid grid-cols-2 gap-8 items-center">
                     <div className="flex justify-center">
                         <ProgressRing progress={paidPercentage} />
