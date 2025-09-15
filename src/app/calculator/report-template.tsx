@@ -231,27 +231,33 @@ const NewLoanReport = ({ reportData, aiActionPlan }: { reportData: NewLoanCalcul
             {/* Page 3: Visual Comparison */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
               <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Visual Breakdown of Your Options</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                 <div>
+                <div className="mb-12">
                     <h3 className="text-2xl font-semibold text-center mb-6">Paydown Timeline</h3>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <LineChart data={bestScenario.amortizationSchedule.filter(a => a.month % 12 === 0 || a.month === 1).map(a => ({ year: Math.floor(a.month / 12), balance: a.remainingBalance }))}>
+                    <ResponsiveContainer width="100%" height={350}>
+                        <ComposedChart data={bestScenario.amortizationSchedule.filter(a => a.month % 12 === 0 || a.month === 1).map(a => ({ year: Math.floor(a.month / 12), balance: a.remainingBalance }))}>
+                            <defs>
+                                <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                                <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis dataKey="year" label={{ value: 'Years', position: 'insideBottom', offset: -5 }} />
                             <YAxis tickFormatter={(val) => formatCurrency(val as number)}/>
                             <Tooltip formatter={(val) => formatCurrency(val as number)}/>
                             <Legend />
-                            <Line type="monotone" dataKey="balance" name="Remaining Balance" stroke='#10B981' strokeWidth={3} />
-                        </LineChart>
+                            <Area type="monotone" dataKey="balance" name="Remaining Balance" stroke='#10B981' fillOpacity={1} fill="url(#colorBalance)" />
+                            <Line type="monotone" dataKey="balance" stroke='#10B981' strokeWidth={2} dot={false} />
+                        </ComposedChart>
                     </ResponsiveContainer>
                 </div>
                  <div>
                     <h3 className="text-2xl font-semibold text-center mb-6">First Year: Principal vs. Interest</h3>
-                     <ResponsiveContainer width="100%" height={300}>
-                         <BarChart data={bestScenario.amortizationSchedule.slice(0, 12)} layout="vertical">
+                     <ResponsiveContainer width="100%" height={400}>
+                         <BarChart data={bestScenario.amortizationSchedule.slice(0, 12)} layout="vertical" margin={{left: 20}}>
                             <CartesianGrid strokeDasharray="3 3" />
                              <XAxis type="number" hide />
-                             <YAxis type="category" dataKey="month" tickFormatter={(val) => `M${val}`} />
+                             <YAxis type="category" dataKey="month" tickFormatter={(val) => `Month ${val}`} width={80} />
                             <Tooltip formatter={(val) => formatCurrency(val as number)}/>
                             <Legend />
                             <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
@@ -259,7 +265,9 @@ const NewLoanReport = ({ reportData, aiActionPlan }: { reportData: NewLoanCalcul
                          </BarChart>
                      </ResponsiveContainer>
                 </div>
-              </div>
+            </div>
+             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Accelerated Payoff Comparison</h2>
                 <div className="mt-8">
                      <h3 className="text-2xl font-semibold text-center mb-6">Amortization Timeline with Extra Payments</h3>
                      <AmortizationTimelineChart originalTerm={baseMonths} scenarios={whatIfScenarios} />
@@ -333,11 +341,11 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
     const whatIfScenarios = [
       { name: '+ $50/mo', months: whatIf50.months},
       { name: '+ $100/mo', months: whatIf100.months}
-    ].filter(s => isFinite(s.months));
+    ].filter(s => isFinite(s.months) && s.months > 0);
 
     // Data for the paydown timeline chart
     const timelineData = schedule.filter(s => s.type === 'disbursement' || s.type === 'repayment' || s.type === 'interest')
-        .map(s => ({ date: s.date, balance: s.endingBalance }));
+        .map(s => ({ date: new Date(s.date).getTime(), balance: s.endingBalance }));
 
 
     return (
@@ -387,12 +395,12 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
                         </ul>
                     </div>
                 </div>
-                 <div className="mt-8 grid grid-cols-2 gap-8">
+                 <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
                      <div>
                         <h3 className="text-2xl font-semibold text-center mb-4">Where Your Money Has Gone</h3>
-                        <ResponsiveContainer width="100%" height={250}>
+                        <ResponsiveContainer width="100%" height={300}>
                             <PieChart>
-                                <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                                <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={(entry) => formatCurrency(entry.value)}>
                                     <Cell fill="#2563EB" />
                                     <Cell fill="#FFAB40" />
                                 </Pie>
@@ -403,11 +411,11 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
                      </div>
                      <div>
                         <h3 className="text-2xl font-semibold text-center mb-4">First 12 Payments</h3>
-                         <ResponsiveContainer width="100%" height={250}>
+                         <ResponsiveContainer width="100%" height={300}>
                              <BarChart data={schedule.slice(0, 12)} layout="vertical" margin={{left: 20}}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                  <XAxis type="number" hide />
-                                 <YAxis type="category" dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', {month: 'short'})} />
+                                 <YAxis type="category" dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', {month: 'short'})} width={60} />
                                 <Tooltip formatter={(val) => formatCurrency(val as number)}/>
                                 <Legend />
                                 <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
@@ -424,15 +432,30 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
                  
                  <div className="mb-8">
                      <h3 className="text-2xl font-semibold text-center mb-4">Your Paydown Timeline</h3>
-                     <ResponsiveContainer width="100%" height={300}>
-                         <LineChart data={timelineData}>
+                     <ResponsiveContainer width="100%" height={400}>
+                        <ComposedChart data={timelineData}>
+                            <defs>
+                                <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#8884d8" stopOpacity={0.4}/>
+                                <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
+                                </linearGradient>
+                            </defs>
                             <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', { year: 'numeric', month: 'short'})} />
+                            <XAxis 
+                                dataKey="date" 
+                                type="number" 
+                                domain={['dataMin', 'dataMax']}
+                                tickFormatter={(unixTime) => new Date(unixTime).toLocaleDateString('en-US', { year: 'numeric', month: 'short'})} 
+                            />
                             <YAxis tickFormatter={(val) => formatCurrency(val as number)} />
-                            <Tooltip formatter={(val) => formatCurrency(val as number)} />
+                            <Tooltip 
+                                labelFormatter={(unixTime) => new Date(unixTime).toLocaleDateString()}
+                                formatter={(val) => formatCurrency(val as number)} 
+                            />
                             <Legend />
-                            <Line type="monotone" dataKey="balance" name="Remaining Balance" stroke="#8884d8" strokeWidth={2} dot={false}/>
-                        </LineChart>
+                            <Area type="monotone" dataKey="balance" name="Remaining Balance" stroke='#8884d8' fillOpacity={1} fill="url(#colorBalance)" />
+                            <Line type="monotone" dataKey="balance" stroke="#8884d8" strokeWidth={2} dot={false}/>
+                        </ComposedChart>
                      </ResponsiveContainer>
                  </div>
 
@@ -453,6 +476,9 @@ const ExistingLoanReport = ({ reportData, aiActionPlan }: { reportData: Existing
                         </div>
                     </div>
                 </div>
+            </div>
+             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Accelerated Payoff Comparison</h2>
                  <div className="mt-8">
                      <h3 className="text-2xl font-semibold text-center mb-6">Payoff Timeline Comparison</h3>
                      <AmortizationTimelineChart originalTerm={totalMonthsFromNow} scenarios={whatIfScenarios} />
@@ -547,3 +573,4 @@ export default function ReportTemplate({ reportData, aiActionPlan }: ReportTempl
     
 
     
+
