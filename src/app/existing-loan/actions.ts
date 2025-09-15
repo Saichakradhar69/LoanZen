@@ -27,6 +27,7 @@ export type CalculationResult = {
     interestRate: number;
     perDayInterest: number;
     schedule: Transaction[];
+    emiAmount?: number;
 }
 
 const disbursementSchema = z.object({
@@ -110,3 +111,5 @@ export async function calculateOutstandingBalanceAction(
         };
     }
 }
+
+    

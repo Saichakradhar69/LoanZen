@@ -266,7 +266,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
 
              {/* Page 4: Action Plan & Upsell */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Recommended Action Plan</h2>
+                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 fontheadline">Your Recommended Action Plan</h2>
 
                 <div className="bg-gray-50 p-6 rounded-lg border mb-12">
                      <h3 className="text-xl font-bold text-gray-800 mb-4">Based on your report, here are your next steps:</h3>
@@ -292,12 +292,14 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
 
 
 const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResults }) => {
-    const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate, perDayInterest } = reportData;
+    const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate, perDayInterest, emiAmount } = reportData;
     const paidAmount = originalLoanAmount - outstandingBalance;
     const paidPercentage = originalLoanAmount > 0 ? (paidAmount / originalLoanAmount) * 100 : 0;
     
-    const lastRepayment = [...schedule].reverse().find(s => s.type === 'repayment');
-    const baseMonthlyPayment = lastRepayment ? lastRepayment.amount : (outstandingBalance > 0 ? outstandingBalance / 120 : originalLoanAmount / 120); 
+    // Prioritize the emiAmount from the form if it exists, otherwise fall back to finding the last repayment.
+    const baseMonthlyPayment = emiAmount && emiAmount > 0 
+        ? emiAmount
+        : [...schedule].reverse().find(s => s.type === 'repayment')?.amount || (outstandingBalance > 0 ? outstandingBalance / 120 : originalLoanAmount / 120);
 
     const baseScenario = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, 0, 0); // Base case to get months and interest from now
     const totalInterestFromNow = isFinite(baseScenario.totalInterest) ? baseScenario.totalInterest : 0;
@@ -604,3 +606,6 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     
 
 
+
+
+    
