@@ -269,8 +269,10 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Recommended Action Plan</h2>
 
                 <div className="bg-gray-50 p-6 rounded-lg border mb-12">
+                     <h3 className="text-xl font-bold text-gray-800 mb-4">Based on your report, here are your next steps:</h3>
                     <ul className="space-y-4 text-lg">
-                        <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Your report is ready! Explore the data to find the best savings opportunities for you.</span></li>
+                        <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Review your options and select the "{bestScenario.scenarioName}" for the most savings.</span></li>
+                         {isFinite(whatIf50.months) && whatIf50.interestSaved > 0 && <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Consider paying an extra <strong>{formatCurrency(50)}/month</strong>. This small change will save you <strong>{formatCurrency(whatIf50.interestSaved)}!</strong></span></li>}
                     </ul>
                 </div>
                 
@@ -280,7 +282,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                      
                      <div className="mt-6 bg-gray-100 p-6 rounded-lg border">
                         <p className="text-xl font-bold">Your exclusive upgrade offer is in your email.</p>
-                        <p className="text-lg mt-2">Use your personal code to start a 14-day free trial now!</p>
+                        <p className="text-lg mt-2">Use your personal code for a <span className="font-extrabold text-green-600">14-DAY FREE TRIAL!</span></p>
                      </div>
                  </div>
             </div>
@@ -348,7 +350,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                         <p className="font-semibold">{loanTypeLabels[reportData.loanType] || 'N/A'}</p>
                     </div>
                     <div className="space-y-1">
-                        <p className="text-sm text-gray-500">Loan Amount</p>
+                        <p className="text-sm text-gray-500">Original Loan Amount</p>
                         <p className="font-semibold">{formatCurrency(reportData.originalLoanAmount)}</p>
                     </div>
                      <div className="space-y-1">
@@ -374,15 +376,37 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                     </div>
                     <div className="bg-gray-50 p-6 rounded-lg border">
                         <h3 className="text-xl font-semibold mb-4">Key Stats</h3>
-                        <ul className="space-y-2">
-                           <li><strong>Original Loan Amount:</strong> {formatCurrency(originalLoanAmount)}</li>
-                           <li className="text-lg"><strong>Outstanding Balance:</strong> <span className="font-bold text-red-600">{formatCurrency(outstandingBalance)}</span></li>
-                           <li><strong>Principal Paid to Date:</strong> {formatCurrency(principalPaidToDate)}</li>
-                           <li><strong>Interest Paid to Date:</strong> {formatCurrency(interestPaidToDate)}</li>
-                           <li><strong>Per Day Interest:</strong> {formatCurrency(perDayInterest)}</li>
-                           <li><strong>Next EMI Date:</strong> {nextEmiDate ? new Date(nextEmiDate).toLocaleDateString() : 'N/A'}</li>
-                           <li><strong>Projected Payoff Date:</strong> {isFinite(totalMonthsFromNow) ? projectedPayoffDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'N/A'}</li>
-                        </ul>
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                            <div>
+                                <p className="text-sm text-gray-500">Original Amount</p>
+                                <p className="font-semibold">{formatCurrency(originalLoanAmount)}</p>
+                            </div>
+                             <div>
+                                <p className="text-sm text-gray-500">Outstanding Balance</p>
+                                <p className="font-semibold text-red-600">{formatCurrency(outstandingBalance)}</p>
+                            </div>
+                             <div>
+                                <p className="text-sm text-gray-500">Principal Paid</p>
+                                <p className="font-semibold">{formatCurrency(principalPaidToDate)}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500">Interest Paid</p>
+                                <p className="font-semibold">{formatCurrency(interestPaidToDate)}</p>
+                            </div>
+                             <div className="col-span-2 border-t mt-2 pt-2"></div>
+                            <div>
+                                <p className="text-sm text-gray-500">Next EMI Date</p>
+                                <p className="font-semibold">{nextEmiDate ? new Date(nextEmiDate).toLocaleDateString() : 'N/A'}</p>
+                            </div>
+                            <div>
+                                <p className="text-sm text-gray-500">Projected Payoff</p>
+                                <p className="font-semibold">{isFinite(totalMonthsFromNow) ? projectedPayoffDate.toLocaleDateString('en-US', { year: 'numeric', month: 'short' }) : 'N/A'}</p>
+                            </div>
+                             <div>
+                                <p className="text-sm text-gray-500">Per Day Interest</p>
+                                <p className="font-semibold">{formatCurrency(perDayInterest)}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div className="mt-8">
@@ -401,16 +425,16 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
                  <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Financial Overview</h2>
                  <div className="mb-12">
-                    <h3 className="text-2xl font-semibold text-center mb-4">Where Your Money Has Gone</h3>
+                    <h3 className="text-2xl font-semibold text-center mb-4">Where Your Money Has Gone (To Date)</h3>
                     <div className="w-[95%] mx-auto">
                         <ResponsiveContainer width="100%" height={350}>
                             <PieChart>
-                                <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                                <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value }) => {
                                     const RADIAN = Math.PI / 180;
-                                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                    const radius = innerRadius + (outerRadius - innerRadius) * 1.3;
                                     const x = cx + radius * Math.cos(-midAngle * RADIAN);
                                     const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                                    return ( <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central"> {`${(percent * 100).toFixed(0)}%`} </text> );
+                                    return ( <text x={x} y={y} fill="black" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central"> {`${name}: ${formatCurrency(value)} (${(percent * 100).toFixed(0)}%)`} </text> );
                                 }}>
                                     <Cell fill="#2563EB" />
                                     <Cell fill="#FFAB40" />
@@ -420,6 +444,10 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                             </PieChart>
                         </ResponsiveContainer>
                     </div>
+                     <div className="text-center mt-6 bg-gray-50 p-4 rounded-lg">
+                        <p className="font-bold">Insight:</p>
+                        <p className="text-sm text-gray-600">In the early stages of your loan, a larger portion of your payment goes toward interest. As you pay down the principal, this ratio will shift.</p>
+                     </div>
                  </div>
             </div>
             
@@ -446,7 +474,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                                     tickFormatter={(unixTime) => new Date(unixTime).toLocaleDateString('en-US', { year: 'numeric', month: 'short'})} 
                                     label={{ value: 'Date', position: 'insideBottom', offset: -10 }}
                                 />
-                                <YAxis tickFormatter={(val) => formatCurrency(val as number)} />
+                                <YAxis tickFormatter={(val) => formatCurrency(val as number)} label={{ value: 'Remaining Balance', angle: -90, position: 'insideLeft', offset: -40 }}/>
                                 <Tooltip 
                                     labelFormatter={(unixTime) => new Date(unixTime).toLocaleDateString()}
                                     formatter={(val) => formatCurrency(val as number)} 
@@ -464,15 +492,15 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                     <div className="bg-green-50 p-6 rounded-lg border border-green-200">
                         <h3 className="text-xl font-semibold mb-4 text-green-800">Extra Monthly Payments</h3>
                         <div className="space-y-4">
-                            {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <p>Paying an extra <strong>{formatCurrency(50)} per month</strong> will get you debt-free <strong>{whatIf50.monthsSaved.toFixed(0)} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(whatIf50.interestSaved)}</strong> in interest.</p>}
+                            {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <p><span className="font-bold">Pay an extra {formatCurrency(50)} per month:</span><br/>🕐 Pay off <strong>{whatIf50.monthsSaved.toFixed(0)} months sooner</strong><br/>💰 Save <strong className="text-green-600">{formatCurrency(whatIf50.interestSaved)}</strong> in interest.</p>}
                             {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <hr className="border-gray-300"/>}
-                            {isFinite(whatIf100.months) && whatIf100.monthsSaved > 0 && <p>Paying an extra <strong>{formatCurrency(100)} per month</strong> will get you debt-free <strong>{whatIf100.monthsSaved.toFixed(0)} months sooner</strong> and save you <strong className="text-green-600">{formatCurrency(whatIf100.interestSaved)}</strong> in interest.</p>}
+                            {isFinite(whatIf100.months) && whatIf100.monthsSaved > 0 && <p><span className="font-bold">Pay an extra {formatCurrency(100)} per month:</span><br/>🕐 Pay off <strong>{whatIf100.monthsSaved.toFixed(0)} months sooner</strong><br/>💰 Save <strong className="text-green-600">{formatCurrency(whatIf100.interestSaved)}</strong> in interest.</p>}
                         </div>
                     </div>
                      <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
                         <h3 className="text-xl font-semibold mb-4 text-orange-800">Lump-Sum Payment</h3>
                         <div className="space-y-4">
-                             {isFinite(whatIf500Lump.months) && whatIf500Lump.monthsSaved > 0 && <p>Making a <strong>one-time extra payment of {formatCurrency(500)}</strong> will shorten your loan term by <strong>{whatIf500Lump.monthsSaved.toFixed(0)} months</strong> and save you <strong className="text-orange-600">{formatCurrency(whatIf500Lump.interestSaved)}</strong> in interest.</p>}
+                             {isFinite(whatIf500Lump.months) && whatIf500Lump.monthsSaved > 0 && <p><span className="font-bold">Make a one-time {formatCurrency(500)} payment:</span><br/>🕐 Shorten loan by <strong>{whatIf500Lump.monthsSaved.toFixed(0)} months</strong><br/>💰 Save <strong className="text-orange-600">{formatCurrency(whatIf500Lump.interestSaved)}</strong> in interest.</p>}
                         </div>
                     </div>
                 </div>
@@ -480,7 +508,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
              <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Accelerated Payoff Comparison</h2>
                  <div className="mt-8">
-                     <h3 className="text-2xl font-semibold text-center mb-6">Payoff Timeline Comparison</h3>
+                     <h3 className="text-2xl font-semibold text-center mb-6">How Extra Payments Shorten Your Loan Term</h3>
                      <AmortizationTimelineChart originalTerm={totalMonthsFromNow} scenarios={whatIfScenarios} />
                 </div>
             </div>
@@ -490,8 +518,11 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Recommended Action Plan</h2>
 
                 <div className="bg-gray-50 p-6 rounded-lg border mb-12">
+                     <h3 className="text-xl font-bold text-gray-800 mb-4">Based on your report, here are your next steps:</h3>
                     <ul className="space-y-4 text-lg">
-                        <li className="flex gap-3"><TrendingUp className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Your report is ready! Explore the data to find the best savings opportunities for you.</span></li>
+                       {isFinite(whatIf50.interestSaved) && whatIf50.interestSaved > 200 && <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Schedule an extra <strong>{formatCurrency(50)}</strong> payment this month. This can save you over <strong>{formatCurrency(whatIf50.interestSaved)}!</strong></span></li>}
+                        <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Set up payment reminders for your due date to avoid late fees.</span></li>
+                        <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Use your Tracker Pro account to set a custom payoff goal.</span></li>
                     </ul>
                 </div>
                 
@@ -501,7 +532,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                      
                      <div className="mt-6 bg-gray-100 p-6 rounded-lg border">
                         <p className="text-xl font-bold">Your exclusive upgrade offer is in your email.</p>
-                        <p className="text-lg mt-2">Use your personal code to start a 14-day free trial now!</p>
+                        <p className="text-lg mt-2">Use your personal code for a <span className="font-extrabold text-green-600">14-DAY FREE TRIAL!</span></p>
                      </div>
                  </div>
             </div>
@@ -512,7 +543,8 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
 export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     if (!reportData) return null;
 
-    const { formType, userEmail, generatedAt, couponCode, aiError } = reportData as any;
+    const { formType, userEmail, generatedAt, couponCode } = reportData;
+    const { sessionId } = (reportData as any);
     
     // Find the first disbursement date
     let disbursementDate = 'N/A';
@@ -546,12 +578,13 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
               <p className="font-bold text-3xl text-blue-800 mt-2">{userEmail || 'Valued Customer'}</p>
             </div>
              <div className="mt-24 text-sm text-gray-500 space-y-1">
+                {sessionId && <p><strong>Report ID:</strong> {sessionId}</p>}
                 <p><strong>Statement Period:</strong> {disbursementDate} to {new Date(generatedAt).toLocaleDateString()}</p>
                 <p><strong>Date of Generation:</strong> {new Date(generatedAt).toLocaleString()}</p>
             </div>
           </div>
-          <p className="text-center text-xs text-gray-400 pb-4">
-              This report is for informational purposes only. All calculations are estimates based on the data you provided.
+          <p className="text-center text-xs text-gray-400 pb-4 max-w-lg mx-auto">
+              This report is for informational purposes only. For exact figures, please consult your loan servicer. This report is based on user-provided data as of {new Date(generatedAt).toLocaleDateString()}.
           </p>
         </div>
 
@@ -559,19 +592,6 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
             ? <NewLoanReport reportData={reportData as NewLoanCalculationResults} />
             : <ExistingLoanReport reportData={reportData as ExistingLoanReportResults} />
         }
-
-        {aiError && (
-            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                <h2 className="text-3xl font-bold text-red-700 border-b-2 border-red-600 pb-2 mb-8 font-headline">AI Insight Error</h2>
-                 <div className="bg-red-50 p-6 rounded-lg border border-red-200">
-                    <h3 className="text-xl font-semibold mb-4 text-red-800">Could Not Generate AI Recommendations</h3>
-                    <p className="text-red-700 mb-4">We were unable to generate personalized AI insights for your report due to an error.</p>
-                     <p className="font-semibold">Error Details:</p>
-                    <pre className="text-sm bg-gray-100 p-4 rounded-md whitespace-pre-wrap font-mono mt-2">{aiError}</pre>
-                     <p className="mt-4 text-sm text-gray-600">This does not affect the mathematical accuracy of your report. Please check your Gemini API Key in the `.env` file or your account's quota.</p>
-                </div>
-            </div>
-        )}
         
       </div>
     );
@@ -582,4 +602,5 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     
 
     
+
 
