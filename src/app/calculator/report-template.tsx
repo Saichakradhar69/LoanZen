@@ -135,6 +135,7 @@ const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: 
 
 
     return (
+        <div className="w-[95%] mx-auto">
         <ResponsiveContainer width="100%" height={150 + (validScenarios.length * 20)}>
             <BarChart data={data} layout="vertical" barCategoryGap="25%" margin={{ left: 30, right: 50 }}>
                 <XAxis type="number" domain={[0, dataMax => Math.ceil(dataMax / 12) * 12]} tickFormatter={(val) => `${val / 12}y`} />
@@ -154,6 +155,7 @@ const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: 
                 ))}
             </BarChart>
         </ResponsiveContainer>
+        </div>
     )
 }
 
@@ -233,37 +235,41 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
               <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Visual Breakdown of Your Options</h2>
                 <div className="mb-12">
                     <h3 className="text-2xl font-semibold text-center mb-6">Paydown Timeline</h3>
-                    <ResponsiveContainer width="100%" height={400}>
-                        <ComposedChart data={bestScenario.amortizationSchedule.filter(a => a.month % 12 === 0 || a.month === 1).map(a => ({ year: Math.floor(a.month / 12), balance: a.remainingBalance }))} margin={{ top: 5, right: 20, left: 50, bottom: 5 }}>
-                            <defs>
-                                <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
-                                <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="year" label={{ value: 'Years', position: 'insideBottom', offset: -5 }} />
-                            <YAxis tickFormatter={(val) => formatCurrency(val as number)}/>
-                            <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                            <Legend />
-                            <Area type="monotone" dataKey="balance" name="Remaining Balance" stroke='#10B981' fillOpacity={1} fill="url(#colorBalance)" />
-                            <Line type="monotone" dataKey="balance" stroke='#10B981' strokeWidth={2} dot={false} />
-                        </ComposedChart>
-                    </ResponsiveContainer>
+                    <div className="w-[95%] mx-auto">
+                        <ResponsiveContainer width="100%" height={400}>
+                            <ComposedChart data={bestScenario.amortizationSchedule.filter(a => a.month % 12 === 0 || a.month === 1).map(a => ({ year: Math.floor(a.month / 12), balance: a.remainingBalance }))} margin={{ top: 5, right: 30, left: 50, bottom: 20 }}>
+                                <defs>
+                                    <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                                    <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis dataKey="year" label={{ value: 'Years', position: 'insideBottom', offset: -10 }} />
+                                <YAxis tickFormatter={(val) => formatCurrency(val as number)}/>
+                                <Tooltip formatter={(val) => formatCurrency(val as number)}/>
+                                <Legend />
+                                <Area type="monotone" dataKey="balance" name="Remaining Balance" stroke='#10B981' fillOpacity={1} fill="url(#colorBalance)" />
+                                <Line type="monotone" dataKey="balance" stroke='#10B981' strokeWidth={2} dot={false} />
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
                  <div>
                     <h3 className="text-2xl font-semibold text-center mb-6">First Year: Principal vs. Interest</h3>
-                     <ResponsiveContainer width="100%" height={500}>
-                         <BarChart data={bestScenario.amortizationSchedule.slice(0, 12)} layout="vertical" margin={{left: 20, right: 30}}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                             <XAxis type="number" hide />
-                             <YAxis type="category" dataKey="month" tickFormatter={(val) => `Month ${val}`} width={80} />
-                            <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                            <Legend />
-                            <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
-                            <Bar dataKey="interest" name="Interest" stackId="a" fill="#FFAB40" />
-                         </BarChart>
-                     </ResponsiveContainer>
+                    <div className="w-[95%] mx-auto">
+                        <ResponsiveContainer width="100%" height={500}>
+                            <BarChart data={bestScenario.amortizationSchedule.slice(0, 12)} layout="vertical" margin={{left: 30, right: 40}}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis type="number" hide />
+                                <YAxis type="category" dataKey="month" tickFormatter={(val) => `Month ${val}`} width={80} />
+                                <Tooltip formatter={(val) => formatCurrency(val as number)}/>
+                                <Legend />
+                                <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
+                                <Bar dataKey="interest" name="Interest" stackId="a" fill="#FFAB40" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
             </div>
              <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
@@ -411,36 +417,40 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                  <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Financial Overview</h2>
                  <div className="mb-12">
                     <h3 className="text-2xl font-semibold text-center mb-4">Where Your Money Has Gone</h3>
-                    <ResponsiveContainer width="100%" height={350}>
-                        <PieChart>
-                            <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
-                                const RADIAN = Math.PI / 180;
-                                const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-                                const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                                const y = cy + radius * Math.sin(-midAngle * RADIAN);
-                                return ( <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central"> {`${(percent * 100).toFixed(0)}%`} </text> );
-                            }}>
-                                <Cell fill="#2563EB" />
-                                <Cell fill="#FFAB40" />
-                            </Pie>
-                            <Tooltip formatter={(val) => formatCurrency(val as number)} />
-                            <Legend />
-                        </PieChart>
-                    </ResponsiveContainer>
+                    <div className="w-[95%] mx-auto">
+                        <ResponsiveContainer width="100%" height={350}>
+                            <PieChart>
+                                <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
+                                    const RADIAN = Math.PI / 180;
+                                    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+                                    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                                    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+                                    return ( <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central"> {`${(percent * 100).toFixed(0)}%`} </text> );
+                                }}>
+                                    <Cell fill="#2563EB" />
+                                    <Cell fill="#FFAB40" />
+                                </Pie>
+                                <Tooltip formatter={(val) => formatCurrency(val as number)} />
+                                <Legend />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
                  </div>
                  <div>
                     <h3 className="text-2xl font-semibold text-center mb-4">First 12 Payments</h3>
-                     <ResponsiveContainer width="100%" height={500}>
-                         <BarChart data={schedule.slice(0, 12)} layout="vertical" margin={{left: 30, right: 30}}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                             <XAxis type="number" hide />
-                             <YAxis type="category" dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', {month: 'short'})} width={60} />
-                            <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                            <Legend />
-                            <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
-                            <Bar dataKey="interest" name="Interest" stackId="a" fill="#FFAB40" />
-                         </BarChart>
-                     </ResponsiveContainer>
+                    <div className="w-[95%] mx-auto">
+                        <ResponsiveContainer width="100%" height={500}>
+                            <BarChart data={schedule.slice(0, 12)} layout="vertical" margin={{left: 40, right: 40}}>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis type="number" hide />
+                                <YAxis type="category" dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', {month: 'short'})} width={60} />
+                                <Tooltip formatter={(val) => formatCurrency(val as number)}/>
+                                <Legend />
+                                <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
+                                <Bar dataKey="interest" name="Interest" stackId="a" fill="#FFAB40" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                  </div>
             </div>
             
@@ -450,31 +460,34 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                  
                  <div className="mb-8">
                      <h3 className="text-2xl font-semibold text-center mb-4">Your Paydown Timeline</h3>
-                     <ResponsiveContainer width="100%" height={400}>
-                        <ComposedChart data={timelineData} margin={{ top: 5, right: 20, left: 50, bottom: 5 }}>
-                            <defs>
-                                <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#8884d8" stopOpacity={0.4}/>
-                                <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis 
-                                dataKey="date" 
-                                type="number" 
-                                domain={['dataMin', 'dataMax']}
-                                tickFormatter={(unixTime) => new Date(unixTime).toLocaleDateString('en-US', { year: 'numeric', month: 'short'})} 
-                            />
-                            <YAxis tickFormatter={(val) => formatCurrency(val as number)} />
-                            <Tooltip 
-                                labelFormatter={(unixTime) => new Date(unixTime).toLocaleDateString()}
-                                formatter={(val) => formatCurrency(val as number)} 
-                            />
-                            <Legend />
-                            <Area type="monotone" dataKey="balance" name="Remaining Balance" stroke='#8884d8' fillOpacity={1} fill="url(#colorBalance)" />
-                            <Line type="monotone" dataKey="balance" stroke="#8884d8" strokeWidth={2} dot={false}/>
-                        </ComposedChart>
-                     </ResponsiveContainer>
+                     <div className="w-[95%] mx-auto">
+                        <ResponsiveContainer width="100%" height={400}>
+                            <ComposedChart data={timelineData} margin={{ top: 5, right: 30, left: 60, bottom: 20 }}>
+                                <defs>
+                                    <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#8884d8" stopOpacity={0.4}/>
+                                    <stop offset="95%" stopColor="#8884d8" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" />
+                                <XAxis 
+                                    dataKey="date" 
+                                    type="number" 
+                                    domain={['dataMin', 'dataMax']}
+                                    tickFormatter={(unixTime) => new Date(unixTime).toLocaleDateString('en-US', { year: 'numeric', month: 'short'})} 
+                                    label={{ value: 'Date', position: 'insideBottom', offset: -10 }}
+                                />
+                                <YAxis tickFormatter={(val) => formatCurrency(val as number)} />
+                                <Tooltip 
+                                    labelFormatter={(unixTime) => new Date(unixTime).toLocaleDateString()}
+                                    formatter={(val) => formatCurrency(val as number)} 
+                                />
+                                <Legend />
+                                <Area type="monotone" dataKey="balance" name="Remaining Balance" stroke='#8884d8' fillOpacity={1} fill="url(#colorBalance)" />
+                                <Line type="monotone" dataKey="balance" stroke="#8884d8" strokeWidth={2} dot={false}/>
+                            </ComposedChart>
+                        </ResponsiveContainer>
+                     </div>
                  </div>
 
                  <p className="text-center text-gray-600 mb-8">See how extra payments can accelerate your journey to being debt-free.</p>
