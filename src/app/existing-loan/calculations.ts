@@ -75,8 +75,7 @@ function calculateCreditLineBalance(
             continue; // Go to the next event
         }
 
-        // --- CAPITALIZATION LOGIC (Happens once) ---
-        // If we have just passed the moratorium end date, capitalize the interest.
+        // --- CAPITALIZATION LOGIC (Happens once, right after moratorium ends) ---
         if (moratoriumEndDate && lastEventDate < moratoriumEndDate) {
             const daysToMoratoriumEnd = differenceInDays(moratoriumEndDate, lastEventDate);
              if (daysToMoratoriumEnd > 0 && balance > 0) {
@@ -130,7 +129,8 @@ function calculateCreditLineBalance(
                 principalComponent = event.amount;
                 break;
             case 'repayment':
-                const interestPortion = Math.min(event.amount, accruedInterest);
+                // Repayments first cover accrued interest, then principal.
+                const interestPortion = Math.min(event.amount, accruedInterest > 0 ? accruedInterest : balance * (currentRate/100/365.25) * daysSinceLastEvent);
                 const principalPortion = event.amount - interestPortion;
                 
                 balance -= event.amount;
@@ -178,6 +178,7 @@ function calculateCreditLineBalance(
     return { balance: Math.max(0, balance), interestPaid, schedule, currentRate };
 }
 
+
 function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
     let events: any[] = [];
     
@@ -218,6 +219,7 @@ function sortAndCombineEvents(data: ExistingLoanFormData): any[] {
     if ((data.paymentStructure === 'fixed' || ['personal', 'car', 'home'].includes(data.loanType)) && data.emiAmount && data.emisPaid && data.emisPaid > 0) {
         
         let firstEmiDateSource = disbursementDate;
+         // For Education loans, EMI starts after last disbursement + moratorium
          if (data.loanType === 'education' && data.disbursements && data.disbursements.length > 0) {
              const lastDisbursement = data.disbursements.reduce((latest, d) => new Date(d.date) > new Date(latest.date) ? d : latest);
              firstEmiDateSource = new Date(lastDisbursement.date);
