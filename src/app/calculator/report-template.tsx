@@ -255,22 +255,6 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                         </ResponsiveContainer>
                     </div>
                 </div>
-                 <div>
-                    <h3 className="text-2xl font-semibold text-center mb-6">First Year: Principal vs. Interest</h3>
-                    <div className="w-[95%] mx-auto">
-                        <ResponsiveContainer width="100%" height={500}>
-                            <BarChart data={bestScenario.amortizationSchedule.slice(0, 12)} layout="vertical" margin={{left: 30, right: 40}}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" hide />
-                                <YAxis type="category" dataKey="month" tickFormatter={(val) => `Month ${val}`} width={80} />
-                                <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                                <Legend />
-                                <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
-                                <Bar dataKey="interest" name="Interest" stackId="a" fill="#FFAB40" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
             </div>
              <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Accelerated Payoff Comparison</h2>
@@ -436,22 +420,6 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                         </ResponsiveContainer>
                     </div>
                  </div>
-                 <div>
-                    <h3 className="text-2xl font-semibold text-center mb-4">First 12 Payments</h3>
-                    <div className="w-[95%] mx-auto">
-                        <ResponsiveContainer width="100%" height={500}>
-                            <BarChart data={schedule.slice(0, 12)} layout="vertical" margin={{left: 40, right: 40}}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis type="number" hide />
-                                <YAxis type="category" dataKey="date" tickFormatter={(val) => new Date(val).toLocaleDateString('en-US', {month: 'short'})} width={60} />
-                                <Tooltip formatter={(val) => formatCurrency(val as number)}/>
-                                <Legend />
-                                <Bar dataKey="principal" name="Principal" stackId="a" fill="#2563EB" />
-                                <Bar dataKey="interest" name="Interest" stackId="a" fill="#FFAB40" />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                 </div>
             </div>
             
              {/* Page 3: Actionable Insights */}
@@ -543,12 +511,12 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
 export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     if (!reportData) return null;
 
-    const { formType, userEmail, generatedAt } = reportData;
+    const { formType, userEmail, generatedAt, couponCode, aiError } = reportData as any;
     
     // Find the first disbursement date
     let disbursementDate = 'N/A';
     if (reportData.formType === 'existing-loan') {
-        const firstDisbursement = reportData.schedule.find(t => t.type === 'disbursement');
+        const firstDisbursement = (reportData as ExistingLoanReportResults).schedule.find(t => t.type === 'disbursement');
         if (firstDisbursement) {
             disbursementDate = new Date(firstDisbursement.date).toLocaleDateString();
         }
@@ -590,11 +558,26 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
             ? <NewLoanReport reportData={reportData as NewLoanCalculationResults} />
             : <ExistingLoanReport reportData={reportData as ExistingLoanReportResults} />
         }
+
+        {aiError && (
+            <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+                <h2 className="text-3xl font-bold text-red-700 border-b-2 border-red-600 pb-2 mb-8 font-headline">AI Insight Error</h2>
+                 <div className="bg-red-50 p-6 rounded-lg border border-red-200">
+                    <h3 className="text-xl font-semibold mb-4 text-red-800">Could Not Generate AI Recommendations</h3>
+                    <p className="text-red-700 mb-4">We were unable to generate personalized AI insights for your report due to an error.</p>
+                     <p className="font-semibold">Error Details:</p>
+                    <pre className="text-sm bg-gray-100 p-4 rounded-md whitespace-pre-wrap font-mono mt-2">{aiError}</pre>
+                     <p className="mt-4 text-sm text-gray-600">This does not affect the mathematical accuracy of your report. Please check your Gemini API Key in the `.env` file or your account's quota.</p>
+                </div>
+            </div>
+        )}
         
       </div>
     );
 }
 
 
+
+    
 
     
