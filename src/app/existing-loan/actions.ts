@@ -64,12 +64,24 @@ const formSchema = z.object({
     transactions: z.array(transactionSchema).optional(),
     emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional()
 }).refine(data => {
-    if (data.loanType === 'education' && data.disbursements && data.disbursements.length > 0) return true;
+    // For standard loans with fixed payments, we need EMI amount and number of EMIs paid.
+    if (['personal', 'car', 'home'].includes(data.loanType) && (!data.emiAmount || data.emiAmount <= 0)) {
+        return false;
+    }
+     if (['personal', 'car', 'home'].includes(data.loanType) && (!data.emisPaid || data.emisPaid < 0)) {
+        return false;
+    }
+    // For education loans, either an original amount or disbursements must be provided.
+    if (data.loanType === 'education' && (!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
+        return false;
+    }
     if (data.loanType === 'credit-line') return true;
+    if (data.loanType === 'custom') return true;
+    // For other loans, an original amount is required.
     return data.originalLoanAmount && data.originalLoanAmount > 0;
 }, {
-    message: "Original loan amount is required unless you are providing multiple disbursements.",
-    path: ["originalLoanAmount"],
+    message: "Please provide all required fields for the selected loan type (e.g., Original Amount, EMI Amount, and EMIs Paid).",
+    path: ["originalLoanAmount"], // Attach error to a prominent field
 });
 
 
@@ -111,5 +123,3 @@ export async function calculateOutstandingBalanceAction(
         };
     }
 }
-
-    

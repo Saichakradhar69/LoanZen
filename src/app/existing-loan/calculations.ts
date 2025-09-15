@@ -201,12 +201,24 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
     let currentRate = data.interestRate;
     let originalLoanAmount = data.originalLoanAmount || 0;
 
-    // Transactional calculation is more accurate for all complex cases
-    const result = calculateCreditLineBalance(events, data.interestRate);
-    outstandingBalance = result.balance;
-    interestPaidToDate = result.interestPaid;
-    schedule = result.schedule;
-    currentRate = result.currentRate;
+    // --- Calculation Router ---
+    // Use the more complex transactional calculation for loans that require it.
+    // Otherwise, use the simpler fixed EMI calculation for standard loans.
+    // This is the core of the refactor to handle different loan types correctly.
+    if (data.loanType === 'credit-line' || data.loanType === 'custom' || (data.disbursements && data.disbursements.length > 0) || (data.rateChanges && data.rateChanges.length > 0)) {
+        const result = calculateCreditLineBalance(events, data.interestRate);
+        outstandingBalance = result.balance;
+        interestPaidToDate = result.interestPaid;
+        schedule = result.schedule;
+        currentRate = result.currentRate;
+    } else {
+        // Fallback to simpler fixed EMI calculation for standard loans
+        const result = calculateFixedEmiLoan(data);
+        outstandingBalance = result.balance;
+        interestPaidToDate = result.interestPaid;
+        schedule = result.schedule;
+    }
+
     
     // Recalculate original loan amount from disbursements if they exist
     if (data.disbursements && data.disbursements.length > 0) {
@@ -253,5 +265,77 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
         interestRate: currentRate,
         perDayInterest: perDayInterest,
         schedule,
+        emiAmount: data.emiAmount,
     };
+}
+
+
+// --- Standard Fixed EMI Loan Calculator ---
+function calculateFixedEmiLoan(
+    data: ExistingLoanFormData
+): { balance: number; interestPaid: number; schedule: Transaction[] } {
+    const schedule: Transaction[] = [];
+    let balance = data.originalLoanAmount || 0;
+    let interestPaid = 0;
+    const monthlyRate = data.interestRate / 12 / 100;
+    const emi = data.emiAmount || 0;
+    const emisPaid = data.emisPaid || 0;
+
+    const disbursementDate = new Date(data.disbursementDate);
+
+    schedule.push({
+        date: format(disbursementDate, 'yyyy-MM-dd'),
+        type: 'disbursement',
+        amount: balance,
+        principal: balance,
+        interest: 0,
+        endingBalance: balance,
+        note: 'Initial loan amount'
+    });
+    
+    if (emi <= 0 || emisPaid <= 0) {
+        // If no payments, just accrue interest to today
+        const daysSinceDisbursement = differenceInDays(new Date(), disbursementDate);
+        const dailyRate = data.interestRate / 365.25 / 100;
+        const accruedInterest = balance * dailyRate * daysSinceDisbursement;
+        balance += accruedInterest;
+        interestPaid = 0; // No repayments made
+         schedule.push({
+            date: format(new Date(), 'yyyy-MM-dd'),
+            type: 'interest',
+            amount: accruedInterest,
+            principal: 0,
+            interest: accruedInterest,
+            endingBalance: balance,
+            note: `Interest accrued for ${daysSinceDisbursement} days`
+        });
+        return { balance, interestPaid, schedule };
+    }
+
+    let paymentDate = add(disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
+    paymentDate = setDate(paymentDate, data.paymentDueDay || 1);
+
+    for (let i = 1; i <= emisPaid; i++) {
+        if (paymentDate > new Date()) break; // Don't project future payments that user said were paid
+
+        const interestComponent = balance * monthlyRate;
+        const principalComponent = emi - interestComponent;
+        
+        balance -= principalComponent;
+        interestPaid += interestComponent;
+
+        schedule.push({
+            date: format(paymentDate, 'yyyy-MM-dd'),
+            type: 'repayment',
+            amount: emi,
+            principal: principalComponent,
+            interest: interestComponent,
+            endingBalance: balance,
+            note: `EMI #${i}`
+        });
+
+        paymentDate = add(paymentDate, { months: 1 });
+    }
+
+    return { balance: Math.max(0, balance), interestPaid, schedule };
 }
