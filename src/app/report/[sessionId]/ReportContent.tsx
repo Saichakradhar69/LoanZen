@@ -20,6 +20,7 @@ function ReportContent({ sessionId }: { sessionId: string }) {
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
   const reportRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -57,6 +58,7 @@ function ReportContent({ sessionId }: { sessionId: string }) {
 
     const fetchAiInsights = async () => {
       setIsLoadingAi(true);
+      setAiError(null);
       try {
         let insightsInput: ReportInsightsInput;
 
@@ -108,7 +110,8 @@ function ReportContent({ sessionId }: { sessionId: string }) {
         setAiActionPlan(result.actionPlan);
       } catch (err) {
         console.error("AI Insights Error:", err);
-        // Don't show an error to the user, just fallback to default text
+        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred while generating AI insights.";
+        setAiError(errorMessage);
       } finally {
         setIsLoadingAi(false);
       }
@@ -309,6 +312,13 @@ function calculateWhatIf(principal: number, monthlyPayment: number, annualRate: 
                         Generating your personalized AI insights...
                     </div>
                 )}
+                 {aiError && (
+                    <div className="mt-4 p-4 bg-destructive/10 rounded-lg text-destructive text-sm">
+                        <p className="font-bold flex items-center gap-2"><AlertCircle /> Could not generate AI recommendations.</p>
+                        <p className="mt-2 text-xs">This might be due to a missing or invalid Gemini API key. Please check your `.env` file and try again.</p>
+                        <p className="font-mono text-xs mt-2 bg-black/20 p-2 rounded">Details: {aiError}</p>
+                    </div>
+                )}
             </div>
           )}
 
@@ -352,3 +362,5 @@ function calculateWhatIf(principal: number, monthlyPayment: number, annualRate: 
 }
 
 export default ReportContent;
+
+    
