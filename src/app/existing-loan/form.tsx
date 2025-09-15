@@ -56,13 +56,48 @@ const formSchema = z.object({
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
     emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional()
-}).refine(data => {
-    if (data.loanType === 'education' && data.disbursements && data.disbursements.length > 0) return true;
-    if (data.loanType === 'credit-line') return true; // Amount not needed for credit line
-    return data.originalLoanAmount && data.originalLoanAmount > 0;
-}, {
-    message: "Original loan amount is required.",
-    path: ["originalLoanAmount"],
+}).superRefine((data, ctx) => {
+    // For standard loans, require original amount, EMI, and EMIs paid.
+    if (['personal', 'car', 'home'].includes(data.loanType)) {
+        if (!data.originalLoanAmount || data.originalLoanAmount <= 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Original Loan Amount is required for this loan type.",
+                path: ["originalLoanAmount"],
+            });
+        }
+        if (!data.emiAmount || data.emiAmount <= 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Monthly Payment (EMI) Amount is required for this loan type.",
+                path: ["emiAmount"],
+            });
+        }
+        if (data.emisPaid === undefined || data.emisPaid < 0) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Number of EMIs Already Paid is required for this loan type.",
+                path: ["emisPaid"],
+            });
+        }
+    }
+
+    // For education loans, either an original amount or disbursements must be provided.
+    if (data.loanType === 'education' && (!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Either Original Loan Amount or at least one Disbursement is required for Education Loans.",
+            path: ["originalLoanAmount"],
+        });
+    }
+
+    if (data.loanType === 'custom' && (!data.originalLoanAmount || data.originalLoanAmount <= 0)) {
+         ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Original Loan Amount is required for Custom Loans.",
+            path: ["originalLoanAmount"],
+        });
+    }
 });
 
 export type ExistingLoanFormData = z.infer<typeof formSchema>;
@@ -88,7 +123,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             emiAmount: undefined,
             paymentDueDay: 1,
             moratoriumPeriod: 0,
-            emisPaid: 0,
+            emisPaid: undefined,
             loanName: '',
             paymentStructure: 'fixed',
             disbursements: [],
@@ -105,7 +140,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                 if (Object.prototype.hasOwnProperty.call(fieldErrors, fieldName)) {
                     form.setError(fieldName as any, {
                         type: 'server',
-                        message: fieldErrors[fieldName][0]
+                        message: Array.isArray(fieldErrors[fieldName]) ? fieldErrors[fieldName][0] : fieldErrors[fieldName]
                     });
                 }
             }

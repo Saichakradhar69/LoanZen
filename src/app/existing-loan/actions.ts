@@ -63,25 +63,48 @@ const formSchema = z.object({
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
     emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional()
-}).refine(data => {
-    // For standard loans with fixed payments, we need EMI amount and number of EMIs paid.
-    if (['personal', 'car', 'home'].includes(data.loanType) && (!data.emiAmount || data.emiAmount <= 0)) {
-        return false;
+}).superRefine((data, ctx) => {
+    // For standard loans, require original amount, EMI, and EMIs paid.
+    if (['personal', 'car', 'home'].includes(data.loanType)) {
+        if (!data.originalLoanAmount || data.originalLoanAmount <= 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Original Loan Amount is required for this loan type.",
+                path: ["originalLoanAmount"],
+            });
+        }
+        if (!data.emiAmount || data.emiAmount <= 0) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Monthly Payment (EMI) Amount is required for this loan type.",
+                path: ["emiAmount"],
+            });
+        }
+        if (data.emisPaid === undefined || data.emisPaid < 0) {
+             ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "Number of EMIs Already Paid is required for this loan type.",
+                path: ["emisPaid"],
+            });
+        }
     }
-     if (['personal', 'car', 'home'].includes(data.loanType) && (!data.emisPaid || data.emisPaid < 0)) {
-        return false;
-    }
+
     // For education loans, either an original amount or disbursements must be provided.
     if (data.loanType === 'education' && (!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
-        return false;
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Either Original Loan Amount or at least one Disbursement is required for Education Loans.",
+            path: ["originalLoanAmount"],
+        });
     }
-    if (data.loanType === 'credit-line') return true;
-    if (data.loanType === 'custom') return true;
-    // For other loans, an original amount is required.
-    return data.originalLoanAmount && data.originalLoanAmount > 0;
-}, {
-    message: "Please provide all required fields for the selected loan type (e.g., Original Amount, EMI Amount, and EMIs Paid).",
-    path: ["originalLoanAmount"], // Attach error to a prominent field
+
+    if (data.loanType === 'custom' && (!data.originalLoanAmount || data.originalLoanAmount <= 0)) {
+         ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Original Loan Amount is required for Custom Loans.",
+            path: ["originalLoanAmount"],
+        });
+    }
 });
 
 

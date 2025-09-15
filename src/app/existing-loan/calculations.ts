@@ -174,12 +174,18 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
     let schedule: Transaction[] = [];
     let currentRate = data.interestRate;
     let originalLoanAmount = data.originalLoanAmount || 0;
-    const events = sortAndCombineEvents(data);
+    
+    const useTransactionalCalculator = 
+        data.loanType === 'credit-line' || 
+        data.loanType === 'custom' || 
+        (data.disbursements && data.disbursements.length > 0) || 
+        (data.rateType === 'floating' && data.rateChanges && data.rateChanges.length > 0) ||
+        (data.paymentStructure === 'variable');
 
     // --- CALCULATION ROUTER ---
-    if (data.loanType === 'credit-line' || data.loanType === 'custom' || (data.disbursements && data.disbursements.length > 0) || (data.rateType === 'floating' && data.rateChanges && data.rateChanges.length > 0)) {
-        // Use transactional calculator for complex scenarios
+    if (useTransactionalCalculator) {
         console.log(`[DEBUG] Using transactional calculator for loan type: ${data.loanType}`);
+        const events = sortAndCombineEvents(data);
         const result = calculateCreditLineBalance(events, data.interestRate);
         outstandingBalance = result.balance;
         interestPaidToDate = result.interestPaid;
@@ -198,6 +204,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Cal
     if (data.disbursements && data.disbursements.length > 0) {
         originalLoanAmount = data.disbursements.reduce((sum, d) => sum + d.amount, 0);
     } else if (data.loanType === 'credit-line') {
+         const events = sortAndCombineEvents(data);
          originalLoanAmount = events
             .filter(e => e.type === 'withdrawal' || e.type === 'disbursement')
             .reduce((sum, e) => sum + e.amount, 0);
@@ -254,6 +261,8 @@ function calculateFixedEmiLoan(
         endingBalance: balance,
         note: 'Initial loan amount'
     });
+    
+    let lastDate = disbursementDate;
 
     if (data.moratoriumPeriod && data.moratoriumPeriod > 0) {
         let moratoriumEndDate = add(disbursementDate, { months: data.moratoriumPeriod });
@@ -270,29 +279,34 @@ function calculateFixedEmiLoan(
             endingBalance: balance,
             note: `Interest capitalized after ${data.moratoriumPeriod}-month moratorium`
         });
+        lastDate = moratoriumEndDate;
     }
     
     if (emi <= 0 || emisPaid <= 0) {
-        const daysSinceLastEvent = differenceInDays(new Date(), disbursementDate);
-        const dailyRate = data.interestRate / 365.25 / 100;
-        const accruedInterest = balance * dailyRate * daysSinceLastEvent;
-        balance += accruedInterest;
-        schedule.push({
-            date: format(new Date(), 'yyyy-MM-dd'),
-            type: 'interest',
-            amount: accruedInterest,
-            principal: 0,
-            interest: accruedInterest,
-            endingBalance: balance,
-            note: `Interest accrued for ${daysSinceLastEvent} days`
-        });
+        // If no payments made, just accrue interest till today and return.
+        const daysSinceLastEvent = differenceInDays(new Date(), lastDate);
+         if (daysSinceLastEvent > 0) {
+            const dailyRate = data.interestRate / 365.25 / 100;
+            const accruedInterest = balance * dailyRate * daysSinceLastEvent;
+            balance += accruedInterest;
+            schedule.push({
+                date: format(new Date(), 'yyyy-MM-dd'),
+                type: 'interest',
+                amount: accruedInterest,
+                principal: 0,
+                interest: accruedInterest,
+                endingBalance: balance,
+                note: `Interest accrued for ${daysSinceLastEvent} days`
+            });
+         }
         return { balance, interestPaid, schedule };
     }
 
-    let paymentDate = add(disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
-    paymentDate = setDate(paymentDate, data.paymentDueDay || 1);
+    let firstEmiDate = add(disbursementDate, { months: 1 + (data.moratoriumPeriod || 0) });
+    firstEmiDate = setDate(firstEmiDate, data.paymentDueDay || 1);
 
     for (let i = 1; i <= emisPaid; i++) {
+        const paymentDate = add(firstEmiDate, { months: i - 1});
         if (paymentDate > new Date()) break;
 
         const interestComponent = balance * monthlyRate;
@@ -310,8 +324,6 @@ function calculateFixedEmiLoan(
             endingBalance: balance,
             note: `EMI #${i}`
         });
-
-        paymentDate = add(paymentDate, { months: 1 });
     }
 
     return { balance: Math.max(0, balance), interestPaid, schedule };
