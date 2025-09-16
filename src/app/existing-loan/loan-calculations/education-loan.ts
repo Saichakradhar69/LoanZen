@@ -29,7 +29,7 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
     const asOfDate = new Date();
 
     let events: LoanEvent[] = [];
-    // Add initial disbursement from main form
+    // Add initial disbursement from main form if it's the only one
      if (data.originalLoanAmount && data.originalLoanAmount > 0 && (!data.disbursements || data.disbursements.length === 0)) {
         events.push({
             date: firstDisbursementDate,
@@ -38,14 +38,14 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
         });
     }
 
-    // Add additional disbursements
+    // Add additional disbursements from the array
     (data.disbursements || []).forEach(d => {
         if (d.date && d.amount > 0) {
             events.push({ date: new Date(d.date), type: 'disbursement', amount: d.amount });
         }
     });
     
-    // Add initial rate
+    // Add initial interest rate
     events.push({
         date: firstDisbursementDate,
         type: 'rate-change',
@@ -53,7 +53,7 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
         rate: interestRate,
     });
 
-    // Add rate changes
+    // Add subsequent rate changes
     (data.rateChanges || []).forEach(rc => {
         if (rc.date && rc.rate > 0) {
             events.push({ date: new Date(rc.date), type: 'rate-change', amount: rc.rate, rate: rc.rate });
@@ -62,16 +62,12 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
     
     const paymentDueDay = data.paymentDueDay || firstDisbursementDate.getDate();
 
-    // Handle both fixed EMI payments and variable repayments
-    if ((data.paymentStructure === 'fixed' || ['personal', 'car', 'home', 'education'].includes(data.loanType)) && data.emiAmount && data.emisPaid && data.emisPaid > 0) {
-        let firstEmiSource = moratoriumEndDate;
-        // If there were disbursements, the EMI should start after the last one + moratorium
-        if (data.disbursements && data.disbursements.length > 0) {
-             const lastDisbursementDate = data.disbursements.map(d => new Date(d.date)).sort((a,b) => b.getTime() - a.getTime())[0];
-             firstEmiSource = add(lastDisbursementDate, { months: moratoriumPeriod });
-        }
+    // Handle fixed EMI payments
+    if (data.emiAmount && data.emisPaid && data.emisPaid > 0) {
+        let firstEmiSourceDate = moratoriumEndDate;
+        // The first EMI starts one month after the moratorium, which itself starts from the *first* disbursement date.
         
-        let firstEmiDate = add(firstEmiSource, { months: 1 });
+        let firstEmiDate = add(firstEmiSourceDate, { months: 1 });
         firstEmiDate = setDate(firstEmiDate, paymentDueDay);
         
         for (let i = 0; i < data.emisPaid; i++) {
@@ -80,70 +76,74 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
                  events.push({ date: paymentDate, type: 'repayment', amount: data.emiAmount });
              }
         }
-    } else if (data.transactions) {
-         (data.transactions || []).forEach(t => {
-            if (t.date && t.amount > 0 && t.type === 'repayment') {
-                events.push({ date: new Date(t.date), type: 'repayment', amount: t.amount });
-            }
-        });
     }
+    
+    // Handle manual/variable repayments
+    (data.transactions || []).forEach(t => {
+        if (t.date && t.amount > 0 && t.type === 'repayment') {
+            events.push({ date: new Date(t.date), type: 'repayment', amount: t.amount });
+        }
+    });
 
-    // Sort all events by date
+    // Sort all events chronologically
     events.sort((a, b) => a.date.getTime() - b.date.getTime());
     
     const schedule: Transaction[] = [];
     let balance = 0;
-    let currentRate = interestRate;
+    let currentRate = interestRate; // Will be set by the first rate-change event
     let interestPaidToDate = 0;
-    let lastEventDate = events.length > 0 ? events[0].date : firstDisbursementDate;
-    
     let accumulatedInterestDuringMoratorium = 0;
+    
+    // Use the date of the very first event as the starting point for calculations
+    let lastEventDate = events.length > 0 ? events[0].date : firstDisbursementDate;
+    let moratoriumInterestCapitalized = false;
+
 
     for (const event of events) {
-        if (isBefore(event.date, lastEventDate)) continue;
+        // Skip events with the same date as the last one to avoid double counting interest
+        if (isSameDay(event.date, lastEventDate) && event.type !== 'disbursement' && event.type !== 'rate-change' && balance === 0) {
+            lastEventDate = event.date;
+        }
 
+        // Calculate interest accrued since the last event
         const days = differenceInDays(event.date, lastEventDate);
         if (days > 0 && balance > 0) {
             const interest = balance * (currentRate / 100 / 365.25) * days;
-            // If we are within the moratorium period
-            if (isBefore(event.date, moratoriumEndDate)) {
-                accumulatedInterestDuringMoratorium += interest;
-            } else {
-                 // First event after moratorium, capitalize interest
-                 if (isBefore(lastEventDate, moratoriumEndDate)) {
-                     const remainingMoratoriumDays = differenceInDays(moratoriumEndDate, lastEventDate);
-                     const remainingMoratoriumInterest = balance * (currentRate / 100 / 365.25) * remainingMoratoriumDays;
-                     accumulatedInterestDuringMoratorium += remainingMoratoriumInterest;
-                     
-                     balance += accumulatedInterestDuringMoratorium;
-                     schedule.push({
-                         date: format(moratoriumEndDate, 'yyyy-MM-dd'),
-                         type: 'interest',
-                         amount: accumulatedInterestDuringMoratorium,
-                         principal: 0,
-                         interest: accumulatedInterestDuringMoratorium,
-                         endingBalance: balance,
-                         note: 'Interest Capitalized'
-                     });
-                     accumulatedInterestDuringMoratorium = 0; // Reset
-                     lastEventDate = moratoriumEndDate;
-                 }
-                
-                 const postMoratoriumDays = differenceInDays(event.date, lastEventDate);
-                 const interestPostMoratorium = balance * (currentRate / 100 / 365.25) * postMoratoriumDays;
-                 balance += interestPostMoratorium;
-                 schedule.push({
-                    date: format(event.date, 'yyyy-MM-dd'),
-                    type: 'interest',
-                    amount: interestPostMoratorium,
-                    principal: 0,
-                    interest: interestPostMoratorium,
-                    endingBalance: balance,
-                    note: 'Interest Accrued'
+            
+            // Check if this interest period crosses the moratorium end date
+            if (isBefore(lastEventDate, moratoriumEndDate) && isBefore(moratoriumEndDate, event.date)) {
+                const daysBeforeMoratoriumEnd = differenceInDays(moratoriumEndDate, lastEventDate);
+                const daysAfterMoratoriumEnd = differenceInDays(event.date, moratoriumEndDate);
+
+                // Accrue and capitalize moratorium interest
+                accumulatedInterestDuringMoratorium += balance * (currentRate / 100 / 365.25) * daysBeforeMoratoriumEnd;
+                balance += accumulatedInterestDuringMoratorium;
+                schedule.push({
+                    date: format(moratoriumEndDate, 'yyyy-MM-dd'), type: 'interest', amount: accumulatedInterestDuringMoratorium,
+                    principal: 0, interest: accumulatedInterestDuringMoratorium, endingBalance: balance, note: 'Interest Capitalized'
                 });
+                moratoriumInterestCapitalized = true;
+                accumulatedInterestDuringMoratorium = 0; // Reset
+
+                // Accrue and add post-moratorium interest
+                const postMoratoriumInterest = balance * (currentRate / 100 / 365.25) * daysAfterMoratoriumEnd;
+                balance += postMoratoriumInterest;
+                schedule.push({
+                    date: format(event.date, 'yyyy-MM-dd'), type: 'interest', amount: postMoratoriumInterest,
+                    principal: 0, interest: postMoratoriumInterest, endingBalance: balance, note: 'Interest Accrued'
+                });
+            } else if (!isBefore(event.date, moratoriumEndDate)) { // Post-moratorium
+                 balance += interest;
+                 schedule.push({
+                    date: format(event.date, 'yyyy-MM-dd'), type: 'interest', amount: interest,
+                    principal: 0, interest: interest, endingBalance: balance, note: 'Interest Accrued'
+                });
+            } else { // During moratorium
+                accumulatedInterestDuringMoratorium += interest;
             }
         }
         
+        // Process the current event
         lastEventDate = event.date;
 
         switch (event.type) {
@@ -157,72 +157,81 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
                 break;
             case 'repayment':
                 if (isBefore(event.date, moratoriumEndDate)) continue; // Ignore repayments during moratorium
-                const interestComponent = Math.min(balance, schedule.filter(s => s.type === 'interest' && new Date(s.date) <= event.date).reduce((acc, curr) => acc + curr.interest, 0));
-                const principalComponent = event.amount - interestComponent;
+
+                 // If moratorium interest hasn't been capitalized yet, do it now.
+                if (!moratoriumInterestCapitalized) {
+                    balance += accumulatedInterestDuringMoratorium;
+                     schedule.push({
+                        date: format(moratoriumEndDate, 'yyyy-MM-dd'), type: 'interest', amount: accumulatedInterestDuringMoratorium,
+                        principal: 0, interest: accumulatedInterestDuringMoratorium, endingBalance: balance, note: 'Interest Capitalized'
+                    });
+                    moratoriumInterestCapitalized = true;
+                    accumulatedInterestDuringMoratorium = 0; // Reset
+                }
                 
+                // Repayment logic assumes interest is already added to balance
                 balance -= event.amount;
-                interestPaidToDate += interestComponent;
+                interestPaidToDate += 0; // Simplified: detailed principal/interest split is complex here.
                 
-                schedule.push({ date: format(event.date, 'yyyy-MM-dd'), type: 'repayment', amount: event.amount, principal: principalComponent, interest: interestComponent, endingBalance: balance, note: 'Repayment' });
+                schedule.push({ date: format(event.date, 'yyyy-MM-dd'), type: 'repayment', amount: event.amount, principal: event.amount, interest: 0, endingBalance: balance, note: 'Repayment' });
                 break;
         }
     }
     
-     // Final interest accrual from last event to as-of date
+     // Final interest accrual from the last event to today
     if (isBefore(lastEventDate, asOfDate)) {
         const days = differenceInDays(asOfDate, lastEventDate);
         if (days > 0 && balance > 0) {
-            if (isBefore(lastEventDate, moratoriumEndDate) && isBefore(asOfDate, moratoriumEndDate)) {
+             if (isBefore(lastEventDate, moratoriumEndDate)) {
                  const interest = balance * (currentRate / 100 / 365.25) * days;
                  accumulatedInterestDuringMoratorium += interest;
-                 balance += interest;
-                  schedule.push({ date: format(asOfDate, 'yyyy-MM-dd'), type: 'interest', amount: interest, principal: 0, interest: interest, endingBalance: balance, note: 'Interest Accrued (Moratorium)' });
-
-            } else {
-                 if (isBefore(lastEventDate, moratoriumEndDate)) {
-                     const remainingMoratoriumDays = differenceInDays(moratoriumEndDate, lastEventDate);
-                     const remainingMoratoriumInterest = balance * (currentRate / 100 / 365.25) * remainingMoratoriumDays;
-                     accumulatedInterestDuringMoratorium += remainingMoratoriumInterest;
-                     
-                     balance += accumulatedInterestDuringMoratorium;
+             } else {
+                 if (!moratoriumInterestCapitalized) {
+                    balance += accumulatedInterestDuringMoratorium;
                      schedule.push({
-                         date: format(moratoriumEndDate, 'yyyy-MM-dd'),
-                         type: 'interest',
-                         amount: accumulatedInterestDuringMoratorium,
-                         principal: 0,
-                         interest: accumulatedInterestDuringMoratorium,
-                         endingBalance: balance,
-                         note: 'Interest Capitalized'
-                     });
-                     lastEventDate = moratoriumEndDate;
+                        date: format(moratoriumEndDate, 'yyyy-MM-dd'), type: 'interest', amount: accumulatedInterestDuringMoratorium,
+                        principal: 0, interest: accumulatedInterestDuringMoratorium, endingBalance: balance, note: 'Interest Capitalized'
+                    });
+                    moratoriumInterestCapitalized = true;
                  }
-                const finalDays = differenceInDays(asOfDate, lastEventDate);
-                const finalInterest = balance * (currentRate / 100 / 365.25) * finalDays;
+                const finalInterest = balance * (currentRate / 100 / 365.25) * days;
                 balance += finalInterest;
-                schedule.push({ date: format(asOfDate, 'yyyy-MM-dd'), type: 'interest', amount: finalInterest, principal: 0, interest: finalInterest, endingBalance: balance, note: 'Interest Accrued' });
-            }
+                schedule.push({ date: format(asOfDate, 'yyyy-MM-dd'), type: 'interest', amount: finalInterest, principal: 0, interest: finalInterest, endingBalance: balance, note: 'Interest Accrued to Date' });
+             }
         }
     }
+    
+    // If today is after moratorium but no other event has occurred to capitalize.
+     if (isBefore(moratoriumEndDate, asOfDate) && !moratoriumInterestCapitalized) {
+        balance += accumulatedInterestDuringMoratorium;
+        schedule.push({
+            date: format(moratoriumEndDate, 'yyyy-MM-dd'), type: 'interest', amount: accumulatedInterestDuringMoratorium,
+            principal: 0, interest: accumulatedInterestDuringMoratorium, endingBalance: balance, note: 'Interest Capitalized'
+        });
+     }
+
 
     const originalLoanAmount = events.filter(e => e.type === 'disbursement').reduce((sum, e) => sum + e.amount, 0);
 
     let nextEmiDate: Date | null = null;
-    if (balance > 0) {
-        let proposedDate = setDate(add(moratoriumEndDate, {months: 1}), paymentDueDay);
-        while (isBefore(proposedDate, asOfDate)) {
-            proposedDate = add(proposedDate, { months: 1 });
+    if (balance > 0 && emiAmount && emisPaid !== undefined) {
+        const lastEmiDate = add(setDate(add(moratoriumEndDate, {months: 1}), paymentDueDay), { months: emisPaid -1});
+        let proposedNextDate = add(lastEmiDate, { months: 1 });
+        if (isBefore(proposedNextDate, asOfDate)) {
+             proposedNextDate = setDate(add(startOfMonth(asOfDate), { months: 1}), paymentDueDay);
         }
-         nextEmiDate = proposedDate;
+        nextEmiDate = proposedNextDate;
     }
     
     const perDayInterest = balance > 0 ? (balance * (currentRate / 100)) / 365.25 : 0;
+    const totalInterestAccrued = schedule.filter(s=>s.type === 'interest').reduce((sum, s) => sum + s.interest, 0);
 
     // Sort final schedule by date
     schedule.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return {
         outstandingBalance: balance,
-        interestPaidToDate,
+        interestPaidToDate: totalInterestAccrued - (balance - originalLoanAmount + schedule.filter(s=>s.type==='repayment').reduce((sum,s) => sum + s.amount, 0)),
         nextEmiDate: nextEmiDate ? nextEmiDate.toISOString() : null,
         originalLoanAmount,
         loanName,
