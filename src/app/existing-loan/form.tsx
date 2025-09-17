@@ -55,7 +55,7 @@ const formSchema = z.object({
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
-    emisPaid: z.coerce.number().min(0, "EMI periods cannot be negative.").optional(),
+    emisPaid: z.coerce.number().min(0, "EMI periods passed cannot be negative.").optional(),
     missedEmis: z.coerce.number().min(0, "Missed EMIs cannot be negative.").optional(),
 }).superRefine((data, ctx) => {
     // For standard loans, require original amount, EMI, and EMIs paid.

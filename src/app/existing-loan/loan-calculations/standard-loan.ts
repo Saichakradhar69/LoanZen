@@ -50,14 +50,13 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
 
         // Calculate interest for the full period
         const interestForPeriod = balance * monthlyInterestRate;
-        balance += interestForPeriod;
-        totalInterestPaid += interestForPeriod;
-
-        const wasPaid = i < actualEmisPaid; // Assuming missed payments are the most recent ones.
+        
+        const wasPaid = i < actualEmisPaid;
         
         if (wasPaid) {
              const principalComponent = emiAmount - interestForPeriod;
-             balance -= emiAmount; // Subtract full EMI from balance
+             balance -= principalComponent;
+             totalInterestPaid += interestForPeriod;
              
              schedule.push({
                 date: format(paymentPeriodDate, 'yyyy-MM-dd'),
@@ -69,6 +68,8 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
                 note: `EMI #${i + 1}`
             });
         } else {
+             // If payment was missed, interest is capitalized
+             balance += interestForPeriod;
              schedule.push({
                 date: format(paymentPeriodDate, 'yyyy-MM-dd'),
                 type: 'interest',

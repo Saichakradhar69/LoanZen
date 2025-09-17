@@ -68,12 +68,11 @@ export function calculateEducationLoan(
       if (t.type === 'repayment') paidEmiDates.add(format(new Date(t.date), 'yyyy-MM-dd'));
     });
 
-    for (let i = 0; i < emisPaid; i++) {
+    const actualEmisPaid = emisPaid - missedEmis;
+    for (let i = 0; i < actualEmisPaid; i++) {
         const paymentDate = add(firstEmiDate, { months: i });
         if (isBefore(paymentDate, asOfDate) || isSameDay(paymentDate, asOfDate)) {
-            // Assume the latest payments are the ones that were missed
-            const wasPaid = i < (emisPaid - missedEmis);
-            if (wasPaid && !paidEmiDates.has(format(paymentDate, 'yyyy-MM-dd'))) {
+            if (!paidEmiDates.has(format(paymentDate, 'yyyy-MM-dd'))) {
                 events.push({ date: paymentDate, type: 'repayment', amount: emiAmount, note: `EMI #${i + 1}` });
             }
         }
