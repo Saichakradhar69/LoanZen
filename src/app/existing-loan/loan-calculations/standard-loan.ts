@@ -1,6 +1,6 @@
 // src/app/existing-loan/loan-calculations/standard-loan.ts
 
-import { add, differenceInDays, format, isBefore, isSameDay, setDate, startOfMonth } from 'date-fns';
+import { add, differenceInDays, format, isBefore, isSameDay, setDate } from 'date-fns';
 import type { ExistingLoanFormData } from '../form';
 import type { CalculationResult, Transaction } from '../actions';
 
@@ -12,6 +12,7 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
         interestRate,
         emiAmount,
         emisPaid,
+        missedEmis = 0,
         paymentDueDay,
         loanName,
         loanType,
@@ -42,19 +43,24 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
 
     let lastPaymentDate = new Date(disbursementDate);
     
-    for (let i = 0; i < emisPaid; i++) {
-        const paymentDate = add(firstEmiDate, { months: i });
-        if (isBefore(paymentDate, new Date()) || isSameDay(paymentDate, new Date())) {
-            
-            // Standard Amortization Calculation
-            const interestForPeriod = balance * monthlyInterestRate;
-            const principalComponent = emiAmount - interestForPeriod;
-            
-            balance -= principalComponent;
-            totalInterestPaid += interestForPeriod;
+    const actualEmisPaid = emisPaid - missedEmis;
 
-            schedule.push({
-                date: format(paymentDate, 'yyyy-MM-dd'),
+    for (let i = 0; i < emisPaid; i++) {
+        const paymentPeriodDate = add(firstEmiDate, { months: i });
+
+        // Calculate interest for the full period
+        const interestForPeriod = balance * monthlyInterestRate;
+        balance += interestForPeriod;
+        totalInterestPaid += interestForPeriod;
+
+        const wasPaid = i < actualEmisPaid; // Assuming missed payments are the most recent ones.
+        
+        if (wasPaid) {
+             const principalComponent = emiAmount - interestForPeriod;
+             balance -= emiAmount; // Subtract full EMI from balance
+             
+             schedule.push({
+                date: format(paymentPeriodDate, 'yyyy-MM-dd'),
                 type: 'repayment',
                 amount: emiAmount,
                 principal: principalComponent,
@@ -62,36 +68,49 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
                 endingBalance: balance,
                 note: `EMI #${i + 1}`
             });
-            lastPaymentDate = paymentDate;
+        } else {
+             schedule.push({
+                date: format(paymentPeriodDate, 'yyyy-MM-dd'),
+                type: 'interest',
+                amount: interestForPeriod,
+                principal: 0,
+                interest: interestForPeriod,
+                endingBalance: balance,
+                note: `Interest for Period (EMI #${i+1} Missed)`
+            });
         }
+        lastPaymentDate = paymentPeriodDate;
     }
     
     // Accrue interest from last payment date to today
-    const daysSinceLastPayment = differenceInDays(new Date(), lastPaymentDate);
-    if (daysSinceLastPayment > 0 && balance > 0) {
-        const finalInterest = balance * (interestRate / 100 / 365.25) * daysSinceLastPayment;
-        balance += finalInterest;
-        schedule.push({
-            date: format(new Date(), 'yyyy-MM-dd'),
-            type: 'interest',
-            amount: finalInterest,
-            principal: 0,
-            interest: finalInterest,
-            endingBalance: balance,
-            note: 'Interest accrued until today'
-        });
+    const asOfDate = new Date();
+    if (isBefore(lastPaymentDate, asOfDate)) {
+        const daysSinceLastPayment = differenceInDays(asOfDate, lastPaymentDate);
+        if (daysSinceLastPayment > 0 && balance > 0) {
+            const finalInterest = balance * (interestRate / 100 / 365.25) * daysSinceLastPayment;
+            balance += finalInterest;
+            schedule.push({
+                date: format(asOfDate, 'yyyy-MM-dd'),
+                type: 'interest',
+                amount: finalInterest,
+                principal: 0,
+                interest: finalInterest,
+                endingBalance: balance,
+                note: 'Interest accrued until today'
+            });
+        }
     }
+
 
     let nextEmiDate: Date | null = null;
     if (balance > 0) {
-        const lastPaidEmiDate = add(firstEmiDate, { months: (emisPaid || 0) -1 });
-        let proposedNextDate = add(lastPaidEmiDate, { months: 1 });
+        let proposedNextDate = add(firstEmiDate, { months: emisPaid || 0 });
         
         // If the next calculated EMI date is in the past, find the next valid one.
-        if (isBefore(proposedNextDate, new Date()) && !isSameDay(proposedNextDate, new Date())) {
-             let nextDate = setDate(new Date(), paymentDueDay || 5);
-             // If this month's due day has already passed, set it to next month.
-             if(isBefore(nextDate, new Date())) {
+        if (isBefore(proposedNextDate, asOfDate) && !isSameDay(proposedNextDate, asOfDate)) {
+             let nextDate = setDate(asOfDate, paymentDueDay || 5);
+             // If this month's due day has already passed or is today, set it to next month.
+             if(isBefore(nextDate, asOfDate) || isSameDay(nextDate, asOfDate)) {
                 nextDate = add(nextDate, {months: 1});
              }
              proposedNextDate = nextDate;

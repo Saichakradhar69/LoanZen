@@ -62,7 +62,8 @@ const formSchema = z.object({
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
-    emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional()
+    emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional(),
+    missedEmis: z.coerce.number().min(0, "Missed EMIs cannot be negative.").optional(),
 }).superRefine((data, ctx) => {
     // For standard loans, require original amount, EMI, and EMIs paid.
     if (['personal', 'car', 'home'].includes(data.loanType)) {
@@ -83,10 +84,18 @@ const formSchema = z.object({
         if (data.emisPaid === undefined || data.emisPaid < 0) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "Number of EMIs Already Paid is required for this loan type.",
+                message: "Number of EMI periods passed is required for this loan type.",
                 path: ["emisPaid"],
             });
         }
+    }
+
+    if (data.missedEmis && data.emisPaid && data.missedEmis > data.emisPaid) {
+         ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Missed EMIs cannot be greater than the number of EMI periods passed.",
+            path: ["missedEmis"],
+        });
     }
 
     // For education loans, either an original amount or disbursements must be provided.

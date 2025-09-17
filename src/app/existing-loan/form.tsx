@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -55,7 +55,8 @@ const formSchema = z.object({
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
-    emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional()
+    emisPaid: z.coerce.number().min(0, "EMI periods cannot be negative.").optional(),
+    missedEmis: z.coerce.number().min(0, "Missed EMIs cannot be negative.").optional(),
 }).superRefine((data, ctx) => {
     // For standard loans, require original amount, EMI, and EMIs paid.
     if (['personal', 'car', 'home'].includes(data.loanType)) {
@@ -76,10 +77,18 @@ const formSchema = z.object({
         if (data.emisPaid === undefined || data.emisPaid < 0) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "Number of EMIs Already Paid is required for this loan type.",
+                message: "Number of EMI periods passed is required for this loan type.",
                 path: ["emisPaid"],
             });
         }
+    }
+    
+    if (data.missedEmis && data.emisPaid && data.missedEmis > data.emisPaid) {
+         ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Missed EMIs cannot be greater than the number of EMI periods passed.",
+            path: ["missedEmis"],
+        });
     }
 
     // For education loans, either an original amount or disbursements must be provided.
@@ -124,6 +133,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             paymentDueDay: 1,
             moratoriumPeriod: 0,
             emisPaid: undefined,
+            missedEmis: 0,
             loanName: '',
             paymentStructure: 'fixed',
             disbursements: [],
@@ -352,13 +362,24 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             case 'education':
                 return (
                     <div className="space-y-6">
-                        <FormField control={form.control} name="emisPaid" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Number of EMIs Already Paid (Optional)</FormLabel>
-                                <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <FormField control={form.control} name="emisPaid" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>EMI Periods Passed (Optional)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
+                                    <FormDescription>Total # of periods since EMI began.</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                             <FormField control={form.control} name="missedEmis" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Number of Missed EMIs (Optional)</FormLabel>
+                                    <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
+                                     <FormDescription>How many payments were missed.</FormDescription>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
                         <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Moratorium Period (in months, optional)</FormLabel>
@@ -443,13 +464,24 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             case 'car':
             case 'home':
                  return (
-                    <FormField control={form.control} name="emisPaid" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Number of EMIs Already Paid</FormLabel>
-                            <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <FormField control={form.control} name="emisPaid" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>EMI Periods Passed</FormLabel>
+                                <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
+                                <FormDescription>Total # of periods since EMI began.</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                         <FormField control={form.control} name="missedEmis" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Number of Missed EMIs</FormLabel>
+                                <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
+                                 <FormDescription>How many payments were missed.</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                    </div>
                  );
             default:
                 return null;
