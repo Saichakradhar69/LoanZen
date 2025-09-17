@@ -18,13 +18,14 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
         interestType
     } = data;
     
-    if (!originalLoanAmount || !disbursementDate || !interestRate || !emiAmount || !emisPaid === undefined) {
+    if (!originalLoanAmount || !disbursementDate || !interestRate || !emiAmount || emisPaid === undefined) {
         throw new Error("Missing required data for standard loan calculation.");
     }
     
     const schedule: Transaction[] = [];
     let balance = originalLoanAmount;
     let totalInterestPaid = 0;
+    const monthlyInterestRate = interestRate / 100 / 12;
 
     let firstEmiDate = add(new Date(disbursementDate), { months: 1 });
     firstEmiDate = setDate(firstEmiDate, paymentDueDay || new Date(disbursementDate).getDate());
@@ -44,13 +45,13 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
     for (let i = 0; i < emisPaid; i++) {
         const paymentDate = add(firstEmiDate, { months: i });
         if (isBefore(paymentDate, new Date()) || isSameDay(paymentDate, new Date())) {
-            const daysSinceLastPayment = differenceInDays(paymentDate, lastPaymentDate);
-            const interestForPeriod = balance * (interestRate / 100 / 365.25) * daysSinceLastPayment;
             
-            totalInterestPaid += interestForPeriod;
-            
+            // Standard Amortization Calculation
+            const interestForPeriod = balance * monthlyInterestRate;
             const principalComponent = emiAmount - interestForPeriod;
+            
             balance -= principalComponent;
+            totalInterestPaid += interestForPeriod;
 
             schedule.push({
                 date: format(paymentDate, 'yyyy-MM-dd'),
@@ -83,11 +84,19 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
 
     let nextEmiDate: Date | null = null;
     if (balance > 0) {
-        const lastEmiDate = add(firstEmiDate, { months: (emisPaid || 0) -1 });
-        nextEmiDate = add(lastEmiDate, { months: 1 });
-        if (isBefore(nextEmiDate, new Date())) {
-             nextEmiDate = setDate(add(startOfMonth(new Date()), { months: 1}), paymentDueDay || 5);
+        const lastPaidEmiDate = add(firstEmiDate, { months: (emisPaid || 0) -1 });
+        let proposedNextDate = add(lastPaidEmiDate, { months: 1 });
+        
+        // If the next calculated EMI date is in the past, find the next valid one.
+        if (isBefore(proposedNextDate, new Date()) && !isSameDay(proposedNextDate, new Date())) {
+             let nextDate = setDate(new Date(), paymentDueDay || 5);
+             // If this month's due day has already passed, set it to next month.
+             if(isBefore(nextDate, new Date())) {
+                nextDate = add(nextDate, {months: 1});
+             }
+             proposedNextDate = nextDate;
         }
+        nextEmiDate = proposedNextDate;
     }
 
     const perDayInterest = balance > 0 ? (balance * (interestRate / 100)) / 365.25 : 0;
