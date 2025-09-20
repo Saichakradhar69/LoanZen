@@ -52,6 +52,8 @@ const formSchema = z.object({
     emiAmount: z.coerce.number().optional(),
     paymentDueDay: z.coerce.number().min(1).max(31).optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
+    moratoriumInterestType: z.enum(['none', 'simple', 'partial']).optional(),
+    moratoriumPaymentAmount: z.coerce.number().optional(),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
@@ -99,6 +101,14 @@ const formSchema = z.object({
             path: ["originalLoanAmount"],
         });
     }
+    
+    if (data.loanType === 'education' && data.moratoriumInterestType === 'partial' && (!data.moratoriumPaymentAmount || data.moratoriumPaymentAmount <= 0)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "A partial payment amount is required for this moratorium type.",
+            path: ["moratoriumPaymentAmount"],
+        });
+    }
 
     if (data.loanType === 'custom' && (!data.originalLoanAmount || data.originalLoanAmount <= 0)) {
          ctx.addIssue({
@@ -132,6 +142,8 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             emiAmount: undefined,
             paymentDueDay: 1,
             moratoriumPeriod: 0,
+            moratoriumInterestType: 'none',
+            moratoriumPaymentAmount: undefined,
             emisPaid: undefined,
             missedEmis: 0,
             loanName: '',
@@ -161,6 +173,8 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
     const rateType = form.watch('rateType');
     const paymentStructure = form.watch('paymentStructure');
     const disbursements = form.watch('disbursements');
+    const moratoriumPeriod = form.watch('moratoriumPeriod');
+    const moratoriumInterestType = form.watch('moratoriumInterestType');
     
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
@@ -365,7 +379,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <FormField control={form.control} name="emisPaid" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>EMI Periods Passed (Optional)</FormLabel>
+                                    <FormLabel>EMI Periods Passed</FormLabel>
                                     <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
                                     <FormDescription>Total # of periods since EMI began.</FormDescription>
                                     <FormMessage />
@@ -373,7 +387,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                             )} />
                              <FormField control={form.control} name="missedEmis" render={({ field }) => (
                                 <FormItem>
-                                    <FormLabel>Number of Missed EMIs (Optional)</FormLabel>
+                                    <FormLabel>Number of Missed EMIs</FormLabel>
                                     <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
                                      <FormDescription>How many payments were missed.</FormDescription>
                                     <FormMessage />
@@ -382,11 +396,55 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                         </div>
                         <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Moratorium Period (in months, optional)</FormLabel>
+                                <FormLabel>Moratorium Period (in months)</FormLabel>
                                 <FormControl><Input type="number" placeholder="e.g., 6" {...field} value={field.value ?? ''} /></FormControl>
                                 <FormMessage />
                             </FormItem>
                         )} />
+                        {moratoriumPeriod && moratoriumPeriod > 0 && (
+                            <div className="space-y-4 rounded-md border bg-gray-50 dark:bg-gray-900 p-4">
+                                <FormField control={form.control} name="moratoriumInterestType" render={({ field }) => (
+                                    <FormItem className="space-y-3">
+                                        <Label>Moratorium Interest Payment</Label>
+                                        <FormControl>
+                                            <RadioGroup onValueChange={field.onChange} defaultValue={field.value || 'none'} className="flex flex-col space-y-2">
+                                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                                    <FormControl><RadioGroupItem value="none" /></FormControl>
+                                                    <div className="space-y-1 leading-none">
+                                                        <Label className="font-normal">No Payment</Label>
+                                                        <p className="text-xs text-muted-foreground">Interest will be capitalized (added to principal).</p>
+                                                    </div>
+                                                </FormItem>
+                                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                                    <FormControl><RadioGroupItem value="simple" /></FormControl>
+                                                    <div className="space-y-1 leading-none">
+                                                        <Label className="font-normal">Pay Full Simple Interest</Label>
+                                                        <p className="text-xs text-muted-foreground">Principal balance will not increase.</p>
+                                                    </div>
+                                                </FormItem>
+                                                <FormItem className="flex items-center space-x-3 space-y-0">
+                                                    <FormControl><RadioGroupItem value="partial" /></FormControl>
+                                                    <div className="space-y-1 leading-none">
+                                                        <Label className="font-normal">Pay a Partial Amount</Label>
+                                                        <p className="text-xs text-muted-foreground">Unpaid interest will be capitalized.</p>
+                                                    </div>
+                                                </FormItem>
+                                            </RadioGroup>
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )} />
+                                {moratoriumInterestType === 'partial' && (
+                                    <FormField control={form.control} name="moratoriumPaymentAmount" render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>Partial Payment Amount</FormLabel>
+                                            <FormControl><Input type="number" placeholder="e.g., 2000" {...field} value={field.value ?? ''} /></FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )} />
+                                )}
+                            </div>
+                        )}
                         {renderDisbursements()}
                     </div>
                 );

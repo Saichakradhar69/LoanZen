@@ -59,10 +59,12 @@ const formSchema = z.object({
     emiAmount: z.coerce.number().optional(),
     paymentDueDay: z.coerce.number().min(1).max(31).optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
+    moratoriumInterestType: z.enum(['none', 'simple', 'partial']).optional(),
+    moratoriumPaymentAmount: z.coerce.number().optional(),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
     transactions: z.array(transactionSchema).optional(),
-    emisPaid: z.coerce.number().min(0, "EMIs paid cannot be negative.").optional(),
+    emisPaid: z.coerce.number().min(0, "EMI periods passed cannot be negative.").optional(),
     missedEmis: z.coerce.number().min(0, "Missed EMIs cannot be negative.").optional(),
 }).superRefine((data, ctx) => {
     // For standard loans, require original amount, EMI, and EMIs paid.
@@ -106,6 +108,15 @@ const formSchema = z.object({
             path: ["originalLoanAmount"],
         });
     }
+    
+    if (data.loanType === 'education' && data.moratoriumInterestType === 'partial' && (!data.moratoriumPaymentAmount || data.moratoriumPaymentAmount <= 0)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "A partial payment amount is required for this moratorium type.",
+            path: ["moratoriumPaymentAmount"],
+        });
+    }
+
 
     if (data.loanType === 'custom' && (!data.originalLoanAmount || data.originalLoanAmount <= 0)) {
          ctx.addIssue({
