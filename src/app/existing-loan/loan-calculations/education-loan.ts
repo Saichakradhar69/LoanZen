@@ -1,168 +1,193 @@
+
 // src/app/existing-loan/loan-calculations/education-loan.ts
 
-import { add, differenceInDays, format, isBefore, isAfter, setDate, isSameDay } from 'date-fns';
+import { add, differenceInDays, format, isBefore, isAfter, setDate, isSameDay, startOfMonth, getDaysInMonth } from 'date-fns';
 import type { ExistingLoanFormData } from '../form';
 import type { CalculationResult, Transaction } from '../actions';
 
+type LoanEvent = {
+    date: Date;
+    type: 'disbursement' | 'repayment' | 'rate-change';
+    amount: number;
+    rate?: number;
+    note?: string;
+};
+
 export function calculateEducationLoan(data: ExistingLoanFormData): CalculationResult {
     const {
-        originalLoanAmount = 0,
         disbursementDate,
-        interestRate = 0,
+        interestRate,
+        loanName,
+        loanType,
+        interestType,
         emiAmount = 0,
         emisPaid = 0,
         missedEmis = 0,
         paymentDueDay = 1,
-        loanName = 'Education Loan',
-        loanType = 'education',
-        interestType = 'reducing',
         moratoriumPeriod = 0,
         moratoriumInterestType = 'none',
-        moratoriumPaymentAmount = 0,
+        moratoriumPaymentAmount = 0
     } = data;
 
     if (!disbursementDate) {
         throw new Error("Missing required disbursement date.");
     }
     
-    // --- Phase 1: Calculate Principal at the end of Moratorium ---
-    const monthlyInterestRate = interestRate / 100 / 12;
+    // --- Phase 1: Build Event Timeline ---
     const firstDisbursementDate = new Date(disbursementDate);
-    const moratoriumEndDate = add(firstDisbursementDate, { months: moratoriumPeriod });
-
-    let principalAtRepaymentStart = originalLoanAmount;
-    let interestPaidDuringMoratorium = 0;
-
-    if (moratoriumPeriod > 0) {
-        if (moratoriumInterestType === 'none') { // Case A: Capitalization
-            // P_cap = P₀ * (1 + i)^m
-            principalAtRepaymentStart = originalLoanAmount * Math.pow(1 + monthlyInterestRate, moratoriumPeriod);
-        } else if (moratoriumInterestType === 'simple') { // Case B: Simple Interest
-            // Principal does not change, but we calculate interest paid
-            interestPaidDuringMoratorium = originalLoanAmount * monthlyInterestRate * moratoriumPeriod;
-            principalAtRepaymentStart = originalLoanAmount;
-        } else if (moratoriumInterestType === 'partial') { // Case C: Partial Interest
-            let currentBalance = originalLoanAmount;
-            for (let m = 0; m < moratoriumPeriod; m++) {
-                const interestThisMonth = currentBalance * monthlyInterestRate;
-                const unpaidInterest = interestThisMonth - moratoriumPaymentAmount;
-                currentBalance += Math.max(0, unpaidInterest); // Add only if payment doesn't cover interest
-                interestPaidDuringMoratorium += Math.min(interestThisMonth, moratoriumPaymentAmount);
-            }
-            principalAtRepaymentStart = currentBalance;
-        }
-    }
-
-
-    // --- Phase 2: Calculate Outstanding Balance after EMIs ---
-    const k = emisPaid - missedEmis; // Number of actual payments made
-    let outstandingBalance = principalAtRepaymentStart;
-    let totalInterestPaidInRepayment = 0;
-    
-    // Generate a theoretical schedule for paid EMIs
-    const schedule: Transaction[] = [];
-
-    // Initial disbursement(s)
-    schedule.push({
-        date: format(firstDisbursementDate, 'yyyy-MM-dd'),
-        type: 'disbursement',
-        amount: originalLoanAmount,
-        principal: originalLoanAmount,
-        interest: 0,
-        endingBalance: originalLoanAmount,
-        note: 'Loan Disbursed'
-    });
-    
-    if (principalAtRepaymentStart !== originalLoanAmount && moratoriumPeriod > 0) {
-         schedule.push({
-            date: format(moratoriumEndDate, 'yyyy-MM-dd'),
-            type: 'interest',
-            amount: principalAtRepaymentStart - originalLoanAmount,
-            principal: 0,
-            interest: principalAtRepaymentStart - originalLoanAmount,
-            endingBalance: principalAtRepaymentStart,
-            note: 'Interest Capitalized'
-        });
-    }
-
-    let lastPaymentDate = moratoriumEndDate;
-
-    if (k > 0) {
-        // Outstanding_k = P * (1+i)^k - EMI * [((1+i)^k - 1) / i]
-        const powerTerm = Math.pow(1 + monthlyInterestRate, k);
-        outstandingBalance = principalAtRepaymentStart * powerTerm - emiAmount * ((powerTerm - 1) / monthlyInterestRate);
-        
-        // To calculate interest paid, we simulate the paid EMIs
-        let tempBalance = principalAtRepaymentStart;
-        for (let i = 0; i < k; i++) {
-            const interestComponent = tempBalance * monthlyInterestRate;
-            const principalComponent = emiAmount - interestComponent;
-            tempBalance -= principalComponent;
-            totalInterestPaidInRepayment += interestComponent;
-
-            const paymentDate = add(setDate(add(moratoriumEndDate, { months: 1 }), paymentDueDay), { months: i });
-            schedule.push({
-                date: format(paymentDate, 'yyyy-MM-dd'),
-                type: 'repayment',
-                amount: emiAmount,
-                principal: principalComponent,
-                interest: interestComponent,
-                endingBalance: tempBalance,
-                note: `EMI #${i + 1}`
-            });
-            lastPaymentDate = paymentDate;
-        }
-    }
-    
-    // --- Phase 3: Accrue interest from last EMI date to today ---
     const asOfDate = new Date();
-    if (isBefore(lastPaymentDate, asOfDate)) {
-        const daysSinceLastPayment = differenceInDays(asOfDate, lastPaymentDate);
-        if (daysSinceLastPayment > 0 && outstandingBalance > 0) {
-            const finalInterest = outstandingBalance * (interestRate / 100 / 365.25) * daysSinceLastPayment;
-            outstandingBalance += finalInterest;
-             schedule.push({
-                date: format(asOfDate, 'yyyy-MM-dd'),
-                type: 'interest',
-                amount: finalInterest,
-                principal: 0,
-                interest: finalInterest,
-                endingBalance: outstandingBalance,
-                note: 'Interest accrued to date'
+    let events: LoanEvent[] = [];
+
+    // Add initial disbursement
+    if (data.originalLoanAmount && data.originalLoanAmount > 0) {
+        events.push({ date: firstDisbursementDate, type: 'disbursement', amount: data.originalLoanAmount, note: 'Initial Disbursement' });
+    }
+    // Add other disbursements
+    data.disbursements?.forEach(d => events.push({ date: new Date(d.date), type: 'disbursement', amount: d.amount, note: 'Disbursement' }));
+
+    // Add rate changes
+    events.push({ date: firstDisbursementDate, type: 'rate-change', amount: interestRate, rate: interestRate, note: `Initial Rate: ${interestRate}%` });
+    data.rateChanges?.forEach(rc => events.push({ date: new Date(rc.date), type: 'rate-change', amount: rc.rate, rate: rc.rate, note: `Rate changed to ${rc.rate}%` }));
+
+    // Add scheduled EMI payments
+    const moratoriumEndDate = add(firstDisbursementDate, { months: moratoriumPeriod });
+    const firstEmiDate = setDate(add(moratoriumEndDate, { months: 1 }), paymentDueDay);
+
+    for (let i = 0; i < emisPaid; i++) {
+        const paymentDate = add(firstEmiDate, { months: i });
+        const isMissed = i >= (emisPaid - missedEmis);
+        if (isBefore(paymentDate, asOfDate) || isSameDay(paymentDate, asOfDate)) {
+             events.push({ 
+                date: paymentDate, 
+                type: 'repayment', 
+                amount: isMissed ? 0 : emiAmount,
+                note: isMissed ? `EMI #${i + 1} (Missed)`: `EMI #${i + 1}`
             });
         }
     }
+    
+    // Add manual transactions (for custom scenarios, but can apply here too)
+    data.transactions?.forEach(t => events.push({date: new Date(t.date), type: t.type, amount: t.amount, note: 'Manual Transaction'}));
+    
+    events.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    // --- Phase 4: Calculate Next EMI Date ---
-    let nextEmiDate: Date | null = null;
-    if (outstandingBalance > 0) {
-        let firstEmiDate = setDate(add(moratoriumEndDate, { months: 1 }), paymentDueDay);
-        let proposedNextDate = add(firstEmiDate, { months: emisPaid });
+    // --- Phase 2: Monthly Iterative Calculation ---
+    const schedule: Transaction[] = [];
+    let balance = 0;
+    let totalInterestPaid = 0;
+    let currentRate = interestRate;
+    let currentDate = events.length > 0 ? startOfMonth(events[0].date) : firstDisbursementDate;
+    
+    while (isBefore(currentDate, asOfDate) || isSameDay(currentDate, asOfDate)) {
+        const monthStartDate = currentDate;
+        const monthEndDate = add(add(monthStartDate, {months: 1}), {days: -1});
+
+        // 1. Process events for the month (disbursements, rate changes)
+        const eventsThisMonth = events.filter(e => e.date >= monthStartDate && e.date <= monthEndDate);
         
-        if (isBefore(proposedNextDate, asOfDate) || isSameDay(proposedNextDate, asOfDate)) {
-             let nextDateFromToday = setDate(asOfDate, paymentDueDay);
-             if (isBefore(nextDateFromToday, asOfDate) || isSameDay(nextDateFromToday, asOfDate)) {
-                 nextDateFromToday = add(nextDateFromToday, { months: 1 });
-             }
-             proposedNextDate = nextDateFromToday;
+        // Use rate from the start of the month
+        const rateEvent = [...events].reverse().find(e => e.type === 'rate-change' && e.date <= monthStartDate);
+        if (rateEvent?.rate) {
+            currentRate = rateEvent.rate;
         }
-        nextEmiDate = proposedNextDate;
+
+        const monthlyInterestRate = currentRate / 100 / 12;
+
+        // 2. Calculate interest for the month
+        const interestForMonth = balance * monthlyInterestRate;
+
+        // 3. Determine payment for the month
+        let paymentForMonth = 0;
+        let isMoratoriumMonth = isBefore(currentDate, moratoriumEndDate);
+
+        if (isMoratoriumMonth) {
+            switch(moratoriumInterestType) {
+                case 'simple':
+                    paymentForMonth = interestForMonth;
+                    break;
+                case 'partial':
+                case 'fixed':
+                    paymentForMonth = moratoriumPaymentAmount;
+                    break;
+                case 'none':
+                default:
+                    paymentForMonth = 0;
+                    break;
+            }
+        } else {
+             // Find EMI payment for this month if scheduled
+            const emiEvent = eventsThisMonth.find(e => e.type === 'repayment');
+            paymentForMonth = emiEvent ? emiEvent.amount : 0;
+        }
+        
+        // 4. Calculate Principal Change & New Balance
+        const interestComponent = Math.min(interestForMonth, paymentForMonth);
+        const principalChange = paymentForMonth - interestForMonth;
+        const closingBalance = balance - principalChange;
+
+        // Log transaction for the month
+        schedule.push({
+            date: format(monthStartDate, 'yyyy-MM-dd'),
+            type: 'repayment', // Generic term for the monthly calculation
+            amount: paymentForMonth,
+            principal: paymentForMonth > interestForMonth ? paymentForMonth - interestForMonth : 0,
+            interest: interestComponent,
+            endingBalance: closingBalance,
+            note: isMoratoriumMonth ? `Moratorium (Interest: ${interestForMonth.toFixed(2)})` : `EMI Payment`
+        });
+        
+        // Add disbursements for the month to balance AFTER interest calc
+        eventsThisMonth.forEach(e => {
+            if(e.type === 'disbursement') {
+                schedule.push({
+                    date: format(e.date, 'yyyy-MM-dd'),
+                    type: 'disbursement', amount: e.amount, principal: e.amount,
+                    interest: 0, endingBalance: balance + e.amount, note: e.note
+                });
+                balance += e.amount;
+            }
+        });
+
+        // Update main balance and interest paid
+        balance = closingBalance;
+        totalInterestPaid += interestComponent;
+
+        // Move to next month
+        currentDate = add(monthStartDate, { months: 1 });
+    }
+
+    // Final accrual from last calc date to as-of date
+    const lastCalcDate = add(currentDate, {months: -1});
+    const daysSinceLastCalc = differenceInDays(asOfDate, lastCalcDate);
+    if (daysSinceLastCalc > 0 && balance > 0) {
+        const finalInterest = balance * (currentRate / 100 / 365.25) * daysSinceLastCalc;
+        balance += finalInterest;
+    }
+
+
+    // --- Phase 3: Calculate Next EMI ---
+    let nextEmiDate: Date | null = null;
+    if (balance > 0) {
+        let proposedDate = setDate(asOfDate, paymentDueDay);
+        if (isBefore(proposedDate, asOfDate) || isSameDay(proposedDate, asOfDate)) {
+            proposedDate = add(proposedDate, { months: 1 });
+        }
+        nextEmiDate = proposedDate;
     }
     
-    const perDayInterest = outstandingBalance > 0 ? (outstandingBalance * (interestRate / 100)) / 365.25 : 0;
-    const totalInterestPaid = interestPaidDuringMoratorium + totalInterestPaidInRepayment;
-    
-    schedule.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const perDayInterest = balance > 0 ? (balance * (currentRate / 100)) / 365.25 : 0;
+
+    const originalLoanAmount = (data.originalLoanAmount || 0) + (data.disbursements || []).reduce((acc, d) => acc + d.amount, 0);
 
     return {
-        outstandingBalance,
+        outstandingBalance: balance,
         interestPaidToDate: totalInterestPaid,
         nextEmiDate: nextEmiDate ? nextEmiDate.toISOString() : null,
         originalLoanAmount,
         loanName,
         loanType,
         interestType,
-        interestRate,
+        interestRate: currentRate,
         perDayInterest,
         schedule,
         emiAmount,

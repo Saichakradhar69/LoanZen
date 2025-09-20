@@ -52,7 +52,7 @@ const formSchema = z.object({
     emiAmount: z.coerce.number().optional(),
     paymentDueDay: z.coerce.number().min(1).max(31).optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
-    moratoriumInterestType: z.enum(['none', 'simple', 'partial']).optional(),
+    moratoriumInterestType: z.enum(['none', 'simple', 'partial', 'fixed']).optional(),
     moratoriumPaymentAmount: z.coerce.number().optional(),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
@@ -102,10 +102,10 @@ const formSchema = z.object({
         });
     }
     
-    if (data.loanType === 'education' && data.moratoriumInterestType === 'partial' && (!data.moratoriumPaymentAmount || data.moratoriumPaymentAmount <= 0)) {
+    if (data.loanType === 'education' && (data.moratoriumInterestType === 'partial' || data.moratoriumInterestType === 'fixed') && (!data.moratoriumPaymentAmount || data.moratoriumPaymentAmount <= 0)) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "A partial payment amount is required for this moratorium type.",
+            message: "A payment amount is required for this moratorium type.",
             path: ["moratoriumPaymentAmount"],
         });
     }
@@ -425,7 +425,14 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                                                 <FormItem className="flex items-center space-x-3 space-y-0">
                                                     <FormControl><RadioGroupItem value="partial" /></FormControl>
                                                     <div className="space-y-1 leading-none">
-                                                        <Label className="font-normal">Pay a Partial Amount</Label>
+                                                        <Label className="font-normal">Pay a Partial Amount (%)</Label>
+                                                        <p className="text-xs text-muted-foreground">Unpaid interest will be capitalized.</p>
+                                                    </div>
+                                                </FormItem>
+                                                 <FormItem className="flex items-center space-x-3 space-y-0">
+                                                    <FormControl><RadioGroupItem value="fixed" /></FormControl>
+                                                    <div className="space-y-1 leading-none">
+                                                        <Label className="font-normal">Pay a Fixed Minimum Amount</Label>
                                                         <p className="text-xs text-muted-foreground">Unpaid interest will be capitalized.</p>
                                                     </div>
                                                 </FormItem>
@@ -434,11 +441,13 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                                         <FormMessage />
                                     </FormItem>
                                 )} />
-                                {moratoriumInterestType === 'partial' && (
+                                {(moratoriumInterestType === 'partial' || moratoriumInterestType === 'fixed') && (
                                     <FormField control={form.control} name="moratoriumPaymentAmount" render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Partial Payment Amount</FormLabel>
-                                            <FormControl><Input type="number" placeholder="e.g., 2000" {...field} value={field.value ?? ''} /></FormControl>
+                                            <FormLabel>
+                                                {moratoriumInterestType === 'partial' ? 'Partial Payment Percentage (%)' : 'Fixed Payment Amount'}
+                                            </FormLabel>
+                                            <FormControl><Input type="number" placeholder={moratoriumInterestType === 'partial' ? "e.g., 50" : "e.g., 2000"} {...field} value={field.value ?? ''} /></FormControl>
                                             <FormMessage />
                                         </FormItem>
                                     )} />

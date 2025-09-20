@@ -59,7 +59,7 @@ const formSchema = z.object({
     emiAmount: z.coerce.number().optional(),
     paymentDueDay: z.coerce.number().min(1).max(31).optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
-    moratoriumInterestType: z.enum(['none', 'simple', 'partial']).optional(),
+    moratoriumInterestType: z.enum(['none', 'simple', 'partial', 'fixed']).optional(),
     moratoriumPaymentAmount: z.coerce.number().optional(),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
@@ -109,10 +109,10 @@ const formSchema = z.object({
         });
     }
     
-    if (data.loanType === 'education' && data.moratoriumInterestType === 'partial' && (!data.moratoriumPaymentAmount || data.moratoriumPaymentAmount <= 0)) {
+    if (data.loanType === 'education' && (data.moratoriumInterestType === 'partial' || data.moratoriumInterestType === 'fixed') && (!data.moratoriumPaymentAmount || data.moratoriumPaymentAmount <= 0)) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "A partial payment amount is required for this moratorium type.",
+            message: "A payment amount is required for this moratorium type.",
             path: ["moratoriumPaymentAmount"],
         });
     }
