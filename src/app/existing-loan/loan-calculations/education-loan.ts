@@ -1,17 +1,8 @@
-
 // src/app/existing-loan/loan-calculations/education-loan.ts
 
 import { add, differenceInDays, format, isBefore, isAfter, setDate, isSameDay, startOfMonth, getDaysInMonth } from 'date-fns';
 import type { ExistingLoanFormData } from '../form';
 import type { CalculationResult, Transaction } from '../actions';
-
-type LoanEvent = {
-    date: Date;
-    type: 'disbursement' | 'repayment' | 'rate-change';
-    amount: number;
-    rate?: number;
-    note?: string;
-};
 
 export function calculateEducationLoan(data: ExistingLoanFormData): CalculationResult {
     const {
@@ -26,7 +17,8 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
         paymentDueDay = 1,
         moratoriumPeriod = 0,
         moratoriumInterestType = 'none',
-        moratoriumPaymentAmount = 0
+        moratoriumPaymentAmount = 0,
+        rateChanges = []
     } = data;
 
     if (!disbursementDate) {
@@ -34,145 +26,191 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
     }
     
     // --- Phase 1: Build Event Timeline ---
-    const firstDisbursementDate = new Date(disbursementDate);
     const asOfDate = new Date();
-    let events: LoanEvent[] = [];
+    const schedule: Transaction[] = [];
 
-    // Add initial disbursement
-    if (data.originalLoanAmount && data.originalLoanAmount > 0) {
-        events.push({ date: firstDisbursementDate, type: 'disbursement', amount: data.originalLoanAmount, note: 'Initial Disbursement' });
+    // Combine all disbursements into a sorted list
+    let disbursements = [...(data.disbursements || [])];
+    if (data.originalLoanAmount && data.originalLoanAmount > 0 && disbursements.length === 0) {
+        disbursements.push({ date: new Date(disbursementDate), amount: data.originalLoanAmount });
     }
-    // Add other disbursements
-    data.disbursements?.forEach(d => events.push({ date: new Date(d.date), type: 'disbursement', amount: d.amount, note: 'Disbursement' }));
+    disbursements.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    if (disbursements.length === 0) {
+        throw new Error("No disbursement amount provided.");
+    }
 
-    // Add rate changes
-    events.push({ date: firstDisbursementDate, type: 'rate-change', amount: interestRate, rate: interestRate, note: `Initial Rate: ${interestRate}%` });
-    data.rateChanges?.forEach(rc => events.push({ date: new Date(rc.date), type: 'rate-change', amount: rc.rate, rate: rc.rate, note: `Rate changed to ${rc.rate}%` }));
-
-    // Add scheduled EMI payments
+    const firstDisbursementDate = new Date(disbursements[0].date);
     const moratoriumEndDate = add(firstDisbursementDate, { months: moratoriumPeriod });
     const firstEmiDate = setDate(add(moratoriumEndDate, { months: 1 }), paymentDueDay);
-
-    for (let i = 0; i < emisPaid; i++) {
-        const paymentDate = add(firstEmiDate, { months: i });
-        const isMissed = i >= (emisPaid - missedEmis);
-        if (isBefore(paymentDate, asOfDate) || isSameDay(paymentDate, asOfDate)) {
-             events.push({ 
-                date: paymentDate, 
-                type: 'repayment', 
-                amount: isMissed ? 0 : emiAmount,
-                note: isMissed ? `EMI #${i + 1} (Missed)`: `EMI #${i + 1}`
-            });
-        }
-    }
     
-    // Add manual transactions (for custom scenarios, but can apply here too)
-    data.transactions?.forEach(t => events.push({date: new Date(t.date), type: t.type, amount: t.amount, note: 'Manual Transaction'}));
-    
-    events.sort((a, b) => a.date.getTime() - b.date.getTime());
+    const sortedRateChanges = [...rateChanges].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // --- Phase 2: Monthly Iterative Calculation ---
-    const schedule: Transaction[] = [];
     let balance = 0;
     let totalInterestPaid = 0;
     let currentRate = interestRate;
-    let currentDate = events.length > 0 ? startOfMonth(events[0].date) : firstDisbursementDate;
     
-    while (isBefore(currentDate, asOfDate) || isSameDay(currentDate, asOfDate)) {
-        const monthStartDate = currentDate;
-        const monthEndDate = add(add(monthStartDate, {months: 1}), {days: -1});
+    let currentDate = startOfMonth(firstDisbursementDate);
 
-        // 1. Process events for the month (disbursements, rate changes)
-        const eventsThisMonth = events.filter(e => e.date >= monthStartDate && e.date <= monthEndDate);
+    // Initial Disbursement(s) on or before the first month starts
+    let lastProcessedDisbursementIndex = -1;
+    disbursements.forEach((d, index) => {
+        if (isBefore(new Date(d.date), currentDate) || isSameDay(new Date(d.date), currentDate)) {
+            balance += d.amount;
+            schedule.push({
+                date: format(new Date(d.date), 'yyyy-MM-dd'),
+                type: 'disbursement',
+                amount: d.amount,
+                principal: d.amount,
+                interest: 0,
+                endingBalance: balance,
+                note: `Disbursement`
+            });
+            lastProcessedDisbursementIndex = index;
+        }
+    });
+
+    while (isBefore(currentDate, asOfDate)) {
+        const monthStartDate = currentDate;
+        const nextMonthStartDate = add(monthStartDate, { months: 1 });
         
-        // Use rate from the start of the month
-        const rateEvent = [...events].reverse().find(e => e.type === 'rate-change' && e.date <= monthStartDate);
-        if (rateEvent?.rate) {
-            currentRate = rateEvent.rate;
+        // Find the applicable interest rate for this month
+        const rateChangeEvent = [...sortedRateChanges].reverse().find(rc => isBefore(new Date(rc.date), nextMonthStartDate) || isSameDay(new Date(rc.date), nextMonthStartDate));
+        if (rateChangeEvent) {
+             currentRate = rateChangeEvent.rate;
         }
 
         const monthlyInterestRate = currentRate / 100 / 12;
 
-        // 2. Calculate interest for the month
+        // Process any disbursements within this month
+        disbursements.forEach((d, index) => {
+            if (index > lastProcessedDisbursementIndex && isBefore(new Date(d.date), nextMonthStartDate)) {
+                 balance += d.amount;
+                 schedule.push({
+                    date: format(new Date(d.date), 'yyyy-MM-dd'),
+                    type: 'disbursement', amount: d.amount, principal: d.amount,
+                    interest: 0, endingBalance: balance, note: `Disbursement`
+                });
+                lastProcessedDisbursementIndex = index;
+            }
+        });
+        
         const interestForMonth = balance * monthlyInterestRate;
-
-        // 3. Determine payment for the month
         let paymentForMonth = 0;
-        let isMoratoriumMonth = isBefore(currentDate, moratoriumEndDate);
+        let interestComponent = 0;
+        let principalComponent = 0;
+        let note = '';
+
+        const isMoratoriumMonth = isBefore(monthStartDate, moratoriumEndDate);
 
         if (isMoratoriumMonth) {
-            switch(moratoriumInterestType) {
+            note = `Moratorium Period`;
+            switch (moratoriumInterestType) {
                 case 'simple':
                     paymentForMonth = interestForMonth;
+                    interestComponent = interestForMonth;
+                    principalComponent = 0;
+                    note += ' (Simple Interest Paid)';
                     break;
                 case 'partial':
+                    paymentForMonth = moratoriumPaymentAmount; // This is a percentage in the form
+                    const partialInterestPayment = interestForMonth * (moratoriumPaymentAmount / 100);
+                    paymentForMonth = partialInterestPayment;
+                    interestComponent = partialInterestPayment;
+                    principalComponent = 0; // No principal payment during moratorium
+                    balance += (interestForMonth - partialInterestPayment); // Capitalize unpaid interest
+                    note += ` (Partial Interest Paid)`;
+                    break;
                 case 'fixed':
                     paymentForMonth = moratoriumPaymentAmount;
+                    interestComponent = Math.min(interestForMonth, paymentForMonth);
+                    principalComponent = 0;
+                    balance += (interestForMonth - interestComponent); // Capitalize unpaid
+                    note += ` (Fixed Min. Payment)`;
                     break;
                 case 'none':
                 default:
                     paymentForMonth = 0;
+                    interestComponent = 0;
+                    principalComponent = 0;
+                    balance += interestForMonth; // Capitalize full interest
+                    note += ' (Interest Capitalized)';
                     break;
             }
-        } else {
-             // Find EMI payment for this month if scheduled
-            const emiEvent = eventsThisMonth.find(e => e.type === 'repayment');
-            paymentForMonth = emiEvent ? emiEvent.amount : 0;
-        }
-        
-        // 4. Calculate Principal Change & New Balance
-        const interestComponent = Math.min(interestForMonth, paymentForMonth);
-        const principalChange = paymentForMonth - interestForMonth;
-        const closingBalance = balance - principalChange;
+             schedule.push({
+                date: format(monthStartDate, 'yyyy-MM-dd'),
+                type: 'interest', amount: interestForMonth, principal: 0, interest: interestForMonth, endingBalance: balance, note
+            });
+             totalInterestPaid += interestComponent;
 
-        // Log transaction for the month
-        schedule.push({
-            date: format(monthStartDate, 'yyyy-MM-dd'),
-            type: 'repayment', // Generic term for the monthly calculation
-            amount: paymentForMonth,
-            principal: paymentForMonth > interestForMonth ? paymentForMonth - interestForMonth : 0,
-            interest: interestComponent,
-            endingBalance: closingBalance,
-            note: isMoratoriumMonth ? `Moratorium (Interest: ${interestForMonth.toFixed(2)})` : `EMI Payment`
-        });
-        
-        // Add disbursements for the month to balance AFTER interest calc
-        eventsThisMonth.forEach(e => {
-            if(e.type === 'disbursement') {
+        } else { // Repayment Period
+            // Find if an EMI was scheduled for this month
+            const paidEmisCount = schedule.filter(s => s.note?.startsWith('EMI #')).length;
+            const missedEmisCount = schedule.filter(s => s.note?.includes('(Missed)')).length;
+
+            const currentEmiIndex = paidEmisCount + missedEmisCount;
+            
+            if (currentEmiIndex < emisPaid) {
+                const isMissed = currentEmiIndex >= (emisPaid - missedEmis);
+                
+                paymentForMonth = isMissed ? 0 : emiAmount;
+                note = isMissed ? `EMI #${currentEmiIndex + 1} (Missed)` : `EMI #${currentEmiIndex + 1}`;
+                
+                interestComponent = interestForMonth;
+                principalComponent = paymentForMonth - interestComponent;
+                balance += principalComponent < 0 ? Math.abs(principalComponent) : 0; // Capitalize if payment < interest
+                balance -= paymentForMonth > interestForMonth ? principalComponent : 0;
+                
+                totalInterestPaid += interestComponent;
+                
                 schedule.push({
-                    date: format(e.date, 'yyyy-MM-dd'),
-                    type: 'disbursement', amount: e.amount, principal: e.amount,
-                    interest: 0, endingBalance: balance + e.amount, note: e.note
+                    date: format(setDate(monthStartDate, paymentDueDay), 'yyyy-MM-dd'),
+                    type: isMissed ? 'interest' : 'repayment',
+                    amount: paymentForMonth,
+                    principal: Math.max(0, principalComponent),
+                    interest: interestComponent,
+                    endingBalance: balance,
+                    note
                 });
-                balance += e.amount;
             }
-        });
-
-        // Update main balance and interest paid
-        balance = closingBalance;
-        totalInterestPaid += interestComponent;
-
-        // Move to next month
-        currentDate = add(monthStartDate, { months: 1 });
+        }
+        currentDate = nextMonthStartDate;
     }
-
-    // Final accrual from last calc date to as-of date
-    const lastCalcDate = add(currentDate, {months: -1});
+    
+    // Final interest accrual from the start of the current month to as-of date
+    const lastCalcDate = startOfMonth(asOfDate);
     const daysSinceLastCalc = differenceInDays(asOfDate, lastCalcDate);
+
     if (daysSinceLastCalc > 0 && balance > 0) {
         const finalInterest = balance * (currentRate / 100 / 365.25) * daysSinceLastCalc;
         balance += finalInterest;
+         schedule.push({
+            date: format(asOfDate, 'yyyy-MM-dd'),
+            type: 'interest',
+            amount: finalInterest,
+            principal: 0,
+            interest: finalInterest,
+            endingBalance: balance,
+            note: 'Interest accrued until today'
+        });
     }
-
 
     // --- Phase 3: Calculate Next EMI ---
     let nextEmiDate: Date | null = null;
-    if (balance > 0) {
-        let proposedDate = setDate(asOfDate, paymentDueDay);
-        if (isBefore(proposedDate, asOfDate) || isSameDay(proposedDate, asOfDate)) {
-            proposedDate = add(proposedDate, { months: 1 });
-        }
-        nextEmiDate = proposedDate;
+    if (balance > 0 && emiAmount > 0) {
+       const lastEmiIndex = emisPaid - 1;
+       const lastEmiDate = add(firstEmiDate, {months: lastEmiIndex});
+       
+       let proposedDate = add(lastEmiDate, {months: 1});
+       
+       if (isBefore(proposedDate, asOfDate) || isSameDay(proposedDate, asOfDate)) {
+           proposedDate = setDate(asOfDate, paymentDueDay);
+           if(isBefore(proposedDate, asOfDate) || isSameDay(proposedDate, asOfDate)) {
+               proposedDate = add(proposedDate, {months: 1});
+           }
+       }
+       nextEmiDate = proposedDate;
     }
     
     const perDayInterest = balance > 0 ? (balance * (currentRate / 100)) / 365.25 : 0;
