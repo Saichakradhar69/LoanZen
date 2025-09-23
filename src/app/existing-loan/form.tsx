@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { CalendarIcon, ChevronDown, Info, Loader2, Plus, Trash2, Zap } from 'lucide-react';
+import { CalendarIcon, Info, Loader2, Plus, Trash2, Zap } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -20,7 +20,6 @@ import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipProvider, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useEffect, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 
 const disbursementSchema = z.object({
@@ -33,12 +32,6 @@ const rateChangeSchema = z.object({
   rate: z.coerce.number().positive('Rate must be positive.').max(100, "Rate seems too high."),
 });
 
-const transactionSchema = z.object({
-    date: z.date({ required_error: 'Transaction date is required.' }),
-    type: z.enum(['withdrawal', 'repayment']),
-    amount: z.coerce.number().positive('Amount must be positive.')
-});
-
 // This is the client-side validation schema.
 const formSchema = z.object({
     loanType: z.string({ required_error: 'Please select a loan type.' }),
@@ -48,7 +41,6 @@ const formSchema = z.object({
     interestRate: z.coerce.number().positive('Interest rate must be positive.').max(100, "Rate seems too high."),
     interestType: z.enum(['reducing', 'flat']),
     rateType: z.enum(['fixed', 'floating']),
-    paymentStructure: z.enum(['fixed', 'variable']).optional(),
     emiAmount: z.coerce.number().optional(),
     paymentDueDay: z.coerce.number().min(1).max(31).optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
@@ -56,9 +48,7 @@ const formSchema = z.object({
     moratoriumPaymentAmount: z.coerce.number().optional(),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
-    transactions: z.array(transactionSchema).optional(),
     emisPaid: z.coerce.number().min(0, "EMI periods passed cannot be negative.").optional(),
-    missedEmis: z.coerce.number().min(0, "Missed EMIs cannot be negative.").optional(),
 }).superRefine((data, ctx) => {
     // For standard loans, require original amount, EMI, and EMIs paid.
     if (['personal', 'car', 'home'].includes(data.loanType)) {
@@ -84,14 +74,6 @@ const formSchema = z.object({
             });
         }
     }
-    
-    if (data.missedEmis && data.emisPaid && data.missedEmis > data.emisPaid) {
-         ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Missed EMIs cannot be greater than the number of EMI periods passed.",
-            path: ["missedEmis"],
-        });
-    }
 
     // For education loans, either an original amount or disbursements must be provided.
     if (data.loanType === 'education' && (!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
@@ -109,14 +91,6 @@ const formSchema = z.object({
             path: ["moratoriumPaymentAmount"],
         });
     }
-
-    if (data.loanType === 'custom' && (!data.originalLoanAmount || data.originalLoanAmount <= 0)) {
-         ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Original Loan Amount is required for Custom Loans.",
-            path: ["originalLoanAmount"],
-        });
-    }
 });
 
 export type ExistingLoanFormData = z.infer<typeof formSchema>;
@@ -128,8 +102,6 @@ interface ExistingLoanFormProps {
 
 
 export default function ExistingLoanForm({ onCalculate, serverState }: ExistingLoanFormProps) {
-    const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-    
     const form = useForm<ExistingLoanFormData>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -145,12 +117,8 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             moratoriumInterestType: 'none',
             moratoriumPaymentAmount: undefined,
             emisPaid: undefined,
-            missedEmis: 0,
-            loanName: '',
-            paymentStructure: 'fixed',
             disbursements: [],
-            rateChanges: [],
-            transactions: []
+            rateChanges: []
         },
     });
     
@@ -171,29 +139,27 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
 
     const loanType = form.watch('loanType');
     const rateType = form.watch('rateType');
-    const paymentStructure = form.watch('paymentStructure');
     const disbursements = form.watch('disbursements');
     const moratoriumPeriod = form.watch('moratoriumPeriod');
     const moratoriumInterestType = form.watch('moratoriumInterestType');
     
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
-    const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
 
     const isOriginalAmountDisabled = loanType === 'education' && disbursements && disbursements.length > 0;
-    const showOriginalAmount = loanType !== 'credit-line';
 
     const renderCommonFields = () => (
         <>
-            {showOriginalAmount && (
+            {loanType !== 'education' || !isOriginalAmountDisabled ? (
                 <FormField control={form.control} name="originalLoanAmount" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Original Loan Amount</FormLabel>
                         <FormControl><Input type="number" placeholder="e.g., 50000" {...field} value={field.value ?? ''} disabled={isOriginalAmountDisabled} /></FormControl>
+                        {isOriginalAmountDisabled && <FormDescription>This is disabled because you have added specific disbursements.</FormDescription>}
                         <FormMessage />
                     </FormItem>
                 )} />
-            )}
+            ) : null}
              <FormField control={form.control} name="disbursementDate" render={({ field }) => (
                 <FormItem className="flex flex-col">
                     <FormLabel>First Disbursement Date</FormLabel>
@@ -311,32 +277,6 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
     </div>
     )
 
-    const renderTransactionHistory = (isRepaymentOnly = false) => (
-        <div>
-             <Label>{isRepaymentOnly ? 'Variable Payments' : 'Transaction History'}</Label>
-              <FormDescription>{isRepaymentOnly ? 'Add each payment you have made.' : 'Add all withdrawals and repayments you have made.'}</FormDescription>
-             <div className="space-y-4 mt-2">
-                {transactionFields.map((field, index) => (
-                    <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
-                         <FormField control={form.control} name={`transactions.${index}.date`} render={({ field }) => (
-                            <FormItem className="flex flex-col"><FormLabel>Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-[240px] justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
-                        )} />
-                        {!isRepaymentOnly && (
-                        <FormField control={form.control} name={`transactions.${index}.type`} render={({ field }) => (
-                            <FormItem><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="withdrawal">Withdrawal</SelectItem><SelectItem value="repayment">Repayment</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-                        )} />
-                        )}
-                        <FormField control={form.control} name={`transactions.${index}.amount`} render={({ field }) => (
-                            <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
-                        )} />
-                        <Button type="button" variant="destructive" size="icon" onClick={() => removeTransaction(index)}><Trash2 className="h-4 w-4" /></Button>
-                    </div>
-                ))}
-                 <Button type="button" variant="outline" onClick={() => appendTransaction({ date: new Date(), type: isRepaymentOnly ? 'repayment' : 'withdrawal', amount: '' as any })}><Plus className="mr-2" />Add {isRepaymentOnly ? 'Payment' : 'Transaction'}</Button>
-            </div>
-        </div>
-    )
-
     const renderDisbursements = () => (
          <div>
              <Label>Disbursements</Label>
@@ -376,24 +316,14 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             case 'education':
                 return (
                     <div className="space-y-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <FormField control={form.control} name="emisPaid" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>EMI Periods Passed</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
-                                    <FormDescription>Total # of periods since EMI began.</FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                             <FormField control={form.control} name="missedEmis" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Number of Missed EMIs</FormLabel>
-                                    <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
-                                     <FormDescription>How many payments were missed.</FormDescription>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
+                        <FormField control={form.control} name="emisPaid" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>EMI Periods Passed (Post-Moratorium)</FormLabel>
+                                <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
+                                <FormDescription>Total # of EMI payments made since the moratorium ended.</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
                         <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Moratorium Period (in months)</FormLabel>
@@ -457,98 +387,18 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                         {renderDisbursements()}
                     </div>
                 );
-            case 'credit-line':
-                 return renderTransactionHistory(false);
-            case 'custom':
-                 return (
-                    <div className="space-y-6">
-                         <FormField control={form.control} name="loanName" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Loan Nickname (Optional)</FormLabel>
-                                <FormControl><Input placeholder="e.g., Personal Loan from Dad" {...field} /></FormControl>
-                            </FormItem>
-                        )} />
-                        <FormField control={form.control} name="paymentStructure" render={({ field }) => (
-                             <FormItem className="space-y-3">
-                                 <FormLabel>How do you make payments?</FormLabel>
-                                <FormControl>
-                                    <RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4">
-                                        <FormItem className="flex items-center space-x-2 space-y-0">
-                                            <FormControl><RadioGroupItem value="fixed" /></FormControl>
-                                            <Label className="font-normal">Fixed Amount (e.g., Monthly EMI)</Label>
-                                        </FormItem>
-                                        <FormItem className="flex items-center space-x-2 space-y-0">
-                                            <FormControl><RadioGroupItem value="variable" /></FormControl>
-                                            <Label className="font-normal">Variable Amounts</Label>
-                                        </FormItem>
-                                    </RadioGroup>
-                                </FormControl>
-                             </FormItem>
-                        )} />
-                       
-                        {paymentStructure === 'fixed' && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                                <FormField control={form.control} name="emiAmount" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Fixed Payment Amount</FormLabel>
-                                        <FormControl><Input type="number" placeholder="e.g., 500" {...field} value={field.value ?? ''} /></FormControl>
-                                    </FormItem>
-                                )} />
-                                <FormField control={form.control} name="emisPaid" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Number of Payments Made</FormLabel>
-                                        <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
-                                    </FormItem>
-                                )} />
-                            </div>
-                        )}
-                        {paymentStructure === 'variable' && (
-                            renderTransactionHistory(true)
-                        )}
-                        
-                        <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
-                            <CollapsibleTrigger asChild>
-                                <Button type="button" variant="link" className="p-0">
-                                    <ChevronDown className="mr-2 h-4 w-4 transition-transform data-[state=open]:rotate-180" />
-                                    Advanced Options (Moratorium, Multiple Disbursements, etc.)
-                                </Button>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="space-y-6 pt-4 animate-in fade-in-0">
-                                <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Moratorium Period (in months)</FormLabel>
-                                        <FormControl><Input type="number" placeholder="e.g., 6" {...field} value={field.value ?? ''} /></FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )} />
-                               {renderDisbursements()}
-                               {rateType === 'floating' && renderFloatingRateHistory()}
-                            </CollapsibleContent>
-                        </Collapsible>
-                    </div>
-                 );
             case 'personal':
             case 'car':
             case 'home':
                  return (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <FormField control={form.control} name="emisPaid" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>EMI Periods Passed</FormLabel>
-                                <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
-                                <FormDescription>Total # of periods since EMI began.</FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                         <FormField control={form.control} name="missedEmis" render={({ field }) => (
-                            <FormItem>
-                                <FormLabel>Number of Missed EMIs</FormLabel>
-                                <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
-                                 <FormDescription>How many payments were missed.</FormDescription>
-                                <FormMessage />
-                            </FormItem>
-                        )} />
-                    </div>
+                    <FormField control={form.control} name="emisPaid" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Number of EMIs Already Paid</FormLabel>
+                            <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
+                             <FormDescription>Total # of payments you have made.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
                  );
             default:
                 return null;
@@ -574,8 +424,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                                         <SelectItem value="car">Car Loan</SelectItem>
                                         <SelectItem value="home">Home Loan</SelectItem>
                                         <SelectItem value="education">Education Loan</SelectItem>
-                                        <SelectItem value="credit-line">Credit Line</SelectItem>
-                                        <SelectItem value="custom">Custom Loan (Advanced)</SelectItem>
+                                        <SelectItem value="custom">Custom (Not Yet Supported)</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -589,7 +438,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                         <div className="space-y-6 pt-4 border-t">
                             <h3 className="text-lg font-medium text-primary">Loan-Specific Details</h3>
                             {renderLoanSpecificFields()}
-                             {rateType === 'floating' && loanType !== 'custom' && loanType !== 'credit-line' && (
+                             {rateType === 'floating' && (
                                 <div className="pt-6 border-t">
                                     {renderFloatingRateHistory()}
                                 </div>

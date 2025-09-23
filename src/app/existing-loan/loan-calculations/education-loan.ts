@@ -1,6 +1,6 @@
 // src/app/existing-loan/loan-calculations/education-loan.ts
 
-import { add, differenceInDays, format, isBefore, isAfter, setDate, isSameDay, startOfMonth, getDaysInMonth } from 'date-fns';
+import { add, differenceInDays, format, isBefore, isAfter, setDate, isSameDay, startOfMonth } from 'date-fns';
 import type { ExistingLoanFormData } from '../form';
 import type { CalculationResult, Transaction } from '../actions';
 
@@ -13,7 +13,6 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
         interestType,
         emiAmount = 0,
         emisPaid = 0,
-        missedEmis = 0,
         paymentDueDay = 1,
         moratoriumPeriod = 0,
         moratoriumInterestType = 'none',
@@ -114,7 +113,6 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
                     note += ' (Simple Interest Paid)';
                     break;
                 case 'partial':
-                    paymentForMonth = moratoriumPaymentAmount; // This is a percentage in the form
                     const partialInterestPayment = interestForMonth * (moratoriumPaymentAmount / 100);
                     paymentForMonth = partialInterestPayment;
                     interestComponent = partialInterestPayment;
@@ -145,33 +143,17 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
              totalInterestPaid += interestComponent;
 
         } else { // Repayment Period
-            // Find if an EMI was scheduled for this month
-            const paidEmisCount = schedule.filter(s => s.note?.startsWith('EMI #')).length;
-            const missedEmisCount = schedule.filter(s => s.note?.includes('(Missed)')).length;
-
-            const currentEmiIndex = paidEmisCount + missedEmisCount;
-            
-            if (currentEmiIndex < emisPaid) {
-                const isMissed = currentEmiIndex >= (emisPaid - missedEmis);
-                
-                paymentForMonth = isMissed ? 0 : emiAmount;
-                note = isMissed ? `EMI #${currentEmiIndex + 1} (Missed)` : `EMI #${currentEmiIndex + 1}`;
-                
+            const paidEmisCount = schedule.filter(s => s.note === 'EMI Payment').length;
+            if (paidEmisCount < emisPaid) {
+                paymentForMonth = emiAmount;
+                note = 'EMI Payment';
                 interestComponent = interestForMonth;
                 principalComponent = paymentForMonth - interestComponent;
-                balance += principalComponent < 0 ? Math.abs(principalComponent) : 0; // Capitalize if payment < interest
-                balance -= paymentForMonth > interestForMonth ? principalComponent : 0;
-                
+                balance -= principalComponent;
                 totalInterestPaid += interestComponent;
-                
-                schedule.push({
+                 schedule.push({
                     date: format(setDate(monthStartDate, paymentDueDay), 'yyyy-MM-dd'),
-                    type: isMissed ? 'interest' : 'repayment',
-                    amount: paymentForMonth,
-                    principal: Math.max(0, principalComponent),
-                    interest: interestComponent,
-                    endingBalance: balance,
-                    note
+                    type: 'repayment', amount: paymentForMonth, principal: principalComponent, interest: interestComponent, endingBalance: balance, note
                 });
             }
         }
@@ -215,7 +197,7 @@ export function calculateEducationLoan(data: ExistingLoanFormData): CalculationR
     
     const perDayInterest = balance > 0 ? (balance * (currentRate / 100)) / 365.25 : 0;
 
-    const originalLoanAmount = (data.originalLoanAmount || 0) + (data.disbursements || []).reduce((acc, d) => acc + d.amount, 0);
+    const originalLoanAmount = disbursements.reduce((acc, d) => acc + d.amount, 0);
 
     return {
         outstandingBalance: balance,

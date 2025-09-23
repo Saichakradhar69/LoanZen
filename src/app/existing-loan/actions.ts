@@ -8,7 +8,7 @@ import type { ExistingLoanFormData } from './form';
 
 export type Transaction = {
     date: string;
-    type: 'disbursement' | 'repayment' | 'withdrawal' | 'interest' | 'rate-change';
+    type: 'disbursement' | 'repayment' | 'interest';
     amount: number;
     principal: number;
     interest: number;
@@ -40,12 +40,6 @@ const rateChangeSchema = z.object({
   rate: z.coerce.number().positive('Rate must be positive.').max(100, "Rate seems too high."),
 });
 
-const transactionSchema = z.object({
-    date: z.coerce.date({ required_error: 'Transaction date is required.' }),
-    type: z.enum(['withdrawal', 'repayment']),
-    amount: z.coerce.number().positive('Amount must be positive.')
-});
-
 // This schema is used for server-side validation.
 const formSchema = z.object({
     loanType: z.string({ required_error: 'Please select a loan type.' }),
@@ -55,7 +49,6 @@ const formSchema = z.object({
     interestRate: z.coerce.number().positive('Interest rate must be positive.').max(100, "Rate seems too high."),
     interestType: z.enum(['reducing', 'flat']),
     rateType: z.enum(['fixed', 'floating']),
-    paymentStructure: z.enum(['fixed', 'variable']).optional(),
     emiAmount: z.coerce.number().optional(),
     paymentDueDay: z.coerce.number().min(1).max(31).optional(),
     moratoriumPeriod: z.coerce.number().min(0, 'Moratorium period cannot be negative.').optional(),
@@ -63,9 +56,7 @@ const formSchema = z.object({
     moratoriumPaymentAmount: z.coerce.number().optional(),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
-    transactions: z.array(transactionSchema).optional(),
     emisPaid: z.coerce.number().min(0, "EMI periods passed cannot be negative.").optional(),
-    missedEmis: z.coerce.number().min(0, "Missed EMIs cannot be negative.").optional(),
 }).superRefine((data, ctx) => {
     // For standard loans, require original amount, EMI, and EMIs paid.
     if (['personal', 'car', 'home'].includes(data.loanType)) {
@@ -86,18 +77,10 @@ const formSchema = z.object({
         if (data.emisPaid === undefined || data.emisPaid < 0) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "Number of EMI periods passed is required for this loan type.",
+                message: "Number of EMIs Already Paid is required for this loan type.",
                 path: ["emisPaid"],
             });
         }
-    }
-
-    if (data.missedEmis && data.emisPaid && data.missedEmis > data.emisPaid) {
-         ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Missed EMIs cannot be greater than the number of EMI periods passed.",
-            path: ["missedEmis"],
-        });
     }
 
     // For education loans, either an original amount or disbursements must be provided.
@@ -114,15 +97,6 @@ const formSchema = z.object({
             code: z.ZodIssueCode.custom,
             message: "A payment amount is required for this moratorium type.",
             path: ["moratoriumPaymentAmount"],
-        });
-    }
-
-
-    if (data.loanType === 'custom' && (!data.originalLoanAmount || data.originalLoanAmount <= 0)) {
-         ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Original Loan Amount is required for Custom Loans.",
-            path: ["originalLoanAmount"],
         });
     }
 });
