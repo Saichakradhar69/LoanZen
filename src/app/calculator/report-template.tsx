@@ -266,7 +266,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
 
              {/* Page 4: Action Plan & Upsell */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 fontheadline">Your Recommended Action Plan</h2>
+                <h2 className="text-3xl font-bold font-headline text-primary">Your Recommended Action Plan</h2>
 
                 <div className="bg-gray-50 p-6 rounded-lg border mb-12">
                      <h3 className="text-xl font-bold text-gray-800 mb-4">Based on your report, here are your next steps:</h3>
@@ -339,6 +339,14 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
     const totalProjectedCost = originalLoanAmount + totalInterestFromNow;
     const totalPaidToDate = principalPaidToDate + interestPaidToDate;
     const totalCostProgress = totalProjectedCost > 0 ? (totalPaidToDate / totalProjectedCost) * 100 : 0;
+
+    const disbursements = schedule.filter(t => t.type === 'disbursement');
+    const hasMultipleDisbursements = disbursements.length > 1;
+
+    const disbursementChartData = disbursements.map(d => ({
+        date: new Date(d.date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+        amount: d.amount,
+    })).reverse();
 
 
     return (
@@ -515,6 +523,35 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                 </div>
             </div>
 
+            {hasMultipleDisbursements && (
+                <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
+                    <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Disbursement History</h2>
+                    <div className="mt-8">
+                        <h3 className="text-2xl font-semibold text-center mb-6">Loan Funds Released Over Time</h3>
+                        <div className="w-[95%] mx-auto">
+                            <ResponsiveContainer width="100%" height={300 + (disbursementChartData.length * 30)}>
+                               <BarChart
+                                    data={disbursementChartData}
+                                    layout="vertical"
+                                    margin={{ top: 20, right: 50, left: 50, bottom: 20 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis type="number" tickFormatter={(val) => formatCurrency(val as number)}/>
+                                    <YAxis type="category" dataKey="date" width={80} interval={0} />
+                                    <Tooltip
+                                        formatter={(val) => formatCurrency(val as number)}
+                                        labelStyle={{ color: 'black' }}
+                                    />
+                                    <Bar dataKey="amount" name="Disbursed Amount" fill="#2563EB">
+                                        <LabelList dataKey="amount" position="right" formatter={(val: number) => formatCurrency(val)} className="fill-gray-800 font-semibold" />
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Page 4: Action Plan & Upsell */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Recommended Action Plan</h2>
@@ -609,3 +646,5 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
 
 
     
+
+  
