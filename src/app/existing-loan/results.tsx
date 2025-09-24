@@ -109,9 +109,8 @@ export default function ExistingLoanResults({ results, formData, onBack }: Exist
                         <p className="text-4xl font-bold text-destructive">{formatCurrency(results.outstandingBalance)}</p>
                     </div>
                      <div className="p-6 bg-secondary rounded-lg">
-                        <p className="text-sm text-muted-foreground">Projected Total Interest</p>
-                        <p className="text-4xl font-bold">{formatCurrency(results.projectedTotalInterest)}</p>
-                        <p className="text-xs text-muted-foreground mt-1">({formatCurrency(results.interestPaidToDate)} paid to date)</p>
+                        <p className="text-sm text-muted-foreground">Total Interest Paid to Date</p>
+                        <p className="text-4xl font-bold">{formatCurrency(results.interestPaidToDate)}</p>
                     </div>
                 </div>
             </TabsContent>
