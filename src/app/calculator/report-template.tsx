@@ -175,14 +175,20 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
     const worstScenario = hasMultipleScenarios ? [...scenarios].sort((a, b) => b.totalPayment - a.totalPayment)[0] : scenarios[0];
     const savings = worstScenario.totalInterest - bestScenario.totalInterest;
 
-    // What-if scenarios for the best option
+    // --- DYNAMIC WHAT-IF SCENARIOS ---
     const baseMonths = bestScenario.loanTerm * 12;
-    const whatIf50 = calculateWhatIf(bestScenario.loanAmount, bestScenario.monthlyPayment, bestScenario.interestRate, baseMonths, bestScenario.totalInterest, 50);
-    const whatIf100 = calculateWhatIf(bestScenario.loanAmount, bestScenario.monthlyPayment, bestScenario.interestRate, baseMonths, bestScenario.totalInterest, 100);
+    const extraPayment5Percent = bestScenario.monthlyPayment * 0.05;
+    const extraPayment10Percent = bestScenario.monthlyPayment * 0.10;
+    const lumpSum1Percent = bestScenario.loanAmount * 0.01;
+
+    const whatIf5Percent = calculateWhatIf(bestScenario.loanAmount, bestScenario.monthlyPayment, bestScenario.interestRate, baseMonths, bestScenario.totalInterest, extraPayment5Percent);
+    const whatIf10Percent = calculateWhatIf(bestScenario.loanAmount, bestScenario.monthlyPayment, bestScenario.interestRate, baseMonths, bestScenario.totalInterest, extraPayment10Percent);
+    const whatIf1PercentLump = calculateWhatIf(bestScenario.loanAmount, bestScenario.monthlyPayment, bestScenario.interestRate, baseMonths, bestScenario.totalInterest, 0, lumpSum1Percent);
+
 
     const whatIfScenarios = [
-      { name: '+ $50/mo', months: whatIf50.months},
-      { name: '+ $100/mo', months: whatIf100.months}
+      { name: `+ ${formatCurrency(extraPayment5Percent)}/mo (5%)`, months: whatIf5Percent.months},
+      { name: `+ ${formatCurrency(extraPayment10Percent)}/mo (10%)`, months: whatIf10Percent.months}
     ].filter(s => isFinite(s.months) && s.months > 0);
 
 
@@ -231,9 +237,10 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                  <div className="bg-blue-50 p-6 rounded-lg border border-blue-200 mt-8">
                     <h3 className="text-xl font-semibold mb-4 text-center text-blue-800">What-If Scenarios</h3>
                     <p className="text-center text-sm text-blue-700 mb-4">See how you can pay off your loan even faster.</p>
-                    <div className="text-center space-y-2">
-                        {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(50)}/month</strong>, you will be debt-free <strong>{whatIf50.monthsSaved.toFixed(0)} months sooner</strong> and save <strong>{formatCurrency(whatIf50.interestSaved)}</strong> in interest.</p>}
-                        {isFinite(whatIf100.months) && whatIf100.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(100)}/month</strong>, you will be debt-free <strong>{whatIf100.monthsSaved.toFixed(0)} months sooner</strong> and save <strong>{formatCurrency(whatIf100.interestSaved)}</strong> in interest.</p>}
+                     <div className="space-y-4 text-center">
+                        {isFinite(whatIf5Percent.months) && whatIf5Percent.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(extraPayment5Percent)}/month</strong> (5% of EMI), you will be debt-free <strong>{whatIf5Percent.monthsSaved.toFixed(0)} months sooner</strong> and save <strong>{formatCurrency(whatIf5Percent.interestSaved)}</strong> in interest.</p>}
+                        {isFinite(whatIf10Percent.months) && whatIf10Percent.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(extraPayment10Percent)}/month</strong> (10% of EMI), you will be debt-free <strong>{whatIf10Percent.monthsSaved.toFixed(0)} months sooner</strong> and save <strong>{formatCurrency(whatIf10Percent.interestSaved)}</strong> in interest.</p>}
+                         {isFinite(whatIf1PercentLump.months) && whatIf1PercentLump.monthsSaved > 0 && <p>If you make a one-time lump-sum payment of <strong>{formatCurrency(lumpSum1Percent)}</strong> (1% of loan), you will save <strong>{formatCurrency(whatIf1PercentLump.interestSaved)}</strong> in interest.</p>}
                     </div>
                 </div>
             </div>
@@ -280,7 +287,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                      <h3 className="text-xl font-bold text-gray-800 mb-4">Based on your report, here are your next steps:</h3>
                     <ul className="space-y-4 text-lg">
                         <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Review your options and select the "{bestScenario.scenarioName}" for the most savings.</span></li>
-                         {isFinite(whatIf50.months) && whatIf50.interestSaved > 0 && <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Consider paying an extra <strong>{formatCurrency(50)}/month</strong>. This small change will save you <strong>{formatCurrency(whatIf50.interestSaved)}!</strong></span></li>}
+                         {isFinite(whatIf5Percent.months) && whatIf5Percent.interestSaved > 0 && <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Consider paying an extra <strong>{formatCurrency(extraPayment5Percent)}/month</strong>. This small change will save you <strong>{formatCurrency(whatIf5Percent.interestSaved)}!</strong></span></li>}
                     </ul>
                 </div>
                 
@@ -596,7 +603,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
     )
 }
 
-export default function ReportTemplate({ reportData }: ReportTemplateProps) {
+export default function ReportTemplate({ reportData }: ReportDataType) {
     if (!reportData) return null;
 
     const { formType, userEmail, generatedAt, couponCode } = reportData;
@@ -665,4 +672,5 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     
 
   
+
 
