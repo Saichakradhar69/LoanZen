@@ -135,8 +135,8 @@ const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: 
 
 
     return (
-        <div className="w-[95%] mx-auto">
-        <ResponsiveContainer width="100%" height={150 + (validScenarios.length * 20)}>
+        <div className="w-[720px] mx-auto">
+        <ResponsiveContainer width={720} height={150 + (validScenarios.length * 20)}>
             <BarChart data={data} layout="vertical" barCategoryGap="25%" margin={{ left: 30, right: 50 }}>
                 <XAxis type="number" domain={[0, dataMax => Math.ceil(dataMax / 12) * 12]} tickFormatter={(val) => `${val / 12}y`} />
                 <YAxis type="category" dataKey="name" hide />
@@ -235,8 +235,8 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
               <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Visual Breakdown of Your Options</h2>
                 <div className="mb-12">
                     <h3 className="text-2xl font-semibold text-center mb-6">Paydown Timeline</h3>
-                    <div className="w-[95%] mx-auto">
-                        <ResponsiveContainer width="100%" height={400}>
+                    <div className="w-[720px] mx-auto">
+                        <ResponsiveContainer width={720} height={400}>
                             <ComposedChart data={bestScenario.amortizationSchedule.filter(a => a.month % 12 === 0 || a.month === 1).map(a => ({ year: Math.floor(a.month / 12), balance: a.remainingBalance }))} margin={{ top: 5, right: 30, left: 50, bottom: 20 }}>
                                 <defs>
                                     <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
@@ -436,8 +436,8 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                  <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Financial Overview</h2>
                  <div className="mb-12">
                     <h3 className="text-2xl font-semibold text-center mb-4">Where Your Money Has Gone (To Date)</h3>
-                    <div className="w-[95%] mx-auto">
-                        <ResponsiveContainer width="100%" height={350}>
+                    <div className="w-[720px] mx-auto">
+                        <ResponsiveContainer width={720} height={350}>
                             <PieChart>
                                 <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value }) => {
                                     const RADIAN = Math.PI / 180;
@@ -467,8 +467,8 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                  
                  <div className="mb-8">
                      <h3 className="text-2xl font-semibold text-center mb-4">Your Paydown Timeline</h3>
-                     <div className="w-[95%] mx-auto">
-                        <ResponsiveContainer width="100%" height={400}>
+                     <div className="w-[720px] mx-auto">
+                        <ResponsiveContainer width={720} height={400}>
                             <ComposedChart data={timelineData} margin={{ top: 5, right: 30, left: 60, bottom: 20 }}>
                                 <defs>
                                     <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
@@ -528,8 +528,8 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                     <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Disbursement History</h2>
                     <div className="mt-8">
                         <h3 className="text-2xl font-semibold text-center mb-6">Loan Funds Released Over Time</h3>
-                        <div className="w-[95%] mx-auto">
-                            <ResponsiveContainer width="100%" height={300 + (disbursementChartData.length * 30)}>
+                        <div className="w-[720px] mx-auto">
+                            <ResponsiveContainer width={720} height={300 + (disbursementChartData.length * 30)}>
                                <BarChart
                                     data={disbursementChartData}
                                     layout="vertical"
