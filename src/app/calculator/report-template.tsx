@@ -37,42 +37,50 @@ function calculateWhatIf(
     extraMonthly: number = 0,
     lumpSum: number = 0
 ) {
-    if (principal <= 0) {
+    const principalInCents = Math.round(principal * 100);
+    const monthlyPaymentInCents = Math.round(monthlyPayment * 100);
+    const extraMonthlyInCents = Math.round(extraMonthly * 100);
+    const lumpSumInCents = Math.round(lumpSum * 100);
+    const baseInterestInCents = Math.round(baseInterest * 100);
+
+    if (principalInCents <= 0) {
         return { months: 0, totalInterest: 0, years: 0, monthsSaved: baseMonths, interestSaved: baseInterest };
     }
-    const monthlyRate = annualRate / 12 / 100;
-    let balance = principal - lumpSum;
+    const monthlyRate = annualRate / 100 / 12;
+    let balanceInCents = principalInCents - lumpSumInCents;
     let months = 0;
-    let totalInterest = 0;
+    let totalInterestInCents = 0;
 
-    const fullPayment = monthlyPayment + extraMonthly;
+    const fullPaymentInCents = monthlyPaymentInCents + extraMonthlyInCents;
 
-    if (lumpSum > 0 && balance <=0) { // Paid off with lump sum
+    if (lumpSumInCents > 0 && balanceInCents <= 0) { // Paid off with lump sum
          return { months: 0, totalInterest: 0, years: 0, monthsSaved: baseMonths, interestSaved: baseInterest };
     }
     
     // If the monthly payment is less than or equal to the interest, it will never be paid off.
-    if (fullPayment <= balance * monthlyRate) {
+    if (fullPaymentInCents <= Math.round(balanceInCents * monthlyRate)) {
         return { months: Infinity, totalInterest: Infinity, years: Infinity, monthsSaved: 0, interestSaved: 0 };
     }
 
 
-    while (balance > 0) {
-        const interest = balance * monthlyRate;
-        const principalPaid = fullPayment - interest;
+    while (balanceInCents > 0) {
+        const interestInCents = Math.round(balanceInCents * monthlyRate);
+        const principalPaidInCents = fullPaymentInCents - interestInCents;
 
-        balance -= principalPaid;
-        totalInterest += interest;
+        balanceInCents -= principalPaidInCents;
+        totalInterestInCents += interestInCents;
         months++;
         if (months > 1200) return { months: Infinity, totalInterest: Infinity, years: Infinity, monthsSaved: 0, interestSaved: 0 }; // Safety break
     }
 
+    const totalInterest = totalInterestInCents / 100;
     const years = months / 12;
     const monthsSaved = baseMonths - months;
-    const interestSaved = baseInterest - totalInterest;
+    const interestSaved = (baseInterestInCents - totalInterestInCents) / 100;
 
     return { months, totalInterest, years, monthsSaved, interestSaved };
 }
+
 
 
 const ProgressRing = ({ progress }: { progress: number }) => {
@@ -292,7 +300,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
 
 
 const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResults }) => {
-    const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate, perDayInterest, emiAmount } = reportData;
+    const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate, perDayInterest, emiAmount, projectedTotalInterest } = reportData;
     const paidAmount = originalLoanAmount - outstandingBalance;
     const paidPercentage = originalLoanAmount > 0 ? (paidAmount / originalLoanAmount) * 100 : 0;
     
@@ -302,7 +310,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
         : [...schedule].reverse().find(s => s.type === 'repayment')?.amount || (outstandingBalance > 0 ? outstandingBalance / 120 : originalLoanAmount / 120);
 
     const baseScenario = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, 0, 0); // Base case to get months and interest from now
-    const totalInterestFromNow = isFinite(baseScenario.totalInterest) ? baseScenario.totalInterest : 0;
+    const totalInterestFromNow = isFinite(baseScenario.totalInterest) ? baseScenario.totalInterest : projectedTotalInterest - interestPaidToDate;
     const totalMonthsFromNow = isFinite(baseScenario.months) ? baseScenario.months : 0;
     
     const projectedPayoffDate = new Date();
@@ -315,10 +323,15 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
     
     const loanTenureYears = Math.ceil(totalMonthsFromNow / 12) + Math.floor((new Date().getTime() - loanStartDate.getTime()) / (1000 * 3600 * 24 * 365.25));
 
-    // What-if scenarios
-    const whatIf50 = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, totalMonthsFromNow, totalInterestFromNow, 50);
-    const whatIf100 = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, totalMonthsFromNow, totalInterestFromNow, 100);
-    const whatIf500Lump = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, totalMonthsFromNow, totalInterestFromNow, 0, 500);
+    // --- DYNAMIC WHAT-IF SCENARIOS ---
+    const extraPayment5Percent = baseMonthlyPayment * 0.05;
+    const extraPayment10Percent = baseMonthlyPayment * 0.10;
+    const lumpSum1Percent = outstandingBalance * 0.01;
+
+    const whatIf5Percent = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, totalMonthsFromNow, totalInterestFromNow, extraPayment5Percent);
+    const whatIf10Percent = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, totalMonthsFromNow, totalInterestFromNow, extraPayment10Percent);
+    const whatIf1PercentLump = calculateWhatIf(outstandingBalance, baseMonthlyPayment, interestRate, totalMonthsFromNow, totalInterestFromNow, 0, lumpSum1Percent);
+
 
     const interestPieData = [
         { name: 'Principal Paid', value: paidAmount },
@@ -327,8 +340,8 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
     const principalPaidToDate = originalLoanAmount - outstandingBalance;
     
     const whatIfScenarios = [
-      { name: '+ $50/mo', months: whatIf50.months},
-      { name: '+ $100/mo', months: whatIf100.months}
+      { name: `+ ${formatCurrency(extraPayment5Percent)}/mo (5%)`, months: whatIf5Percent.months},
+      { name: `+ ${formatCurrency(extraPayment10Percent)}/mo (10%)`, months: whatIf10Percent.months}
     ].filter(s => isFinite(s.months) && s.months > 0);
 
     // Data for the paydown timeline chart
@@ -404,9 +417,9 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                                 <p className="font-semibold">{formatCurrency(interestPaidToDate)}</p>
                             </div>
                              <div className="col-span-2 border-t mt-2 pt-2"></div>
-                            <div>
-                                <p className="text-sm text-gray-500">Next EMI Date</p>
-                                <p className="font-semibold">{nextEmiDate ? new Date(nextEmiDate).toLocaleDateString() : 'N/A'}</p>
+                             <div>
+                                <p className="text-sm text-gray-500">Projected Total Interest</p>
+                                <p className="font-semibold">{formatCurrency(projectedTotalInterest)}</p>
                             </div>
                             <div>
                                 <p className="text-sm text-gray-500">Projected Payoff</p>
@@ -416,6 +429,10 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                                 <p className="text-sm text-gray-500">Per Day Interest</p>
                                 <p className="font-semibold">{formatCurrency(perDayInterest)}</p>
                             </div>
+                             <div>
+                                <p className="text-sm text-gray-500">Next EMI Date</p>
+                                <p className="font-semibold">{nextEmiDate ? new Date(nextEmiDate).toLocaleDateString() : 'N/A'}</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -424,7 +441,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                      <div className="bg-gray-50 p-6 rounded-lg border">
                          <div className="flex justify-between mb-2 text-sm">
                            <span>Paid to Date: {formatCurrency(totalPaidToDate)}</span>
-                           <span>Total Projected Cost (Principal + Interest): {formatCurrency(totalProjectedCost)}</span>
+                           <span>Total Projected Cost (Principal + Interest): {formatCurrency(originalLoanAmount + projectedTotalInterest)}</span>
                          </div>
                          <Progress value={totalCostProgress} />
                          <p className="text-center text-sm text-gray-500 mt-2">{totalCostProgress.toFixed(1)}% of total lifetime cost paid</p>
@@ -502,15 +519,15 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                     <div className="bg-green-50 p-6 rounded-lg border border-green-200">
                         <h3 className="text-xl font-semibold mb-4 text-green-800">Extra Monthly Payments</h3>
                         <div className="space-y-4">
-                            {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <p><span className="font-bold">Pay an extra {formatCurrency(50)} per month:</span><br/>🕐 Pay off <strong>{whatIf50.monthsSaved.toFixed(0)} months sooner</strong><br/>💰 Save <strong className="text-green-600">{formatCurrency(whatIf50.interestSaved)}</strong> in interest.</p>}
-                            {isFinite(whatIf50.months) && whatIf50.monthsSaved > 0 && <hr className="border-gray-300"/>}
-                            {isFinite(whatIf100.months) && whatIf100.monthsSaved > 0 && <p><span className="font-bold">Pay an extra {formatCurrency(100)} per month:</span><br/>🕐 Pay off <strong>{whatIf100.monthsSaved.toFixed(0)} months sooner</strong><br/>💰 Save <strong className="text-green-600">{formatCurrency(whatIf100.interestSaved)}</strong> in interest.</p>}
+                            {isFinite(whatIf5Percent.months) && whatIf5Percent.monthsSaved > 0 && <p><span className="font-bold">Pay an extra {formatCurrency(extraPayment5Percent)} per month (5% of EMI):</span><br/>🕐 Pay off <strong>{whatIf5Percent.monthsSaved.toFixed(0)} months sooner</strong><br/>💰 Save <strong className="text-green-600">{formatCurrency(whatIf5Percent.interestSaved)}</strong> in interest.</p>}
+                            {isFinite(whatIf10Percent.months) && whatIf10Percent.interestSaved > 0 && <hr className="border-gray-300"/>}
+                            {isFinite(whatIf10Percent.months) && whatIf10Percent.monthsSaved > 0 && <p><span className="font-bold">Pay an extra {formatCurrency(extraPayment10Percent)} per month (10% of EMI):</span><br/>🕐 Pay off <strong>{whatIf10Percent.monthsSaved.toFixed(0)} months sooner</strong><br/>💰 Save <strong className="text-green-600">{formatCurrency(whatIf10Percent.interestSaved)}</strong> in interest.</p>}
                         </div>
                     </div>
                      <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
                         <h3 className="text-xl font-semibold mb-4 text-orange-800">Lump-Sum Payment</h3>
                         <div className="space-y-4">
-                             {isFinite(whatIf500Lump.months) && whatIf500Lump.monthsSaved > 0 && <p><span className="font-bold">Make a one-time {formatCurrency(500)} payment:</span><br/>🕐 Shorten loan by <strong>{whatIf500Lump.monthsSaved.toFixed(0)} months</strong><br/>💰 Save <strong className="text-orange-600">{formatCurrency(whatIf500Lump.interestSaved)}</strong> in interest.</p>}
+                             {isFinite(whatIf1PercentLump.months) && whatIf1PercentLump.monthsSaved > 0 && <p><span className="font-bold">Make a one-time {formatCurrency(lumpSum1Percent)} payment (1% of balance):</span><br/>🕐 Shorten loan by <strong>{whatIf1PercentLump.monthsSaved.toFixed(0)} months</strong><br/>💰 Save <strong className="text-orange-600">{formatCurrency(whatIf1PercentLump.interestSaved)}</strong> in interest.</p>}
                         </div>
                     </div>
                 </div>
@@ -559,7 +576,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                 <div className="bg-gray-50 p-6 rounded-lg border mb-12">
                      <h3 className="text-xl font-bold text-gray-800 mb-4">Based on your report, here are your next steps:</h3>
                     <ul className="space-y-4 text-lg">
-                       {isFinite(whatIf50.interestSaved) && whatIf50.interestSaved > 200 && <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Schedule an extra <strong>{formatCurrency(50)}</strong> payment this month. This can save you over <strong>{formatCurrency(whatIf50.interestSaved)}!</strong></span></li>}
+                       {isFinite(whatIf5Percent.interestSaved) && whatIf5Percent.interestSaved > 20 && <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Schedule an extra <strong>{formatCurrency(extraPayment5Percent)}</strong> payment this month. This can save you over <strong>{formatCurrency(whatIf5Percent.interestSaved)}!</strong></span></li>}
                         <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Set up payment reminders for your due date to avoid late fees.</span></li>
                         <li className="flex gap-3"><Check className="text-green-500 w-6 h-6 shrink-0 mt-1" /><span>Use your Tracker Pro account to set a custom payoff goal.</span></li>
                     </ul>
@@ -648,3 +665,4 @@ export default function ReportTemplate({ reportData }: ReportTemplateProps) {
     
 
   
+
