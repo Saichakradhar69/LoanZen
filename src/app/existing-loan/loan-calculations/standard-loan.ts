@@ -192,6 +192,33 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
 
     const originalLoanAmount = disbursements.reduce((acc, d) => acc + d.amount, 0);
 
+     // --- Project remaining interest ---
+    let futureBalance = balance;
+    let remainingInterest = 0;
+    let projectionDate = asOfDate;
+    
+    if (futureBalance > 0 && emiAmount > 0) {
+        while (futureBalance > 0) {
+            const monthlyInterestRate = currentRate / 100 / 12;
+            const interestPortion = futureBalance * monthlyInterestRate;
+
+            if (emiAmount <= interestPortion) {
+                remainingInterest = Infinity; // Loan will never be paid off
+                break;
+            }
+
+            remainingInterest += interestPortion;
+            const principalPortion = emiAmount - interestPortion;
+            futureBalance -= principalPortion;
+
+            projectionDate = add(projectionDate, { months: 1 });
+            if (differenceInDays(projectionDate, asOfDate) > 365 * 40) { // 40 year safety break
+                remainingInterest = Infinity;
+                break;
+            }
+        }
+    }
+
     return {
         outstandingBalance: balance,
         interestPaidToDate: totalInterestPaid,
@@ -204,5 +231,6 @@ export function calculateStandardLoan(data: ExistingLoanFormData): CalculationRe
         perDayInterest,
         schedule,
         emiAmount,
+        projectedTotalInterest: totalInterestPaid + (isFinite(remainingInterest) ? remainingInterest : 0)
     };
 }

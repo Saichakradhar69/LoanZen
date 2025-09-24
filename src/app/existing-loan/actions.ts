@@ -28,6 +28,7 @@ export type CalculationResult = {
     perDayInterest: number;
     schedule: Transaction[];
     emiAmount?: number;
+    projectedTotalInterest: number;
 }
 
 const disbursementSchema = z.object({
@@ -62,11 +63,8 @@ const formSchema = z.object({
     // For standard loans, require original amount OR disbursements, plus EMI details.
     if (['personal', 'car', 'home'].includes(data.loanType)) {
         if ((!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: "Either Original Loan Amount or at least one Disbursement is required.",
-                path: ["originalLoanAmount"],
-            });
+            // This is now a soft requirement. If disbursements are provided, original amount is not needed.
+            // No issue added here, but the logic in the form should guide the user.
         }
         if (!data.emiAmount || data.emiAmount <= 0) {
             ctx.addIssue({
@@ -86,11 +84,7 @@ const formSchema = z.object({
 
     // For education loans, require original amount OR disbursements.
     if (data.loanType === 'education' && (!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
-        ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            message: "Either Original Loan Amount or at least one Disbursement is required for Education Loans.",
-            path: ["originalLoanAmount"],
-        });
+         // This is now a soft requirement.
     }
     
     if (data.loanType === 'education' && (data.moratoriumInterestType === 'partial' || data.moratoriumInterestType === 'fixed') && (!data.moratoriumPaymentAmount || data.moratoriumPaymentAmount <= 0)) {
