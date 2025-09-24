@@ -39,14 +39,30 @@ function calculateAmortization(loanAmount: number, annualInterestRate: number, l
   const monthlyInterestRate = annualInterestRate / 100 / 12;
   const numberOfPayments = loanTermYears * 12;
   
-  // Use BigInt for calculations to handle large numbers and precision
-  const loanAmountInCents = BigInt(Math.round(loanAmount * 100));
-
+  if (monthlyInterestRate <= 0) {
+    const monthlyPayment = loanAmount / numberOfPayments;
+    const amortizationSchedule = [];
+    for (let i = 1; i <= numberOfPayments; i++) {
+        amortizationSchedule.push({
+            month: i,
+            monthlyPayment: monthlyPayment,
+            principal: monthlyPayment,
+            interest: 0,
+            remainingBalance: loanAmount - (monthlyPayment * i)
+        });
+    }
+    return {
+        monthlyPayment: monthlyPayment,
+        totalInterest: 0,
+        totalPayment: loanAmount,
+        amortizationSchedule,
+    };
+  }
+  
   const powerTerm = Math.pow(1 + monthlyInterestRate, numberOfPayments);
   
   if (!isFinite(powerTerm)) {
     console.error("Calculation failed: Math.pow resulted in Infinity. Check inputs.");
-    // Return a sensible default or throw an error
     return {
       monthlyPayment: 0,
       totalInterest: 0,
@@ -55,35 +71,38 @@ function calculateAmortization(loanAmount: number, annualInterestRate: number, l
     };
   }
 
-  // Perform calculation using floating point numbers first, then convert to BigInt to avoid precision loss on intermediate steps
-  const monthlyPaymentFloat = (loanAmount * monthlyInterestRate * powerTerm) / (powerTerm - 1);
-  const monthlyPaymentInCents = BigInt(Math.round(monthlyPaymentFloat * 100));
+  const monthlyPayment = (loanAmount * monthlyInterestRate * powerTerm) / (powerTerm - 1);
 
-  let remainingBalanceInCents = loanAmountInCents;
-  let totalInterestInCents = BigInt(0);
+  let balance = loanAmount;
+  let totalInterest = 0;
   const amortizationSchedule: AmortizationData[] = [];
 
   for (let month = 1; month <= numberOfPayments; month++) {
-    const interestInCents = remainingBalanceInCents * BigInt(Math.round(monthlyInterestRate * 1000000)) / BigInt(1000000);
-    const principalInCents = monthlyPaymentInCents - interestInCents;
+    const interest = balance * monthlyInterestRate;
+    // For the last payment, the principal is the remaining balance
+    const principal = (month === numberOfPayments) ? balance : monthlyPayment - interest;
     
-    remainingBalanceInCents -= principalInCents;
-    totalInterestInCents += interestInCents;
+    const actualPayment = principal + interest;
+    balance -= principal;
+    totalInterest += interest;
 
     amortizationSchedule.push({
       month,
-      monthlyPayment: parseFloat((Number(monthlyPaymentInCents) / 100).toFixed(2)),
-      principal: parseFloat((Number(principalInCents) / 100).toFixed(2)),
-      interest: parseFloat((Number(interestInCents) / 100).toFixed(2)),
-      remainingBalance: parseFloat(Math.abs(Number(remainingBalanceInCents) / 100).toFixed(2)),
+      monthlyPayment: parseFloat(actualPayment.toFixed(2)),
+      principal: parseFloat(principal.toFixed(2)),
+      interest: parseFloat(interest.toFixed(2)),
+      remainingBalance: parseFloat(Math.abs(balance).toFixed(2)),
     });
+     // Safety break if balance is paid off
+    if (balance <= 0) break;
   }
 
-  const totalInterest = Number(totalInterestInCents) / 100;
+  const finalTotalPayment = loanAmount + totalInterest;
+
   return {
-    monthlyPayment: parseFloat((Number(monthlyPaymentInCents)/100).toFixed(2)),
+    monthlyPayment: parseFloat(monthlyPayment.toFixed(2)),
     totalInterest: parseFloat(totalInterest.toFixed(2)),
-    totalPayment: parseFloat((loanAmount + totalInterest).toFixed(2)),
+    totalPayment: parseFloat(finalTotalPayment.toFixed(2)),
     amortizationSchedule,
   };
 }
