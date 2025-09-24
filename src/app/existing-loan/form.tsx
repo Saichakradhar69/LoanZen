@@ -49,13 +49,14 @@ const formSchema = z.object({
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
     emisPaid: z.coerce.number().min(0, "EMI periods passed cannot be negative.").optional(),
+    missedEmis: z.coerce.number().min(0, "Missed EMIs cannot be negative.").optional(),
 }).superRefine((data, ctx) => {
-    // For standard loans, require original amount, EMI, and EMIs paid.
+    // For standard loans, require original amount OR disbursements, plus EMI details.
     if (['personal', 'car', 'home'].includes(data.loanType)) {
-        if (!data.originalLoanAmount || data.originalLoanAmount <= 0) {
+        if ((!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "Original Loan Amount is required for this loan type.",
+                message: "Either Original Loan Amount or at least one Disbursement is required.",
                 path: ["originalLoanAmount"],
             });
         }
@@ -69,13 +70,13 @@ const formSchema = z.object({
         if (data.emisPaid === undefined || data.emisPaid < 0) {
              ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "Number of EMI periods passed is required for this loan type.",
+                message: "Number of EMIs Already Paid is required for this loan type.",
                 path: ["emisPaid"],
             });
         }
     }
 
-    // For education loans, either an original amount or disbursements must be provided.
+    // For education loans, require original amount OR disbursements.
     if (data.loanType === 'education' && (!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -89,6 +90,14 @@ const formSchema = z.object({
             code: z.ZodIssueCode.custom,
             message: "A payment amount is required for this moratorium type.",
             path: ["moratoriumPaymentAmount"],
+        });
+    }
+
+    if (data.missedEmis && data.emisPaid !== undefined && data.missedEmis > data.emisPaid) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Missed EMIs cannot be greater than total EMIs paid.",
+            path: ["missedEmis"],
         });
     }
 });
@@ -117,6 +126,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             moratoriumInterestType: 'none',
             moratoriumPaymentAmount: undefined,
             emisPaid: undefined,
+            missedEmis: 0,
             disbursements: [],
             rateChanges: []
         },
@@ -146,11 +156,11 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
 
-    const isOriginalAmountDisabled = loanType === 'education' && disbursements && disbursements.length > 0;
+    const isOriginalAmountDisabled = disbursements && disbursements.length > 0;
 
     const renderCommonFields = () => (
         <>
-            {loanType !== 'education' || !isOriginalAmountDisabled ? (
+            {!isOriginalAmountDisabled ? (
                 <FormField control={form.control} name="originalLoanAmount" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Original Loan Amount</FormLabel>
@@ -324,6 +334,14 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                                 <FormMessage />
                             </FormItem>
                         )} />
+                         <FormField control={form.control} name="missedEmis" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Number of Missed EMIs</FormLabel>
+                                <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
+                                <FormDescription>Of the total EMIs passed, how many were missed?</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
                         <FormField control={form.control} name="moratoriumPeriod" render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Moratorium Period (in months)</FormLabel>
@@ -384,21 +402,30 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                                 )}
                             </div>
                         )}
-                        {renderDisbursements()}
                     </div>
                 );
             case 'personal':
             case 'car':
             case 'home':
                  return (
-                    <FormField control={form.control} name="emisPaid" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Number of EMIs Already Paid</FormLabel>
-                            <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
-                             <FormDescription>Total # of payments you have made.</FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
+                    <div className="space-y-6">
+                        <FormField control={form.control} name="emisPaid" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Number of EMIs Already Paid</FormLabel>
+                                <FormControl><Input type="number" placeholder="e.g., 12" {...field} value={field.value ?? ''} /></FormControl>
+                                <FormDescription>Total # of payments you have made.</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                        <FormField control={form.control} name="missedEmis" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Number of Missed EMIs</FormLabel>
+                                <FormControl><Input type="number" placeholder="e.g., 2" {...field} value={field.value ?? ''} /></FormControl>
+                                <FormDescription>Of the total EMIs passed, how many were missed?</FormDescription>
+                                <FormMessage />
+                            </FormItem>
+                        )} />
+                    </div>
                  );
             default:
                 return null;
@@ -438,6 +465,11 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                         <div className="space-y-6 pt-4 border-t">
                             <h3 className="text-lg font-medium text-primary">Loan-Specific Details</h3>
                             {renderLoanSpecificFields()}
+                        </div>
+
+                        <div className="space-y-6 pt-4 border-t">
+                            <h3 className="text-lg font-medium text-primary">Advanced Details</h3>
+                             {renderDisbursements()}
                              {rateType === 'floating' && (
                                 <div className="pt-6 border-t">
                                     {renderFloatingRateHistory()}

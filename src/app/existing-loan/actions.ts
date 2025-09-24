@@ -57,13 +57,14 @@ const formSchema = z.object({
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
     emisPaid: z.coerce.number().min(0, "EMI periods passed cannot be negative.").optional(),
+    missedEmis: z.coerce.number().min(0, "Missed EMIs cannot be negative.").optional(),
 }).superRefine((data, ctx) => {
-    // For standard loans, require original amount, EMI, and EMIs paid.
+    // For standard loans, require original amount OR disbursements, plus EMI details.
     if (['personal', 'car', 'home'].includes(data.loanType)) {
-        if (!data.originalLoanAmount || data.originalLoanAmount <= 0) {
+        if ((!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
             ctx.addIssue({
                 code: z.ZodIssueCode.custom,
-                message: "Original Loan Amount is required for this loan type.",
+                message: "Either Original Loan Amount or at least one Disbursement is required.",
                 path: ["originalLoanAmount"],
             });
         }
@@ -83,7 +84,7 @@ const formSchema = z.object({
         }
     }
 
-    // For education loans, either an original amount or disbursements must be provided.
+    // For education loans, require original amount OR disbursements.
     if (data.loanType === 'education' && (!data.originalLoanAmount || data.originalLoanAmount <= 0) && (!data.disbursements || data.disbursements.length === 0)) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -97,6 +98,14 @@ const formSchema = z.object({
             code: z.ZodIssueCode.custom,
             message: "A payment amount is required for this moratorium type.",
             path: ["moratoriumPaymentAmount"],
+        });
+    }
+
+    if (data.missedEmis && data.emisPaid !== undefined && data.missedEmis > data.emisPaid) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Missed EMIs cannot be greater than total EMIs paid.",
+            path: ["missedEmis"],
         });
     }
 });
