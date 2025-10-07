@@ -240,7 +240,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                      <div className="space-y-4 text-center">
                         {isFinite(whatIf5Percent.months) && whatIf5Percent.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(extraPayment5Percent)}/month</strong> (5% of EMI), you will be debt-free <strong>{whatIf5Percent.monthsSaved.toFixed(0)} months sooner</strong> and save <strong>{formatCurrency(whatIf5Percent.interestSaved)}</strong> in interest.</p>}
                         {isFinite(whatIf10Percent.months) && whatIf10Percent.monthsSaved > 0 && <p>If you pay an extra <strong>{formatCurrency(extraPayment10Percent)}/month</strong> (10% of EMI), you will be debt-free <strong>{whatIf10Percent.monthsSaved.toFixed(0)} months sooner</strong> and save <strong>{formatCurrency(whatIf10Percent.interestSaved)}</strong> in interest.</p>}
-                         {isFinite(whatIf1PercentLump.months) && whatIf1PercentLump.monthsSaved > 0 && <p>If you make a one-time lump-sum payment of <strong>{formatCurrency(lumpSum1Percent)}</strong> (1% of loan), you will save <strong>{formatCurrency(whatIf1PercentLump.interestSaved)}</strong> in interest.</p>}
+                         {isFinite(whatIf1PercentLump.interestSaved) && whatIf1PercentLump.interestSaved > 0 && <p>If you make a one-time lump-sum payment of <strong>{formatCurrency(lumpSum1Percent)}</strong> (1% of loan), you will save <strong>{formatCurrency(whatIf1PercentLump.interestSaved)}</strong> in interest.</p>}
                     </div>
                 </div>
             </div>
@@ -534,7 +534,7 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                      <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
                         <h3 className="text-xl font-semibold mb-4 text-orange-800">Lump-Sum Payment</h3>
                         <div className="space-y-4">
-                             {isFinite(whatIf1PercentLump.months) && whatIf1PercentLump.monthsSaved > 0 && <p><span className="font-bold">Make a one-time {formatCurrency(lumpSum1Percent)} payment (1% of balance):</span><br/>🕐 Shorten loan by <strong>{whatIf1PercentLump.monthsSaved.toFixed(0)} months</strong><br/>💰 Save <strong className="text-orange-600">{formatCurrency(whatIf1PercentLump.interestSaved)}</strong> in interest.</p>}
+                             {isFinite(whatIf1PercentLump.interestSaved) && whatIf1PercentLump.interestSaved > 0 && <p><span className="font-bold">Make a one-time {formatCurrency(lumpSum1Percent)} payment (1% of balance):</span><br/>🕐 Shorten loan by <strong>{whatIf1PercentLump.monthsSaved.toFixed(0)} months</strong><br/>💰 Save <strong className="text-orange-600">{formatCurrency(whatIf1PercentLump.interestSaved)}</strong> in interest.</p>}
                         </div>
                     </div>
                 </div>
@@ -674,3 +674,6 @@ export default function ReportTemplate({ reportData }: ReportDataType) {
   
 
 
+
+
+    
