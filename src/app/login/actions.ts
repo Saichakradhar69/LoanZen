@@ -2,7 +2,7 @@
 
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { redirect } from 'next/navigation';
-import { initializeFirebase } from "@/firebase";
+import { initializeFirebase } from "@/firebase/server";
 
 export async function loginAction(
   prevState: any,

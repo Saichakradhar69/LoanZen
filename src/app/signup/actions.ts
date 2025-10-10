@@ -6,7 +6,7 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { redirect } from 'next/navigation';
-import { initializeFirebase } from '@/firebase';
+import { initializeFirebase } from '@/firebase/server';
 import { setDoc, doc } from 'firebase/firestore';
 
 export async function signupAction(prevState: any, formData: FormData) {
@@ -15,9 +15,6 @@ export async function signupAction(prevState: any, formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
 
-  console.log('Attempting signup with:', { firstName, lastName, email });
-
-  // Correctly initialize Firebase services once
   const { auth, firestore } = initializeFirebase();
 
   try {
@@ -43,13 +40,7 @@ export async function signupAction(prevState: any, formData: FormData) {
       createdAt: new Date(),
     });
 
-    console.log('✅ Signup successful! User created:', user.uid);
-
   } catch (error: any) {
-    console.error('❌ Signup failed:');
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
-    
     let userMessage = 'An unexpected error occurred. Please try again.';
     
     switch (error.code) {
