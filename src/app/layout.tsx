@@ -30,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${ptSans.variable} ${playfairDisplay.variable} dark`}>
-      <body className="font-body antialiased">
+      <body>
         <FirebaseClientProvider>
           <div className="flex flex-col min-h-screen">
             <Header />

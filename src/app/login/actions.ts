@@ -1,6 +1,6 @@
 'use server';
 
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithEmailAndPassword } from "firebase/auth";
 import { redirect } from 'next/navigation';
 import { initializeFirebase } from "@/firebase/server";
 
