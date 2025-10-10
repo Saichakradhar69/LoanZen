@@ -7,7 +7,7 @@ import {
 } from 'firebase/auth';
 import { redirect } from 'next/navigation';
 import { initializeFirebase } from '@/firebase';
-import { getFirestore, setDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, setDoc, doc } from 'firebase/firestore';
 
 export async function signupAction(prevState: any, formData: FormData) {
   const firstName = formData.get('first-name') as string;
@@ -28,21 +28,15 @@ export async function signupAction(prevState: any, formData: FormData) {
     await updateProfile(user, {
       displayName: `${firstName} ${lastName}`,
     });
-
+    
     const userDocRef = doc(firestore, 'users', user.uid);
 
-    const trialEnds = new Date();
-    trialEnds.setDate(trialEnds.getDate() + 14);
-
-    // Use the non-blocking set operation and let the error boundary catch issues
+    // This is a non-blocking call, but for the signup flow, we want to ensure it completes.
     await setDoc(userDocRef, {
       email: user.email,
       displayName: `${firstName} ${lastName}`,
-      subscriptionStatus: 'trial',
-      trialEnds: trialEnds,
-      createdAt: serverTimestamp(),
-      lastLogin: serverTimestamp(),
     });
+
   } catch (error: any) {
     let message = 'An unexpected error occurred.';
     // Provide more specific feedback based on the Firebase error code.
