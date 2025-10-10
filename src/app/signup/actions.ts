@@ -3,7 +3,6 @@
 
 import {
   createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
 import { redirect } from 'next/navigation';
@@ -12,21 +11,18 @@ import { setDoc, doc, getDoc } from 'firebase/firestore';
 
 async function ensureUserDocument(user: any, firestore: any, firstName: string, lastName: string) {
     const userDocRef = doc(firestore, 'users', user.uid);
-    const userDoc = await getDoc(userDocRef);
-
-    if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
-            email: user.email,
-            displayName: `${firstName} ${lastName}`,
-            subscriptionStatus: 'trial',
-            trialEnds: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-            createdAt: new Date(),
-        });
-        if (user.displayName !== `${firstName} ${lastName}`) {
-          await updateProfile(user, {
-            displayName: `${firstName} ${lastName}`,
-          });
-        }
+    // No need to check if it exists, we are creating it on signup.
+    await setDoc(userDocRef, {
+        email: user.email,
+        displayName: `${firstName} ${lastName}`,
+        subscriptionStatus: 'trial',
+        trialEnds: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+        createdAt: new Date(),
+    });
+    if (user.displayName !== `${firstName} ${lastName}`) {
+      await updateProfile(user, {
+        displayName: `${firstName} ${lastName}`,
+      });
     }
 }
 
@@ -54,25 +50,11 @@ export async function signupAction(prevState: any, formData: FormData) {
     await ensureUserDocument(user, firestore, firstName, lastName);
 
   } catch (error: any) {
-    // If the error is that the email is already in use, try to sign in instead.
-    if (error.code === 'auth/email-already-in-use') {
-        try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
-            await ensureUserDocument(userCredential.user, firestore, firstName, lastName);
-            // On successful login, redirect to the dashboard.
-            redirect('/dashboard');
-        } catch (loginError: any) {
-             let userMessage = 'An unexpected error occurred during login. Please try again.';
-             if (loginError.code === 'auth/wrong-password' || loginError.code === 'auth/invalid-credential') {
-                userMessage = "This email is already registered, but the password you entered is incorrect.";
-             }
-             return { type: 'error', message: userMessage };
-        }
-    }
-    
-    // Handle other signup errors
     let userMessage = 'An unexpected error occurred. Please try again.';
     switch (error.code) {
+      case 'auth/email-already-in-use':
+        userMessage = 'This email is already registered. Please use the login page.';
+        break;
       case 'auth/invalid-email':
         userMessage = 'The email address is not valid.';
         break;
@@ -93,4 +75,3 @@ export async function signupAction(prevState: any, formData: FormData) {
   // Redirect to the dashboard on successful signup
   redirect('/dashboard');
 }
-
