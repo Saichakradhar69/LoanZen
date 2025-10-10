@@ -16,7 +16,6 @@ export async function signupAction(prevState: any, formData: FormData) {
   const password = formData.get('password') as string;
 
   try {
-    // Initialize Firebase once and get all required services.
     const { auth, firestore } = initializeFirebase();
 
     const userCredential = await createUserWithEmailAndPassword(
@@ -26,17 +25,16 @@ export async function signupAction(prevState: any, formData: FormData) {
     );
     const user = userCredential.user;
 
-    // Update user profile display name
     await updateProfile(user, {
       displayName: `${firstName} ${lastName}`,
     });
 
-    // Add user document to Firestore
     const userDocRef = doc(firestore, 'users', user.uid);
 
     const trialEnds = new Date();
     trialEnds.setDate(trialEnds.getDate() + 14);
 
+    // Use the non-blocking set operation and let the error boundary catch issues
     await setDoc(userDocRef, {
       email: user.email,
       displayName: `${firstName} ${lastName}`,
@@ -47,12 +45,13 @@ export async function signupAction(prevState: any, formData: FormData) {
     });
   } catch (error: any) {
     let message = 'An unexpected error occurred.';
+    // Provide more specific feedback based on the Firebase error code.
     if (error.code === 'auth/email-already-in-use') {
-      message = 'This email address is already in use.';
+      message = 'This email address is already in use by another account.';
     } else if (error.code === 'auth/weak-password') {
-      message = 'The password is too weak. Please use at least 6 characters.';
+      message = 'The password is too weak. It must be at least 6 characters long.';
     } else if (error.code === 'auth/invalid-email') {
-      message = 'Please enter a valid email address.';
+      message = 'The email address is not valid.';
     }
     console.error('Signup Error:', error.code, error.message);
     return { type: 'error', message };
