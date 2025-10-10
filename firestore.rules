@@ -1,0 +1,128 @@
+/**
+ * @fileOverview
+ * This ruleset enforces a strict user-ownership model for all data within the LoanZen application.
+ * All data (user profiles, loans, payments, rate histories) is nested under the `/users/{userId}` path,
+ * ensuring that only the authenticated user can access their own data.
+ *
+ * Data Structure:
+ * - /users/{userId}: Stores user profiles.
+ * - /users/{userId}/loans/{loanId}: Stores loan details for a specific user.
+ * - /users/{userId}/loans/{loanId}/payments/{paymentId}: Stores payment history for a specific loan.
+ * - /users/{userId}/loans/{loanId}/rateHistory/{rateId}: Stores rate history for a specific loan.
+ *
+ * Key Security Decisions:
+ * - User data is strictly isolated and only accessible to the owning user.
+ * - All read and write operations are protected by ownership checks.
+ * - `list` operations are only allowed for the owner of the data.
+ * - Data consistency is enforced between the path and internal document fields (userId, loanId) on create and update.
+ *
+ * Denormalization for Authorization:
+ * - The `Loan` documents contain a `userId` field, allowing for direct ownership checks without additional `get()` calls.
+ * - The `Payment` documents contain a `loanId` field, allowing for direct association with the parent loan.
+ * - The `RateHistory` documents contain a `loanId` field, allowing for direct association with the parent loan.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /**
+     * @description Controls access to user profiles. Only the authenticated user can read or modify their own profile.
+     * @path /users/{userId}
+     * @allow (create) - User with ID 'user_abc' can create their profile: `request.auth.uid == 'user_abc'`
+     * @allow (get, update, delete) - User with ID 'user_abc' can read, update, or delete their profile.
+     * @deny (create) - User with ID 'user_xyz' cannot create a profile with ID 'user_abc': `request.auth.uid != 'user_abc'`
+     * @deny (get, update, delete) - User with ID 'user_xyz' cannot read, update, or delete profile 'user_abc'.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+      function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if false;
+
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && resource.data.id == request.resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to loan documents for a specific user. Only the authenticated user can read or modify their own loans.
+     * @path /users/{userId}/loans/{loanId}
+     * @allow (create) - User with ID 'user_abc' can create a loan with userId = 'user_abc'.
+     * @allow (get, list, update, delete) - User with ID 'user_abc' can read, list, update, or delete their own loan.
+     * @deny (create) - User with ID 'user_xyz' cannot create a loan with userId = 'user_abc'.
+     * @deny (get, list, update, delete) - User with ID 'user_xyz' cannot read, list, update, or delete a loan belonging to 'user_abc'.
+     * @principle Enforces document ownership and validates the loan's `userId` against the path.
+     */
+    match /users/{userId}/loans/{loanId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+       function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && resource.data.userId == request.resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to payment documents for a specific loan. Only the authenticated user (loan owner) can read or modify payments.
+     * @path /users/{userId}/loans/{loanId}/payments/{paymentId}
+     * @allow (create) - User with ID 'user_abc' can create a payment for loanId associated with userId = 'user_abc'.
+     * @allow (get, list, update, delete) - User with ID 'user_abc' can read, list, update, or delete their own loan payments.
+     * @deny (create) - User with ID 'user_xyz' cannot create a payment for a loanId associated with user 'user_abc'.
+     * @deny (get, list, update, delete) - User with ID 'user_xyz' cannot read, list, update, or delete payments for loans belonging to 'user_abc'.
+     * @principle Enforces document ownership and validates the payment's `loanId` association.
+     */
+    match /users/{userId}/loans/{loanId}/payments/{paymentId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+       function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) && get(/databases/$(database)/documents/users/$(userId)/loans/$(loanId)).data.userId == userId && request.resource.data.loanId == loanId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to rate history documents for a specific loan. Only the authenticated user (loan owner) can read or modify rate history.
+     * @path /users/{userId}/loans/{loanId}/rateHistory/{rateId}
+     * @allow (create) - User with ID 'user_abc' can create a rate history entry for loanId associated with userId = 'user_abc'.
+     * @allow (get, list, update, delete) - User with ID 'user_abc' can read, list, update, or delete rate history entries for their own loans.
+     * @deny (create) - User with ID 'user_xyz' cannot create a rate history entry for a loanId associated with user 'user_abc'.
+     * @deny (get, list, update, delete) - User with ID 'user_xyz' cannot read, list, update, or delete rate history entries for loans belonging to 'user_abc'.
+     * @principle Enforces document ownership and validates the rate history's `loanId` association.
+     */
+    match /users/{userId}/loans/{loanId}/rateHistory/{rateId} {
+      function isOwner(userId) {
+        return request.auth.uid == userId;
+      }
+       function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
+      }
+
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+
+      allow create: if isOwner(userId) && get(/databases/$(database)/documents/users/$(userId)/loans/$(loanId)).data.userId == userId && request.resource.data.loanId == loanId;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+  }
+}
