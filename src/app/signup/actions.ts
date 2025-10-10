@@ -1,13 +1,13 @@
+
 'use server';
 
 import {
-  getAuth,
   createUserWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
 import { redirect } from 'next/navigation';
 import { initializeFirebase } from '@/firebase';
-import { getFirestore, setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc } from 'firebase/firestore';
 
 export async function signupAction(prevState: any, formData: FormData) {
   const firstName = formData.get('first-name') as string;
@@ -15,9 +15,12 @@ export async function signupAction(prevState: any, formData: FormData) {
   const email = formData.get('email') as string;
   const password = formData.get('password') as string;
 
-  try {
-    const { auth, firestore } = initializeFirebase();
+  console.log('Attempting signup with:', { firstName, lastName, email });
 
+  // Correctly initialize Firebase services once
+  const { auth, firestore } = initializeFirebase();
+
+  try {
     const userCredential = await createUserWithEmailAndPassword(
       auth,
       email,
@@ -25,15 +28,13 @@ export async function signupAction(prevState: any, formData: FormData) {
     );
     const user = userCredential.user;
 
-    // Update the user's profile with their name
+    // Update the user's profile with their name in Firebase Auth
     await updateProfile(user, {
       displayName: `${firstName} ${lastName}`,
     });
     
-    // Create a new document in the 'users' collection with the user's UID
+    // Create the user's profile document in Firestore
     const userDocRef = doc(firestore, 'users', user.uid);
-
-    // Set the user's profile data in the document
     await setDoc(userDocRef, {
       email: user.email,
       displayName: `${firstName} ${lastName}`,
@@ -42,20 +43,36 @@ export async function signupAction(prevState: any, formData: FormData) {
       createdAt: new Date(),
     });
 
+    console.log('✅ Signup successful! User created:', user.uid);
+
   } catch (error: any) {
-    let message = 'An unexpected error occurred. Please try again.';
-    // Provide more specific feedback based on the Firebase error code.
-    if (error.code === 'auth/email-already-in-use') {
-      message = 'This email address is already in use by another account.';
-    } else if (error.code === 'auth/weak-password') {
-      message = 'The password is too weak. It must be at least 6 characters long.';
-    } else if (error.code === 'auth/invalid-email') {
-      message = 'The email address is not valid.';
+    console.error('❌ Signup failed:');
+    console.error('Error code:', error.code);
+    console.error('Error message:', error.message);
+    
+    let userMessage = 'An unexpected error occurred. Please try again.';
+    
+    switch (error.code) {
+      case 'auth/email-already-in-use':
+        userMessage = 'This email address is already in use by another account.';
+        break;
+      case 'auth/invalid-email':
+        userMessage = 'The email address is not valid.';
+        break;
+      case 'auth/operation-not-allowed':
+        userMessage = 'Email/password sign-up is not enabled for this project.';
+        break;
+      case 'auth/weak-password':
+        userMessage = 'The password is too weak. It must be at least 6 characters long.';
+        break;
+      default:
+        // Keep the generic message for other unexpected errors
+        break;
     }
-    console.error('Signup Error:', error.code, error.message);
-    return { type: 'error', message };
+    
+    return { type: 'error', message: userMessage };
   }
 
-  // Redirect to the dashboard on successful signup and profile creation
+  // Redirect to the dashboard on successful signup
   redirect('/dashboard');
 }
