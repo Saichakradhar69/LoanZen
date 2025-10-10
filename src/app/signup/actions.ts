@@ -4,14 +4,17 @@
 import {
   createUserWithEmailAndPassword,
   updateProfile,
+  signInWithEmailAndPassword,
 } from 'firebase/auth';
 import { redirect } from 'next/navigation';
 import { initializeFirebase } from '@/firebase/server';
 import { setDoc, doc, getDoc } from 'firebase/firestore';
+import { Auth, User } from 'firebase/auth';
+import { Firestore } from 'firebase/firestore';
 
-async function ensureUserDocument(user: any, firestore: any, firstName: string, lastName: string) {
+async function createUserDocument(user: User, firestore: Firestore, firstName: string, lastName: string) {
     const userDocRef = doc(firestore, 'users', user.uid);
-    // No need to check if it exists, we are creating it on signup.
+    // This function is only called on new user creation, so we don't need to check if it exists.
     await setDoc(userDocRef, {
         email: user.email,
         displayName: `${firstName} ${lastName}`,
@@ -19,13 +22,7 @@ async function ensureUserDocument(user: any, firestore: any, firstName: string, 
         trialEnds: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
         createdAt: new Date(),
     });
-    if (user.displayName !== `${firstName} ${lastName}`) {
-      await updateProfile(user, {
-        displayName: `${firstName} ${lastName}`,
-      });
-    }
 }
-
 
 export async function signupAction(prevState: any, formData: FormData) {
   const firstName = formData.get('first-name') as string;
@@ -43,11 +40,13 @@ export async function signupAction(prevState: any, formData: FormData) {
     );
     const user = userCredential.user;
 
+    // Update the profile in Firebase Auth first
     await updateProfile(user, {
       displayName: `${firstName} ${lastName}`,
     });
     
-    await ensureUserDocument(user, firestore, firstName, lastName);
+    // Then create the corresponding document in Firestore
+    await createUserDocument(user, firestore, firstName, lastName);
 
   } catch (error: any) {
     let userMessage = 'An unexpected error occurred. Please try again.';
@@ -65,10 +64,9 @@ export async function signupAction(prevState: any, formData: FormData) {
         userMessage = 'The password is too weak. It must be at least 6 characters long.';
         break;
       default:
-        // Keep the generic message for other unexpected errors
+        console.error("Signup Error:", error); // Log for debugging
         break;
     }
-    
     return { type: 'error', message: userMessage };
   }
 
