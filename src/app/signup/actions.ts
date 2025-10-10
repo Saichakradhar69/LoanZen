@@ -3,11 +3,33 @@
 
 import {
   createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
   updateProfile,
 } from 'firebase/auth';
 import { redirect } from 'next/navigation';
 import { initializeFirebase } from '@/firebase/server';
-import { setDoc, doc } from 'firebase/firestore';
+import { setDoc, doc, getDoc } from 'firebase/firestore';
+
+async function ensureUserDocument(user: any, firestore: any, firstName: string, lastName: string) {
+    const userDocRef = doc(firestore, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (!userDoc.exists()) {
+        await setDoc(userDocRef, {
+            email: user.email,
+            displayName: `${firstName} ${lastName}`,
+            subscriptionStatus: 'trial',
+            trialEnds: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+            createdAt: new Date(),
+        });
+        if (user.displayName !== `${firstName} ${lastName}`) {
+          await updateProfile(user, {
+            displayName: `${firstName} ${lastName}`,
+          });
+        }
+    }
+}
+
 
 export async function signupAction(prevState: any, formData: FormData) {
   const firstName = formData.get('first-name') as string;
@@ -25,28 +47,32 @@ export async function signupAction(prevState: any, formData: FormData) {
     );
     const user = userCredential.user;
 
-    // Update the user's profile with their name in Firebase Auth
     await updateProfile(user, {
       displayName: `${firstName} ${lastName}`,
     });
     
-    // Create the user's profile document in Firestore
-    const userDocRef = doc(firestore, 'users', user.uid);
-    await setDoc(userDocRef, {
-      email: user.email,
-      displayName: `${firstName} ${lastName}`,
-      subscriptionStatus: 'trial',
-      trialEnds: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
-      createdAt: new Date(),
-    });
+    await ensureUserDocument(user, firestore, firstName, lastName);
 
   } catch (error: any) {
-    let userMessage = 'An unexpected error occurred. Please try again.';
+    // If the error is that the email is already in use, try to sign in instead.
+    if (error.code === 'auth/email-already-in-use') {
+        try {
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            await ensureUserDocument(userCredential.user, firestore, firstName, lastName);
+            // On successful login, redirect to the dashboard.
+            redirect('/dashboard');
+        } catch (loginError: any) {
+             let userMessage = 'An unexpected error occurred during login. Please try again.';
+             if (loginError.code === 'auth/wrong-password' || loginError.code === 'auth/invalid-credential') {
+                userMessage = "This email is already registered, but the password you entered is incorrect.";
+             }
+             return { type: 'error', message: userMessage };
+        }
+    }
     
+    // Handle other signup errors
+    let userMessage = 'An unexpected error occurred. Please try again.';
     switch (error.code) {
-      case 'auth/email-already-in-use':
-        userMessage = 'This email address is already in use by another account.';
-        break;
       case 'auth/invalid-email':
         userMessage = 'The email address is not valid.';
         break;
@@ -67,3 +93,4 @@ export async function signupAction(prevState: any, formData: FormData) {
   // Redirect to the dashboard on successful signup
   redirect('/dashboard');
 }
+
