@@ -12,24 +12,12 @@
         },
         "email": {
           "type": "string",
-          "description": "User's email address.",
+          "description": "Email address of the user.",
           "format": "email"
         },
         "subscriptionStatus": {
           "type": "string",
-          "description": "The current subscription status of the user (e.g., 'free', 'one-time', 'tracker_pro')."
-        },
-        "stripeCustomerId": {
-          "type": "string",
-          "description": "The user's ID in Stripe, used for managing subscriptions and payments."
-        },
-        "firstName": {
-          "type": "string",
-          "description": "User's first name."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "User's last name."
+          "description": "The current subscription status of the user (e.g., free, one-time purchase, pro)."
         }
       },
       "required": [
@@ -42,7 +30,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Loan",
       "type": "object",
-      "description": "Represents a loan belonging to a user.",
+      "description": "Represents a loan associated with a user.",
       "properties": {
         "id": {
           "type": "string",
@@ -58,7 +46,7 @@
         },
         "interestRate": {
           "type": "number",
-          "description": "The annual interest rate of the loan."
+          "description": "The interest rate of the loan."
         },
         "disbursementDate": {
           "type": "string",
@@ -67,7 +55,7 @@
         },
         "loanType": {
           "type": "string",
-          "description": "The type of loan (e.g., 'fixed', 'floating')."
+          "description": "The type of loan (e.g., fixed, floating)."
         }
       },
       "required": [
@@ -83,7 +71,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Payment",
       "type": "object",
-      "description": "Represents a payment made towards a loan.",
+      "description": "Represents a payment made on a loan.",
       "properties": {
         "id": {
           "type": "string",
@@ -114,7 +102,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "RateHistory",
       "type": "object",
-      "description": "Represents a change in the interest rate of a floating rate loan.",
+      "description": "Represents a change in the interest rate for a floating rate loan.",
       "properties": {
         "id": {
           "type": "string",
@@ -126,7 +114,7 @@
         },
         "effectiveDate": {
           "type": "string",
-          "description": "The date the new interest rate became effective.",
+          "description": "The date the new rate became effective.",
           "format": "date-time"
         },
         "interestRate": {
@@ -157,11 +145,11 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profiles and subscription status.  Authorization is based on the `userId` path parameter.",
+          "description": "Stores user profiles. Includes the 'id', 'email', and 'subscriptionStatus' fields.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier for the user."
+              "description": "The unique identifier for the user, corresponding to the Firebase Auth UID."
             }
           ]
         }
@@ -173,11 +161,11 @@
           "schema": {
             "$ref": "#/backend/entities/Loan"
           },
-          "description": "Stores loan details for a specific user. Authorization is based on the `userId` path parameter. Includes denormalized 'userId' to maintain the principle of Authorization Independence, such that security rules do not require calling `get()` to ensure access to loan data.",
+          "description": "Stores loan details associated with a specific user. Includes denormalized 'subscriptionStatus' from the user document for authorization independence.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier for the user."
+              "description": "The unique identifier for the user owning the loan."
             },
             {
               "name": "loanId",
@@ -193,15 +181,15 @@
           "schema": {
             "$ref": "#/backend/entities/Payment"
           },
-          "description": "Stores payment history for a specific loan. Authorization is based on the `userId` path parameter. Includes denormalized 'loanId' to maintain the principle of Authorization Independence, such that security rules do not require calling `get()` to ensure access to payment data.",
+          "description": "Stores payment details for a specific loan owned by a user. Includes denormalized 'subscriptionStatus' from the user document and 'loanType' from the loan document for authorization independence.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier for the user."
+              "description": "The unique identifier for the user owning the loan and payment."
             },
             {
               "name": "loanId",
-              "description": "The unique identifier for the loan."
+              "description": "The unique identifier for the loan associated with the payment."
             },
             {
               "name": "paymentId",
@@ -217,15 +205,15 @@
           "schema": {
             "$ref": "#/backend/entities/RateHistory"
           },
-          "description": "Stores rate history for a specific loan. Authorization is based on the `userId` path parameter. Includes denormalized 'loanId' to maintain the principle of Authorization Independence, such that security rules do not require calling `get()` to ensure access to rate history data.",
+          "description": "Stores the rate history for a specific loan owned by a user. Includes denormalized 'subscriptionStatus' from the user document and 'loanType' from the loan document for authorization independence.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique identifier for the user."
+              "description": "The unique identifier for the user owning the loan and rate history."
             },
             {
               "name": "loanId",
-              "description": "The unique identifier for the loan."
+              "description": "The unique identifier for the loan associated with the rate history."
             },
             {
               "name": "rateId",
@@ -235,6 +223,6 @@
         }
       }
     ],
-    "reasoning": "The Firestore structure is designed to securely manage user data, loan information, payments, and rate history while prioritizing authorization independence and scalability. The design adheres to the principle of Authorization Independence by avoiding `get()` calls in security rules. This is achieved by denormalizing data where necessary, specifically by nesting data under user-owned paths. This structure ensures data isolation and efficient queries, while supporting the core features of the LoanZen application.\n\nThe `/users/{userId}` collection stores user profiles and subscription status. Loans, payments, and rate history are organized under the user's document to ensure that only the user has access to their data. This approach simplifies security rules and allows for atomic operations. For QAPs (Queries Are Not Filters), the path-based ownership (`/users/{userId}/loans/{loanId}`) ensures secure `list` operations; security rules can efficiently filter based on the user ID without requiring complex server-side filtering.\n\nDenormalization Strategy: The userId is present in Loan documents, ensuring authorization checks can be performed without needing to read the User document.\n\nQAPs Support: The design supports secure `list` operations because each subcollection is directly linked to its parent User via path-based ownership, enabling security rules to easily filter based on the user ID."
+    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the LoanZen application.  User data and their associated loans, payments, and rate histories are organized in a hierarchical structure under the `/users/{userId}` path. This enables simple, path-based security rules for user-owned data. Crucially, to achieve authorization independence, any authorization-relevant data from the user document (e.g., `subscriptionStatus`) that is needed to control access to loans, payments, or rate histories MUST be copied into these subcollections.  This denormalization avoids the need for `get()` calls in security rules, enabling atomic operations. For example, if a `pro` subscription is required to access detailed loan information, the `subscriptionStatus` should be copied into each `loan` document. This design supports QAPs (Rules are not Filters) because listing operations are always scoped to a user's data. Since the data is segregated by user ID, rules can efficiently enforce that a user can only access data under their own `/users/{userId}` path."
   }
 }
