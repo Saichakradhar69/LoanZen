@@ -54,7 +54,7 @@ export default function SignupPage() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="password">Password</Label>
-                <Input id="password" name="password" type="password" />
+                <Input id="password" name="password" type="password" required />
               </div>
 
                {state?.type === 'error' && (
