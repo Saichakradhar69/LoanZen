@@ -3,13 +3,24 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { ChevronDown, Menu } from 'lucide-react';
+import { ChevronDown, LogOut, Menu, User } from 'lucide-react';
 import Logo from '../logo';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useState } from 'react';
+import { useUser } from '@/firebase';
+import { getAuth, signOut } from 'firebase/auth';
 
 export default function Header() {
   const [currency, setCurrency] = useState('USD');
+  const { user, isUserLoading } = useUser();
+  const auth = getAuth();
+
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    // You might want to redirect the user to the homepage after logout
+    window.location.href = '/';
+  };
 
   const navLinks = [
     { href: '/', label: 'Home' },
@@ -64,12 +75,50 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
+           {user && (
+            <Link href="/dashboard" className="text-foreground/60 transition-colors hover:text-foreground/80">
+              Dashboard
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-2 ml-auto">
-          <Button size="sm" asChild>
-            <Link href="/calculator">Get Started</Link>
-          </Button>
+           {!isUserLoading && (
+            <>
+              {user ? (
+                 <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="secondary" size="icon" className="rounded-full">
+                      <User className="h-5 w-5" />
+                      <span className="sr-only">Toggle user menu</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                     <DropdownMenuSeparator />
+                    <DropdownMenuItem>
+                       <p className="text-sm text-muted-foreground">{user.email}</p>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout}>
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Log out</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <>
+                  <Button size="sm" variant="ghost" asChild>
+                    <Link href="/login">Login</Link>
+                  </Button>
+                  <Button size="sm" asChild>
+                    <Link href="/signup">Sign Up</Link>
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
