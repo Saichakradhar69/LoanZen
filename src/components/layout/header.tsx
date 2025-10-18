@@ -6,14 +6,20 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { ChevronDown, LogOut, Menu, User } from 'lucide-react';
 import Logo from '../logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useUser } from '@/firebase';
 import { getAuth, signOut } from 'firebase/auth';
+import ClientOnly from '../ClientOnly';
 
 export default function Header() {
   const [currency, setCurrency] = useState('USD');
+  const [isMounted, setIsMounted] = useState(false);
   const { user, isUserLoading } = useUser();
   const auth = getAuth();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
 
   const handleLogout = async () => {
@@ -83,41 +89,52 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2 ml-auto">
-           {!isUserLoading && (
+          <ClientOnly fallback={
             <>
-              {user ? (
-                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="secondary" size="icon" className="rounded-full">
-                      <User className="h-5 w-5" />
-                      <span className="sr-only">Toggle user menu</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                     <DropdownMenuSeparator />
-                    <DropdownMenuItem>
-                       <p className="text-sm text-muted-foreground">{user.email}</p>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout}>
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <span>Log out</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : (
-                <>
-                  <Button size="sm" variant="ghost" asChild>
-                    <Link href="/login">Login</Link>
-                  </Button>
-                  <Button size="sm" asChild>
-                    <Link href="/signup">Sign Up</Link>
-                  </Button>
-                </>
-              )}
+              <Button size="sm" variant="ghost" asChild>
+                <Link href="/login">Login</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link href="/signup">Sign Up</Link>
+              </Button>
             </>
-          )}
+          }>
+            {!isUserLoading && (
+              <>
+                {user ? (
+                   <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="secondary" size="icon" className="rounded-full">
+                        <User className="h-5 w-5" />
+                        <span className="sr-only">Toggle user menu</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                       <DropdownMenuSeparator />
+                      <DropdownMenuItem>
+                         <p className="text-sm text-muted-foreground">{user.email}</p>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleLogout}>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Log out</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : (
+                  <>
+                    <Button size="sm" variant="ghost" asChild>
+                      <Link href="/login">Login</Link>
+                    </Button>
+                    <Button size="sm" asChild>
+                      <Link href="/signup">Sign Up</Link>
+                    </Button>
+                  </>
+                )}
+              </>
+            )}
+          </ClientOnly>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

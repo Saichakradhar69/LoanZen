@@ -1,10 +1,15 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, Check, Download, Globe, Lock, PenSquare, X, Zap } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useHydrationSafe } from '@/hooks/use-hydration-safe';
 
 export default function HomePage() {
+  useHydrationSafe();
+  
   return (
     <div className="flex flex-col dark">
       {/* Hero Section */}

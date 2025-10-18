@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/toaster';
 import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import NoSSR from '@/components/NoSSR';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -29,14 +30,66 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${ptSans.variable} ${playfairDisplay.variable} dark`}>
-      <body>
+    <html lang="en" className={`${ptSans.variable} ${playfairDisplay.variable} dark`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Aggressive cleanup of browser extension attributes
+              (function() {
+                const extensionAttrs = ['bis_register', '__processed_', 'bis_skin_checked', 'data-bis-*'];
+                
+                function removeExtensionAttrs() {
+                  const allElements = document.querySelectorAll('*');
+                  allElements.forEach(el => {
+                    if (el instanceof HTMLElement) {
+                      extensionAttrs.forEach(attr => {
+                        if (el.hasAttribute(attr)) {
+                          el.removeAttribute(attr);
+                        }
+                      });
+                      // Remove any attribute starting with bis_ or __processed
+                      Array.from(el.attributes).forEach(attr => {
+                        if (attr.name.startsWith('bis_') || attr.name.startsWith('__processed')) {
+                          el.removeAttribute(attr.name);
+                        }
+                      });
+                    }
+                  });
+                }
+                
+                // Run immediately
+                if (document.readyState === 'loading') {
+                  document.addEventListener('DOMContentLoaded', removeExtensionAttrs);
+                } else {
+                  removeExtensionAttrs();
+                }
+                
+                // Run on every mutation
+                const observer = new MutationObserver(removeExtensionAttrs);
+                observer.observe(document.documentElement, { 
+                  attributes: true, 
+                  childList: true, 
+                  subtree: true,
+                  attributeFilter: ['bis_skin_checked', 'bis_register', '__processed_']
+                });
+                
+                // Run periodically as backup
+                setInterval(removeExtensionAttrs, 100);
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body suppressHydrationWarning>
         <FirebaseClientProvider>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-grow">{children}</main>
-            <Footer />
-          </div>
+          <NoSSR>
+            <div className="flex flex-col min-h-screen">
+              <Header />
+              <main className="flex-grow">{children}</main>
+              <Footer />
+            </div>
+          </NoSSR>
           <Toaster />
         </FirebaseClientProvider>
       </body>
