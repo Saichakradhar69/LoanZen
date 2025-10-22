@@ -1,3 +1,4 @@
+
 // src/app/existing-loan/calculations.ts
 
 import type { ExistingLoanFormData } from './form';
@@ -8,14 +9,17 @@ import { calculateCreditLine } from './loan-calculations/credit-line';
 import { calculateCustomLoan } from './loan-calculations/custom-loan';
 
 
-export function performExistingLoanCalculations(data: ExistingLoanFormData): CalculationResult {
+export function performExistingLoanCalculations(data: ExistingLoanFormData): Omit<CalculationResult, 'formData'> {
     
     switch (data.loanType) {
         case 'personal':
         case 'car':
         case 'home':
+        case 'student':
+        case 'mortgage':
+        case 'other':
             return calculateStandardLoan(data);
-        case 'education':
+        case 'education': // This could have more complex logic in the future
             return calculateEducationLoan(data);
         case 'credit-line':
             return calculateCreditLine(data);

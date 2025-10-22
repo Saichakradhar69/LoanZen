@@ -1,12 +1,12 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useFirestore } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,9 +23,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, toDate } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
-import { calculateCurrentBalance } from '@/utils/loan-calculations';
+import { performExistingLoanCalculations } from '@/app/existing-loan/calculations';
+import type { Loan } from '@/app/dashboard/page';
+
 
 const loanFormSchema = z.object({
   loanName: z.string().min(1, 'Loan name is required.'),
@@ -35,6 +37,7 @@ const loanFormSchema = z.object({
   interestRate: z.coerce.number().min(0, 'Rate cannot be negative.').max(100, 'Rate seems too high.'),
   monthlyPayment: z.coerce.number().positive('Must be a positive number.'),
   emisPaid: z.coerce.number().min(0, 'Cannot be negative.'),
+  paymentDueDay: z.coerce.number().min(1).max(31).optional(),
 });
 
 type LoanFormValues = z.infer<typeof loanFormSchema>;
@@ -43,6 +46,7 @@ interface AddLoanDialogProps {
   isOpen: boolean;
   setIsOpen: (open: boolean) => void;
   userId: string;
+  loanToEdit?: Loan | null;
 }
 
 const loanTypes = [
@@ -54,10 +58,12 @@ const loanTypes = [
   { value: 'other', label: 'Other' }
 ];
 
-export default function AddLoanDialog({ isOpen, setIsOpen, userId }: AddLoanDialogProps) {
+export default function AddLoanDialog({ isOpen, setIsOpen, userId, loanToEdit }: AddLoanDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
+
+  const isEditing = !!loanToEdit;
 
   const form = useForm<LoanFormValues>({
     resolver: zodResolver(loanFormSchema),
@@ -68,9 +74,45 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId }: AddLoanDial
       disbursementDate: undefined,
       interestRate: '' as any,
       monthlyPayment: '' as any,
-      emisPaid: 0,
+      emisPaid: '' as any,
+      paymentDueDay: 1,
     },
   });
+
+  useEffect(() => {
+    if (isEditing && loanToEdit) {
+      let disbursementDate: Date;
+      // Convert Firestore Timestamp to Date if necessary
+      if (loanToEdit.disbursementDate && typeof (loanToEdit.disbursementDate as any).toDate === 'function') {
+        disbursementDate = (loanToEdit.disbursementDate as any).toDate();
+      } else {
+        disbursementDate = toDate(loanToEdit.disbursementDate);
+      }
+
+      form.reset({
+        loanName: loanToEdit.loanName,
+        loanType: loanToEdit.loanType,
+        originalLoanAmount: loanToEdit.originalLoanAmount,
+        disbursementDate: disbursementDate,
+        interestRate: loanToEdit.interestRate,
+        monthlyPayment: loanToEdit.monthlyPayment,
+        emisPaid: loanToEdit.emisPaid,
+        paymentDueDay: loanToEdit.paymentDueDay || 1,
+      });
+    } else {
+      form.reset({
+        loanName: '',
+        loanType: 'personal',
+        originalLoanAmount: '' as any,
+        disbursementDate: new Date(),
+        interestRate: '' as any,
+        monthlyPayment: '' as any,
+        emisPaid: 0,
+        paymentDueDay: 1,
+      });
+    }
+  }, [loanToEdit, isEditing, form]);
+
 
   const onSubmit = async (data: LoanFormValues) => {
     setIsLoading(true);
@@ -79,32 +121,58 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId }: AddLoanDial
         throw new Error("User not authenticated.");
       }
 
-      const currentBalance = calculateCurrentBalance({
-          ...data,
-          paymentDueDay: new Date(data.disbursementDate).getDate(),
-      });
+      // Prepare data for calculation
+      const calculationInput = {
+        loanType: data.loanType,
+        loanName: data.loanName,
+        interestType: 'reducing',
+        rateType: 'fixed',
+        originalLoanAmount: data.originalLoanAmount,
+        disbursementDate: data.disbursementDate,
+        interestRate: data.interestRate,
+        emiAmount: data.monthlyPayment,
+        emisPaid: data.emisPaid,
+        paymentDueDay: data.paymentDueDay || 1,
+      };
 
-      const loansCollectionRef = collection(firestore, 'users', userId, 'loans');
-      await addDoc(loansCollectionRef, {
-        ...data,
-        userId,
-        currentBalance,
-        createdAt: serverTimestamp(),
-      });
+      const calculatedData = performExistingLoanCalculations(calculationInput as any);
+      const { outstandingBalance } = calculatedData;
       
-      toast({
-        title: 'Success!',
-        description: `Loan "${data.loanName}" has been added.`,
-      });
+      const loanData = {
+          ...data,
+          userId,
+          currentBalance: outstandingBalance
+      }
+
+      if (isEditing && loanToEdit) {
+        // Update existing loan
+        const loanDocRef = doc(firestore, 'users', userId, 'loans', loanToEdit.id);
+        await updateDoc(loanDocRef, loanData);
+        toast({
+            title: 'Success!',
+            description: `Loan "${data.loanName}" has been updated.`,
+        });
+      } else {
+        // Add new loan
+        const loansCollectionRef = collection(firestore, 'users', userId, 'loans');
+        await addDoc(loansCollectionRef, {
+            ...loanData,
+            createdAt: serverTimestamp(),
+        });
+        toast({
+            title: 'Success!',
+            description: `Loan "${data.loanName}" has been added.`,
+        });
+      }
       
       form.reset();
       setIsOpen(false);
     } catch (error) {
-        console.error("Failed to add loan:", error);
+        console.error("Failed to save loan:", error);
         toast({
             variant: "destructive",
             title: "Error",
-            description: "Could not add the loan. Please try again."
+            description: "Could not save the loan. Please try again."
         });
     } finally {
         setIsLoading(false);
@@ -115,9 +183,9 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId }: AddLoanDial
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add a New Loan</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit Loan' : 'Add a New Loan'}</DialogTitle>
           <DialogDescription>
-            Enter the details of your loan to start tracking it.
+            {isEditing ? 'Update the details of your loan.' : 'Enter the details of your loan to start tracking it.'}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -252,12 +320,25 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId }: AddLoanDial
                     </FormItem>
                 )}
                 />
+              <FormField
+                control={form.control}
+                name="paymentDueDay"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Payment Due Day of Month</FormLabel>
+                    <FormControl>
+                        <Input type="number" placeholder="e.g., 1" min="1" max="31" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
 
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Add Loan
+                {isEditing ? 'Save Changes' : 'Add Loan'}
               </Button>
             </DialogFooter>
           </form>

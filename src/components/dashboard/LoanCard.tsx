@@ -25,6 +25,8 @@ import type { Loan } from '@/app/dashboard/page';
 
 interface LoanCardProps {
   loan: Loan;
+  onEdit: () => void;
+  onDelete: () => void;
 }
 
 const loanTypeIcons = {
@@ -49,7 +51,7 @@ const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 };
 
-export default function LoanCard({ loan }: LoanCardProps) {
+export default function LoanCard({ loan, onEdit, onDelete }: LoanCardProps) {
   const { 
     id, 
     loanName, 
@@ -119,11 +121,11 @@ export default function LoanCard({ loan }: LoanCardProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={onEdit}>
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Loan
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600">
+              <DropdownMenuItem className="text-red-600" onClick={onDelete}>
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete Loan
               </DropdownMenuItem>
