@@ -1,8 +1,6 @@
-
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { 
@@ -11,16 +9,8 @@ import {
   CreditCard, 
   GraduationCap, 
   FileText,
-  MoreHorizontal,
-  Edit,
-  Trash2
+  PiggyBank
 } from 'lucide-react';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import type { Loan } from '@/app/dashboard/page';
 
 interface LoanCardProps {
@@ -35,16 +25,7 @@ const loanTypeIcons = {
   'student': GraduationCap,
   'mortgage': Home,
   'credit-card': CreditCard,
-  'other': FileText
-};
-
-const loanTypeColors = {
-  'personal': 'amber',
-  'car': 'blue',
-  'student': 'purple',
-  'mortgage': 'green',
-  'credit-card': 'red',
-  'other': 'gray'
+  'other': PiggyBank
 };
 
 const formatCurrency = (value: number) => {
@@ -53,7 +34,6 @@ const formatCurrency = (value: number) => {
 
 export default function LoanCard({ loan, onEdit, onDelete }: LoanCardProps) {
   const { 
-    id, 
     loanName, 
     loanType, 
     currentBalance, 
@@ -63,109 +43,51 @@ export default function LoanCard({ loan, onEdit, onDelete }: LoanCardProps) {
   } = loan;
 
   const IconComponent = loanTypeIcons[loanType as keyof typeof loanTypeIcons] || FileText;
-  const color = loanTypeColors[loanType as keyof typeof loanTypeColors] || 'gray';
   
-  const colorClasses = {
-    amber: 'border-l-amber-500 bg-amber-50 dark:bg-amber-900/20',
-    blue: 'border-l-blue-500 bg-blue-50 dark:bg-blue-900/20',
-    purple: 'border-l-purple-500 bg-purple-50 dark:bg-purple-900/20',
-    green: 'border-l-green-500 bg-green-50 dark:bg-green-900/20',
-    red: 'border-l-red-500 bg-red-50 dark:bg-red-900/20',
-    gray: 'border-l-gray-500 bg-gray-50 dark:bg-gray-900/20'
-  };
-
-  const iconColorClasses = {
-    amber: 'bg-amber-100 text-amber-600',
-    blue: 'bg-blue-100 text-blue-600',
-    purple: 'bg-purple-100 text-purple-600',
-    green: 'bg-green-100 text-green-600',
-    red: 'bg-red-100 text-red-600',
-    gray: 'bg-gray-100 text-gray-600'
-  };
-
   const isHighInterest = interestRate > 15;
-  const progress = originalLoanAmount > 0 ? ((originalLoanAmount - currentBalance) / originalLoanAmount) * 100 : 0;
-  const isUrgent = progress < 20 && currentBalance > 10000;
+  const progress = originalLoanAmount > 0 ? Math.round(((originalLoanAmount - currentBalance) / originalLoanAmount) * 100) : 0;
+  
+  const borderColorClass = isHighInterest ? 'border-red-500/50' : 'border-primary/50';
 
   return (
-    <Card className={`border-l-4 ${colorClasses[color as keyof typeof colorClasses]}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className={`p-2 rounded-lg ${iconColorClasses[color as keyof typeof iconColorClasses]}`}>
-              <IconComponent className="h-5 w-5" />
+    <Card className={`bg-card hover:bg-secondary/50 transition-colors cursor-pointer border-l-4 ${borderColorClass}`} onClick={onEdit}>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-4">
+            <div className={`p-2 rounded-lg bg-secondary`}>
+              <IconComponent className="h-6 w-6 text-primary" />
             </div>
-            <div>
-              <CardTitle className="text-lg">{loanName}</CardTitle>
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-muted-foreground capitalize">
-                  {loanType.replace('-', ' ')} Loan
-                </span>
-                {isHighInterest && (
-                  <Badge variant="destructive" className="text-xs">
-                    High Interest
-                  </Badge>
-                )}
-                {isUrgent && (
-                  <Badge variant="outline" className="text-xs border-amber-500 text-amber-600">
-                    Priority
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Loan
-              </DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600" onClick={onDelete}>
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Loan
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-muted-foreground">Current Balance</div>
-              <div className="font-semibold text-lg">{formatCurrency(currentBalance)}</div>
-            </div>
-            <div>
-              <div className="text-sm text-muted-foreground">Interest Rate</div>
-              <div className={`font-semibold text-lg ${isHighInterest ? 'text-red-600' : ''}`}>
-                {interestRate}%
-              </div>
-            </div>
-          </div>
-          
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Monthly Payment</span>
-              <span className="font-semibold">{formatCurrency(monthlyPayment)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Original Amount</span>
-              <span className="font-semibold">{formatCurrency(originalLoanAmount)}</span>
-            </div>
-          </div>
+            <div className="flex-1">
+                <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle className="text-base font-bold">{loanName}</CardTitle>
+                        <p className="text-xs text-muted-foreground capitalize">{loanType.replace('-', ' ')} Loan</p>
+                    </div>
+                    {isHighInterest && (
+                        <Badge variant="destructive" className="text-xs shrink-0">
+                            High Interest
+                        </Badge>
+                    )}
+                </div>
 
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Progress</span>
-              <span className="font-medium">{Math.round(progress)}%</span>
+                <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground mt-3">
+                    <span>Balance</span>
+                    <span>Interest Rate</span>
+                    <span>Monthly Payment</span>
+                </div>
+                 <div className="grid grid-cols-3 gap-2 text-sm font-semibold">
+                    <span>{formatCurrency(currentBalance)}</span>
+                    <span className={isHighInterest ? 'text-red-400' : ''}>{interestRate}%</span>
+                    <span>{formatCurrency(monthlyPayment)}</span>
+                </div>
+
+                <div className="mt-3 space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground">Progress</span>
+                        <span>{progress}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" indicatorClassName={isHighInterest ? 'bg-red-500' : 'bg-primary'}/>
+                </div>
             </div>
-            <Progress value={progress} className="h-2" />
-          </div>
         </div>
       </CardContent>
     </Card>

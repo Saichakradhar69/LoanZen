@@ -1,15 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { ChevronDown, LogOut, Menu, User } from 'lucide-react';
+import { Bell, ChevronDown, Cog, LogOut, Menu, User } from 'lucide-react';
 import Logo from '../logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useState, useEffect } from 'react';
 import { useUser } from '@/firebase';
 import { getAuth, signOut } from 'firebase/auth';
 import ClientOnly from '../ClientOnly';
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 
 export default function Header() {
   const [currency, setCurrency] = useState('USD');
@@ -24,9 +25,17 @@ export default function Header() {
 
   const handleLogout = async () => {
     await signOut(auth);
-    // You might want to redirect the user to the homepage after logout
     window.location.href = '/';
   };
+  
+  const getUserInitials = () => {
+    if (!user || !user.displayName) return '?';
+    const names = user.displayName.split(' ');
+    if (names.length > 1) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return names[0][0].toUpperCase();
+  }
 
   const navLinks = [
     { href: '/', label: 'Home' },
@@ -38,12 +47,14 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="mr-auto hidden md:flex">
+      <div className="container flex h-16 items-center">
+        <div className="mr-auto hidden md:flex items-center gap-4">
           <Logo />
+           <div className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "cursor-default hover:bg-transparent")}>
+            Trial: 12 days left
+          </div>
         </div>
 
-        {/* Mobile Menu */}
         <div className="md:hidden flex-1">
           <Sheet>
             <SheetTrigger asChild>
@@ -69,20 +80,18 @@ export default function Header() {
           </Sheet>
         </div>
         
-        {/* Centered logo on mobile */}
         <div className="md:hidden">
             <Logo />
         </div>
 
-        {/* Desktop Menu */}
-        <nav className="hidden md:flex flex-1 items-center justify-center gap-4 text-sm font-medium">
+        <nav className="hidden md:flex flex-1 items-center justify-center gap-6 text-sm font-medium">
           {navLinks.map((link) => (
             <Link key={link.href} href={link.href} className="text-foreground/60 transition-colors hover:text-foreground/80">
               {link.label}
             </Link>
           ))}
            {user && (
-            <Link href="/dashboard" className="text-foreground/60 transition-colors hover:text-foreground/80">
+            <Link href="/dashboard" className="text-foreground font-semibold transition-colors hover:text-foreground/80">
               Dashboard
             </Link>
           )}
@@ -102,19 +111,30 @@ export default function Header() {
             {!isUserLoading && (
               <>
                 {user ? (
+                  <>
+                  <Button variant="ghost" size="icon"><Bell className="h-5 w-5"/></Button>
+                  <Button variant="ghost" size="icon"><Cog className="h-5 w-5"/></Button>
                    <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="secondary" size="icon" className="rounded-full">
-                        <User className="h-5 w-5" />
-                        <span className="sr-only">Toggle user menu</span>
+                       <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
+                            <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                          </Avatar>
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuLabel>
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-medium leading-none">{user.displayName}</p>
+                          <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
+                        </div>
+                      </DropdownMenuLabel>
                        <DropdownMenuSeparator />
-                      <DropdownMenuItem>
-                         <p className="text-sm text-muted-foreground">{user.email}</p>
-                      </DropdownMenuItem>
+                        <DropdownMenuItem>
+                            <User className="mr-2 h-4 w-4" />
+                            <span>Profile</span>
+                        </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleLogout}>
                         <LogOut className="mr-2 h-4 w-4" />
@@ -122,6 +142,7 @@ export default function Header() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  </>
                 ) : (
                   <>
                     <Button size="sm" variant="ghost" asChild>
