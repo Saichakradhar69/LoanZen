@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,8 +13,7 @@ import {
   FileText,
   MoreHorizontal,
   Edit,
-  Trash2,
-  CreditCard as Payment
+  Trash2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -21,71 +21,69 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { Loan } from '@/app/dashboard/page';
 
 interface LoanCardProps {
-  id: string;
-  name: string;
-  type: string;
-  balance: number;
-  interestRate: number;
-  monthlyPayment: number;
-  progress: number;
-  originalAmount: number;
+  loan: Loan;
 }
 
 const loanTypeIcons = {
+  'personal': FileText,
   'car': Car,
-  'home': Home,
+  'student': GraduationCap,
   'mortgage': Home,
   'credit-card': CreditCard,
-  'student': GraduationCap,
-  'personal': FileText,
   'other': FileText
 };
 
 const loanTypeColors = {
+  'personal': 'amber',
   'car': 'blue',
-  'home': 'green',
+  'student': 'purple',
   'mortgage': 'green',
   'credit-card': 'red',
-  'student': 'purple',
-  'personal': 'amber',
   'other': 'gray'
 };
 
-export default function LoanCard({
-  id,
-  name,
-  type,
-  balance,
-  interestRate,
-  monthlyPayment,
-  progress,
-  originalAmount
-}: LoanCardProps) {
-  const IconComponent = loanTypeIcons[type as keyof typeof loanTypeIcons] || FileText;
-  const color = loanTypeColors[type as keyof typeof loanTypeColors] || 'gray';
+const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+};
+
+export default function LoanCard({ loan }: LoanCardProps) {
+  const { 
+    id, 
+    loanName, 
+    loanType, 
+    currentBalance, 
+    interestRate, 
+    monthlyPayment, 
+    originalLoanAmount 
+  } = loan;
+
+  const IconComponent = loanTypeIcons[loanType as keyof typeof loanTypeIcons] || FileText;
+  const color = loanTypeColors[loanType as keyof typeof loanTypeColors] || 'gray';
   
   const colorClasses = {
+    amber: 'border-l-amber-500 bg-amber-50 dark:bg-amber-900/20',
     blue: 'border-l-blue-500 bg-blue-50 dark:bg-blue-900/20',
+    purple: 'border-l-purple-500 bg-purple-50 dark:bg-purple-900/20',
     green: 'border-l-green-500 bg-green-50 dark:bg-green-900/20',
     red: 'border-l-red-500 bg-red-50 dark:bg-red-900/20',
-    amber: 'border-l-amber-500 bg-amber-50 dark:bg-amber-900/20',
-    purple: 'border-l-purple-500 bg-purple-50 dark:bg-purple-900/20',
     gray: 'border-l-gray-500 bg-gray-50 dark:bg-gray-900/20'
   };
 
   const iconColorClasses = {
+    amber: 'bg-amber-100 text-amber-600',
     blue: 'bg-blue-100 text-blue-600',
+    purple: 'bg-purple-100 text-purple-600',
     green: 'bg-green-100 text-green-600',
     red: 'bg-red-100 text-red-600',
-    amber: 'bg-amber-100 text-amber-600',
-    purple: 'bg-purple-100 text-purple-600',
     gray: 'bg-gray-100 text-gray-600'
   };
 
   const isHighInterest = interestRate > 15;
-  const isUrgent = progress < 20 && balance > 10000;
+  const progress = originalLoanAmount > 0 ? ((originalLoanAmount - currentBalance) / originalLoanAmount) * 100 : 0;
+  const isUrgent = progress < 20 && currentBalance > 10000;
 
   return (
     <Card className={`border-l-4 ${colorClasses[color as keyof typeof colorClasses]}`}>
@@ -96,10 +94,10 @@ export default function LoanCard({
               <IconComponent className="h-5 w-5" />
             </div>
             <div>
-              <CardTitle className="text-lg">{name}</CardTitle>
+              <CardTitle className="text-lg">{loanName}</CardTitle>
               <div className="flex items-center space-x-2">
                 <span className="text-sm text-muted-foreground capitalize">
-                  {type.replace('-', ' ')} Loan
+                  {loanType.replace('-', ' ')} Loan
                 </span>
                 {isHighInterest && (
                   <Badge variant="destructive" className="text-xs">
@@ -125,10 +123,6 @@ export default function LoanCard({
                 <Edit className="h-4 w-4 mr-2" />
                 Edit Loan
               </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Payment className="h-4 w-4 mr-2" />
-                Make Payment
-              </DropdownMenuItem>
               <DropdownMenuItem className="text-red-600">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete Loan
@@ -142,7 +136,7 @@ export default function LoanCard({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <div className="text-sm text-muted-foreground">Current Balance</div>
-              <div className="font-semibold text-lg">${balance.toLocaleString()}</div>
+              <div className="font-semibold text-lg">{formatCurrency(currentBalance)}</div>
             </div>
             <div>
               <div className="text-sm text-muted-foreground">Interest Rate</div>
@@ -155,11 +149,11 @@ export default function LoanCard({
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Monthly Payment</span>
-              <span className="font-semibold">${monthlyPayment.toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(monthlyPayment)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Original Amount</span>
-              <span className="font-semibold">${originalAmount.toLocaleString()}</span>
+              <span className="font-semibold">{formatCurrency(originalLoanAmount)}</span>
             </div>
           </div>
 
