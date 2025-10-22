@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -11,6 +12,7 @@ import { useUser } from '@/firebase';
 import { getAuth, signOut } from 'firebase/auth';
 import ClientOnly from '../ClientOnly';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { cn } from '@/lib/utils';
 
 export default function Header() {
   const [currency, setCurrency] = useState('USD');
