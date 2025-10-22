@@ -63,11 +63,11 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId }: AddLoanDial
     resolver: zodResolver(loanFormSchema),
     defaultValues: {
       loanName: '',
-      loanType: undefined,
-      originalLoanAmount: undefined,
+      loanType: '',
+      originalLoanAmount: '' as any,
       disbursementDate: undefined,
-      interestRate: undefined,
-      monthlyPayment: undefined,
+      interestRate: '' as any,
+      monthlyPayment: '' as any,
       emisPaid: 0,
     },
   });
