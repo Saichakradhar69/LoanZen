@@ -58,7 +58,7 @@ export default function UpcomingPayments({ loans }: UpcomingPaymentsProps) {
                              {loan.paymentInfo.daysUntil < 7 ? (
                                 <Badge variant="destructive" className="text-xs">Urgent</Badge>
                              ) : (
-                                <Badge variant="secondary" className="text-xs text-yellow-300 border-yellow-500/50">Soon</Badge>
+                                <Badge variant="secondary" className="text-xs border-yellow-500/50 text-yellow-600 dark:text-yellow-400">Soon</Badge>
                              )}
                         </div>
                     </div>

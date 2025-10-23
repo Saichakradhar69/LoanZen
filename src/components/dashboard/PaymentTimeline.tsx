@@ -8,11 +8,11 @@ interface PaymentTimelineProps {
 }
 
 const colorPairs = [
-    { primary: 'bg-blue-500', secondary: 'bg-blue-900/50' },
-    { primary: 'bg-red-500', secondary: 'bg-red-900/50' },
-    { primary: 'bg-green-500', secondary: 'bg-green-900/50' },
-    { primary: 'bg-purple-500', secondary: 'bg-purple-900/50' },
-    { primary: 'bg-amber-500', secondary: 'bg-amber-900/50' },
+    { primary: 'bg-blue-500', secondary: 'bg-primary/10' },
+    { primary: 'bg-red-500', secondary: 'bg-destructive/10' },
+    { primary: 'bg-green-500', secondary: 'bg-green-500/10' },
+    { primary: 'bg-purple-500', secondary: 'bg-purple-500/10' },
+    { primary: 'bg-amber-500', secondary: 'bg-amber-500/10' },
 ]
 
 export default function PaymentTimeline({ loans }: PaymentTimelineProps) {

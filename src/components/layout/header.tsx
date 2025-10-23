@@ -13,6 +13,7 @@ import { getAuth, signOut } from 'firebase/auth';
 import ClientOnly from '../ClientOnly';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from './theme-toggle';
 
 export default function Header() {
   const [currency, setCurrency] = useState('USD');
@@ -100,6 +101,7 @@ export default function Header() {
         </nav>
 
         <div className="flex items-center gap-2 ml-auto">
+          <ThemeToggle />
           <ClientOnly fallback={
             <>
               <Button size="sm" variant="ghost" asChild>
