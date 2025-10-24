@@ -1,39 +1,43 @@
 /**
- * @fileOverview
- * This ruleset enforces a strict user-ownership model for all data within the LoanZen application.
- * All data is nested under /users/{userId}, ensuring that users can only access their own data.
+ * @fileoverview Firestore Security Rules for LoanZen application.
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model. All data is nested under
+ * /users/{userId}, and users can only access data associated with their own user ID.
+ * This structure ensures that users can only manage their own loans, payments,
+ * rate histories, and chats.  Denormalization is used to make rule evaluation
+ * more performant.
  *
  * Data Structure:
- * - /users/{userId}: Stores user profile information.
+ * - /users/{userId}: Stores user profiles.
  * - /users/{userId}/loans/{loanId}: Stores loan details for a specific user.
  * - /users/{userId}/loans/{loanId}/payments/{paymentId}: Stores payment details for a specific loan.
- * - /users/{userId}/loans/{loanId}/rateHistory/{rateId}: Stores rate history for a loan.
+ * - /users/{userId}/loans/{loanId}/rateHistory/{rateId}: Stores rate history for a specific loan.
  * - /users/{userId}/chats/{chatId}: Stores chat sessions for a user.
  * - /users/{userId}/chats/{chatId}/messages/{messageId}: Stores messages within a user's chat session.
  *
  * Key Security Decisions:
- * - User listing is disabled.
- * - All write operations are restricted to the owner of the data.
- * - Read operations are also restricted to the owner.
- *
- * Denormalization for Authorization:
- * - Authorization independence is achieved by denormalizing relevant user data (e.g., `subscriptionStatus`)
- *   into subcollections like `loans`, `payments`, and `rateHistory`. This avoids costly `get()` calls in security rules.
+ * - Users can only access data under their own /users/{userId} path.
+ * - Listing operations are allowed within a user's scope.
+ * - Data validation is minimal in this prototyping phase, focusing on ownership and relational integrity.
+ * - Denormalization is used so that rules can authorize access without reads (e.g. subscriptionStatus).
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Enforces access control for user profiles. Only the authenticated user can read and write their own profile.
+     * @description Grants access to user profiles based on ownership.
      * @path /users/{userId}
-     * @allow (create) User with matching auth UID can create their profile.
-     * @allow (get) User with matching auth UID can get their profile.
-     * @allow (update) User with matching auth UID can update their profile.
-     * @allow (delete) User with matching auth UID can delete their profile.
-     * @deny (create) User with mismatched auth UID cannot create a profile.
-     * @deny (get) User with mismatched auth UID cannot get another user's profile.
-     * @principle Enforces document ownership for reads and writes.
+     * @allow (create) User with ID 'user123' can create their own profile.
+     * @allow (get) User with ID 'user123' can read their own profile.
+     * @allow (update) User with ID 'user123' can update their own profile.
+     * @allow (delete) User with ID 'user123' can delete their own profile.
+     * @deny (create) User with ID 'user456' cannot create a profile with ID 'user123'.
+     * @deny (get) User with ID 'user456' cannot read the profile of user 'user123'.
+     * @deny (update) User with ID 'user456' cannot update the profile of user 'user123'.
+     * @deny (delete) User with ID 'user456' cannot delete the profile of user 'user123'.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId} {
       function isSignedIn() {
@@ -45,7 +49,7 @@ service cloud.firestore {
       }
 
       function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+        return isOwner(userId) && resource.data != null;
       }
 
       allow get: if isSignedIn() && isOwner(userId);
@@ -56,15 +60,17 @@ service cloud.firestore {
     }
 
     /**
-     * @description Enforces access control for loans associated with a specific user. Only the owner can manage their loans.
+     * @description Grants access to loans based on user ownership.
      * @path /users/{userId}/loans/{loanId}
-     * @allow (create) User with matching auth UID can create a loan.
-     * @allow (get) User with matching auth UID can get their loan.
-     * @allow (update) User with matching auth UID can update their loan.
-     * @allow (delete) User with matching auth UID can delete their loan.
-     * @deny (create) User with mismatched auth UID cannot create a loan.
-     * @deny (get) User with mismatched auth UID cannot get another user's loan.
-     * @principle Enforces document ownership for reads and writes.
+     * @allow (create) User 'user123' can create a loan under their ID.
+     * @allow (get) User 'user123' can read a loan under their ID.
+     * @allow (update) User 'user123' can update a loan under their ID.
+     * @allow (delete) User 'user123' can delete a loan under their ID.
+     * @deny (create) User 'user456' cannot create a loan under user 'user123'.
+     * @deny (get) User 'user456' cannot read a loan under user 'user123'.
+     * @deny (update) User 'user456' cannot update a loan under user 'user123'.
+     * @deny (delete) User 'user456' cannot delete a loan under user 'user123'.
+     * @principle Restricts access to a user's own loans.
      */
     match /users/{userId}/loans/{loanId} {
       function isSignedIn() {
@@ -76,7 +82,7 @@ service cloud.firestore {
       }
 
       function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+        return isOwner(userId) && resource.data != null;
       }
 
       allow get: if isSignedIn() && isOwner(userId);
@@ -87,15 +93,17 @@ service cloud.firestore {
     }
 
     /**
-     * @description Enforces access control for payments associated with a specific loan and user. Only the owner can manage their payments.
+     * @description Grants access to payments based on loan and user ownership.
      * @path /users/{userId}/loans/{loanId}/payments/{paymentId}
-     * @allow (create) User with matching auth UID can create a payment.
-     * @allow (get) User with matching auth UID can get their payment.
-     * @allow (update) User with matching auth UID can update their payment.
-     * @allow (delete) User with matching auth UID can delete their payment.
-     * @deny (create) User with mismatched auth UID cannot create a payment.
-     * @deny (get) User with mismatched auth UID cannot get another user's payment.
-     * @principle Enforces document ownership for reads and writes.
+     * @allow (create) User 'user123' can create a payment for their loan.
+     * @allow (get) User 'user123' can read a payment for their loan.
+     * @allow (update) User 'user123' can update a payment for their loan.
+     * @allow (delete) User 'user123' can delete a payment for their loan.
+     * @deny (create) User 'user456' cannot create a payment under user 'user123'.
+     * @deny (get) User 'user456' cannot read a payment under user 'user123'.
+     * @deny (update) User 'user456' cannot update a payment under user 'user123'.
+     * @deny (delete) User 'user456' cannot delete a payment under user 'user123'.
+     * @principle Enforces ownership at the user and loan level for payment management.
      */
     match /users/{userId}/loans/{loanId}/payments/{paymentId} {
       function isSignedIn() {
@@ -107,7 +115,7 @@ service cloud.firestore {
       }
 
       function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+        return isOwner(userId) && resource.data != null;
       }
 
       allow get: if isSignedIn() && isOwner(userId);
@@ -118,15 +126,17 @@ service cloud.firestore {
     }
 
     /**
-     * @description Enforces access control for rate history entries associated with a specific loan and user. Only the owner can manage their rate history.
+     * @description Grants access to rate history based on loan and user ownership.
      * @path /users/{userId}/loans/{loanId}/rateHistory/{rateId}
-     * @allow (create) User with matching auth UID can create a rate history entry.
-     * @allow (get) User with matching auth UID can get their rate history entry.
-     * @allow (update) User with matching auth UID can update their rate history entry.
-     * @allow (delete) User with matching auth UID can delete their rate history entry.
-     * @deny (create) User with mismatched auth UID cannot create a rate history entry.
-     * @deny (get) User with mismatched auth UID cannot get another user's rate history entry.
-     * @principle Enforces document ownership for reads and writes.
+     * @allow (create) User 'user123' can create a rate history entry for their loan.
+     * @allow (get) User 'user123' can read a rate history entry for their loan.
+     * @allow (update) User 'user123' can update a rate history entry for their loan.
+     * @allow (delete) User 'user123' can delete a rate history entry for their loan.
+     * @deny (create) User 'user456' cannot create a rate history entry under user 'user123'.
+     * @deny (get) User 'user456' cannot read a rate history entry under user 'user123'.
+     * @deny (update) User 'user456' cannot update a rate history entry under user 'user123'.
+     * @deny (delete) User 'user456' cannot delete a rate history entry under user 'user123'.
+     * @principle Restricts rate history management to the loan owner.
      */
     match /users/{userId}/loans/{loanId}/rateHistory/{rateId} {
       function isSignedIn() {
@@ -138,7 +148,7 @@ service cloud.firestore {
       }
 
       function isExistingOwner(userId) {
-        return isOwner(userId) && resource != null;
+        return isOwner(userId) && resource.data != null;
       }
 
       allow get: if isSignedIn() && isOwner(userId);
@@ -147,12 +157,21 @@ service cloud.firestore {
       allow update: if isSignedIn() && isExistingOwner(userId);
       allow delete: if isSignedIn() && isExistingOwner(userId);
     }
-    
-    /**
-     * @description Enforces access control for chat sessions for a user. Only the owner can manage their chats.
-     * @path /users/{userId}/chats/{chatId}
-     */
-    match /users/{userId}/chats/{chatId} {
+
+     /**
+      * @description Grants access to chat sessions based on user ownership.
+      * @path /users/{userId}/chats/{chatId}
+      * @allow (create) User 'user123' can create a chat session under their ID.
+      * @allow (get) User 'user123' can read a chat session under their ID.
+      * @allow (update) User 'user123' can update a chat session under their ID.
+      * @allow (delete) User 'user123' can delete a chat session under their ID.
+      * @deny (create) User 'user456' cannot create a chat session under user 'user123'.
+      * @deny (get) User 'user456' cannot read a chat session under user 'user123'.
+      * @deny (update) User 'user456' cannot update a chat session under user 'user123'.
+      * @deny (delete) User 'user456' cannot delete a chat session under user 'user123'.
+      * @principle Restricts access to a user's own chat sessions.
+      */
+     match /users/{userId}/chats/{chatId} {
         function isSignedIn() {
             return request.auth != null;
         }
@@ -162,7 +181,7 @@ service cloud.firestore {
         }
 
         function isExistingOwner(userId) {
-            return isOwner(userId) && resource != null;
+            return isOwner(userId) && resource.data != null;
         }
 
         allow get: if isSignedIn() && isOwner(userId);
@@ -170,13 +189,22 @@ service cloud.firestore {
         allow create: if isSignedIn() && isOwner(userId);
         allow update: if isSignedIn() && isExistingOwner(userId);
         allow delete: if isSignedIn() && isExistingOwner(userId);
-    }
+     }
 
-    /**
-     * @description Enforces access control for messages within a user's chat session. Only the owner can manage their messages.
-     * @path /users/{userId}/chats/{chatId}/messages/{messageId}
-     */
-    match /users/{userId}/chats/{chatId}/messages/{messageId} {
+     /**
+      * @description Grants access to chat messages based on chat session and user ownership.
+      * @path /users/{userId}/chats/{chatId}/messages/{messageId}
+      * @allow (create) User 'user123' can create a message in their chat session.
+      * @allow (get) User 'user123' can read a message in their chat session.
+      * @allow (update) User 'user123' can update a message in their chat session.
+      * @allow (delete) User 'user123' can delete a message in their chat session.
+      * @deny (create) User 'user456' cannot create a message in user 'user123's chat session.
+      * @deny (get) User 'user456' cannot read a message in user 'user123's chat session.
+      * @deny (update) User 'user456' cannot update a message in user 'user123's chat session.
+      * @deny (delete) User 'user456' cannot delete a message in user 'user123's chat session.
+      * @principle Enforces ownership at the user and chat level for message management.
+      */
+     match /users/{userId}/chats/{chatId}/messages/{messageId} {
         function isSignedIn() {
             return request.auth != null;
         }
@@ -186,7 +214,7 @@ service cloud.firestore {
         }
 
         function isExistingOwner(userId) {
-            return isOwner(userId) && resource != null;
+            return isOwner(userId) && resource.data != null;
         }
 
         allow get: if isSignedIn() && isOwner(userId);
@@ -194,6 +222,6 @@ service cloud.firestore {
         allow create: if isSignedIn() && isOwner(userId);
         allow update: if isSignedIn() && isExistingOwner(userId);
         allow delete: if isSignedIn() && isExistingOwner(userId);
-    }
+     }
   }
 }
