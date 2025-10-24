@@ -1,7 +1,7 @@
 // src/ai/flows/prepayment-advisor.ts
 'use server';
 /**
- * @fileOverview A prepayment advisor AI agent.
+ * @fileOverview A prepayment advisor AI agent that provides conversational advice.
  *
  * - getPrepaymentAdvice - A function that handles the prepayment advice process.
  * - PrepaymentAdvisorInput - The input type for the getPrepaymentAdvice function.
@@ -9,76 +9,68 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import { z } from 'genkit';
+
+const MessageSchema = z.object({
+  role: z.enum(['user', 'model']),
+  content: z.string(),
+});
 
 const PrepaymentAdvisorInputSchema = z.object({
-  income: z
-    .number()
-    .describe('The user monthly income after taxes and other deductions'),
   loans: z.array(
     z.object({
       loanName: z.string().describe('The human-readable name of the loan.'),
-      outstandingBalance: z.number().describe('The outstanding balance of the loan.'),
+      currentBalance: z.number().describe('The outstanding balance of the loan.'),
       interestRate: z.number().describe('The interest rate of the loan.'),
-      minimumPayment: z.number().describe('The minimum monthly payment for the loan.'),
+      monthlyPayment: z.number().describe('The minimum monthly payment for the loan.'),
     })
-  ).describe('An array of loans the user has.'),
-  savingsOpportunities: z.array(
-    z.object({
-      opportunityName: z.string().describe('The name of the savings opportunity.'),
-      amount: z.number().describe('The amount of savings available.'),
-      startDate: z.string().describe('The start date of the savings opportunity (YYYY-MM-DD).'),
-    })
-  ).optional().describe('An array of savings opportunities the user has.'),
-  debtManagementTechniques: z.array(
-    z.object({
-      techniqueName: z.string().describe('The name of the debt management technique.'),
-      description: z.string().describe('The description of the debt management technique.'),
-    })
-  ).optional().describe('An array of debt management techniques the user is considering.'),
+  ).describe('An array of the user\'s current loans.'),
+  history: z.array(MessageSchema).describe("The conversation history."),
 });
 export type PrepaymentAdvisorInput = z.infer<typeof PrepaymentAdvisorInputSchema>;
 
 const PrepaymentAdvisorOutputSchema = z.object({
-  advice: z.string().describe('The advice on the user\'s optimal repayment strategy.'),
+  content: z.string().describe("The AI's response to the user."),
 });
 export type PrepaymentAdvisorOutput = z.infer<typeof PrepaymentAdvisorOutputSchema>;
+
 
 export async function getPrepaymentAdvice(input: PrepaymentAdvisorInput): Promise<PrepaymentAdvisorOutput> {
   return prepaymentAdvisorFlow(input);
 }
 
+
 const prompt = ai.definePrompt({
   name: 'prepaymentAdvisorPrompt',
-  input: {schema: PrepaymentAdvisorInputSchema},
-  output: {schema: PrepaymentAdvisorOutputSchema},
-  prompt: `You are a financial advisor specializing in debt repayment strategies.
+  input: { schema: PrepaymentAdvisorInputSchema },
+  output: { schema: PrepaymentAdvisorOutputSchema },
+  prompt: `You are a friendly and expert financial advisor specializing in debt repayment strategies for LoanZen. Your goal is to provide clear, actionable advice to help users manage and pay off their loans faster.
 
-You will analyze the user's income, loans, savings opportunities, and debt management techniques to recommend an optimal repayment strategy.
+You have access to the user's current loan information and the ongoing conversation history.
 
-Income: {{{income}}}
-Loans: {{#each loans}}{{{loanName}}}: Outstanding Balance: {{{outstandingBalance}}}, Interest Rate: {{{interestRate}}}, Minimum Payment: {{{minimumPayment}}}
+CURRENT LOAN INFORMATION:
+{{#if loans}}
+{{#each loans}}
+- {{loanName}}:
+  - Current Balance: \${{currentBalance}}
+  - Interest Rate: {{interestRate}}%
+  - Monthly Payment: \${{monthlyPayment}}
 {{/each}}
-
-{{#if savingsOpportunities}}
-Savings Opportunities: {{#each savingsOpportunities}}{{{opportunityName}}}: {{{amount}}}, Start Date: {{{startDate}}}
-{{/each}}
+{{else}}
+The user has not provided any loan information.
 {{/if}}
 
-{{#if debtManagementTechniques}}
-Debt Management Techniques: {{#each debtManagementTechniques}}{{{techniqueName}}}: {{{description}}}
+CONVERSATION HISTORY:
+{{#each history}}
+- {{role}}: {{content}}
 {{/each}}
-{{/if}}
 
-Consider the following strategies:
-- Debt Avalanche: Prioritize paying off loans with the highest interest rates first.
-- Debt Snowball: Prioritize paying off loans with the smallest balances first.
-- Consider incorporating savings opportunities to accelerate debt payoff.
-- Evaluate the debt management techniques the user is considering.
+Based on the full context of the user's loans and the conversation history, provide a helpful and relevant response to the user's last message. Be conversational and empathetic. If the user asks a question, answer it. If they are looking for a strategy, analyze their loans and suggest one, like the debt avalanche (paying off highest interest rate first) or debt snowball (paying off lowest balance first) methods.
 
-Based on this information, provide a detailed repayment strategy that minimizes interest paid and accelerates debt payoff.
-`, 
+Keep your responses concise and easy to understand.
+`,
 });
+
 
 const prepaymentAdvisorFlow = ai.defineFlow(
   {
@@ -86,8 +78,11 @@ const prepaymentAdvisorFlow = ai.defineFlow(
     inputSchema: PrepaymentAdvisorInputSchema,
     outputSchema: PrepaymentAdvisorOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    return output!;
+  async (input) => {
+    const { output } = await prompt(input);
+    if (!output) {
+      return { content: "I'm sorry, I couldn't process that request. Could you try rephrasing?" };
+    }
+    return output;
   }
 );

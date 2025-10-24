@@ -1,228 +1,117 @@
+// src/app/advisor/ChatInterface.tsx
 'use client';
 
-import { useActionState, useEffect, useRef } from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { getAdviceAction } from './actions';
-import { Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Bot, Loader2, Send, User as UserIcon } from 'lucide-react';
+import { useCollection } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase } from '@/firebase/provider';
+import { askAdvisorAction } from './actions';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { useFormStatus } from 'react-dom';
 
-const PrepaymentAdvisorFormSchema = z.object({
-  income: z.string().min(1, { message: 'Monthly income is required.' }),
-  loans: z.array(
-    z.object({
-      loanName: z.string().min(1, { message: 'Loan name is required.' }),
-      outstandingBalance: z.string().min(1, { message: 'Balance is required.' }),
-      interestRate: z.string().min(1, { message: 'Interest rate is required.' }),
-      minimumPayment: z.string().min(1, { message: 'Minimum payment is required.' }),
-    })
-  ),
-});
-
-type AdvisorFormValues = z.infer<typeof PrepaymentAdvisorFormSchema>;
-
-function SubmitButton() {
-    const { pending } = useFormStatus();
-    return (
-        <Button type="submit" disabled={pending} className="w-full sm:w-auto">
-            {pending ? (
-                <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Getting Advice...
-                </>
-            ) : (
-                <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Get AI Advice
-                </>
-            )}
-        </Button>
-    )
+interface Message {
+  id: string;
+  role: 'user' | 'model';
+  content: string;
+  createdAt: { seconds: number; nanoseconds: number; } | Date;
 }
 
+interface ChatInterfaceProps {
+  userId: string;
+  chatId: string;
+}
 
-export default function AdvisorForm() {
-  const [state, formAction] = useActionState(getAdviceAction, null);
+export default function ChatInterface({ userId, chatId }: ChatInterfaceProps) {
+  const firestore = useFirestore();
+  const [inputValue, setInputValue] = useState('');
+  const [isPending, startTransition] = useTransition();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const resultsRef = useRef<HTMLDivElement>(null);
 
-
-  const form = useForm<AdvisorFormValues>({
-    resolver: zodResolver(PrepaymentAdvisorFormSchema),
-    defaultValues: {
-      income: '',
-      loans: [{ loanName: '', outstandingBalance: '', interestRate: '', minimumPayment: '' }],
-    },
-  });
+  const messagesQuery = useMemoFirebase(() => {
+    if (!userId || !chatId) return null;
+    const messagesRef = collection(firestore, 'users', userId, 'chats', chatId, 'messages');
+    return query(messagesRef, orderBy('createdAt', 'asc'));
+  }, [firestore, userId, chatId]);
   
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'loans',
-  });
-
-  const onSubmit = (data: AdvisorFormValues) => {
-    const formData = new FormData();
-    formData.append('income', data.income);
-    formData.append('loans', JSON.stringify(data.loans));
-    formAction(formData);
+  const { data: messages, isLoading } = useCollection<Message>(messagesQuery);
+  
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-  
+
   useEffect(() => {
-    if (state?.type === 'error' && state.errors?._global) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: state.errors._global[0],
-      })
-    }
-    if (state?.type === 'success' && state.data?.advice) {
-      resultsRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [state, toast]);
+    scrollToBottom();
+  }, [messages]);
+
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputValue.trim() || isPending) return;
+
+    const messageContent = inputValue.trim();
+    setInputValue('');
+
+    startTransition(async () => {
+      const result = await askAdvisorAction(userId, chatId, messageContent);
+      if (result?.type === 'error') {
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: result.error,
+        });
+      }
+    });
+  };
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Financial Details</CardTitle>
-          <CardDescription>
-            Provide your income and loan information so our AI can tailor its advice.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <FormField
-                control={form.control}
-                name="income"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Monthly Take-Home Income</FormLabel>
-                    <FormControl>
-                      <Input type="number" placeholder="e.g., 4000" {...field} />
-                    </FormControl>
-                     <FormMessage>{state?.errors?.income?.[0]}</FormMessage>
-                  </FormItem>
+    <div className="flex-grow flex flex-col bg-muted/20">
+      <div className="flex-grow overflow-y-auto p-4 md:p-6 space-y-6">
+        {isLoading && !messages && (
+            <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+            </div>
+        )}
+        {messages?.map((msg) => (
+            <div key={msg.id} className={cn("flex items-start gap-4", msg.role === 'user' ? 'justify-end' : 'justify-start')}>
+                {msg.role === 'model' && (
+                    <Avatar className="h-8 w-8 border">
+                        <AvatarFallback><Bot /></AvatarFallback>
+                    </Avatar>
                 )}
-              />
+                <div className={cn("max-w-md md:max-w-lg lg:max-w-2xl px-4 py-3 rounded-lg shadow-sm", msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background')}>
+                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                </div>
+                {msg.role === 'user' && (
+                    <Avatar className="h-8 w-8 border">
+                        <AvatarFallback><UserIcon /></AvatarFallback>
+                    </Avatar>
+                )}
+            </div>
+        ))}
+         <div ref={messagesEndRef} />
+      </div>
 
-              <div className="space-y-4">
-                <FormLabel>Your Loans</FormLabel>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="rounded-lg border p-4 space-y-4 relative">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                       <FormField
-                          control={form.control}
-                          name={`loans.${index}.loanName`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Loan Name</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g., Car Loan" {...field} />
-                              </FormControl>
-                              <FormMessage>{state?.errors?.loans?.[index]?.loanName}</FormMessage>
-                            </FormItem>
-                          )}
-                        />
-                       <FormField
-                          control={form.control}
-                          name={`loans.${index}.outstandingBalance`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Outstanding Balance ($)</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="e.g., 15000" {...field} />
-                              </FormControl>
-                               <FormMessage>{state?.errors?.loans?.[index]?.outstandingBalance}</FormMessage>
-                            </FormItem>
-                          )}
-                        />
-                         <FormField
-                          control={form.control}
-                          name={`loans.${index}.interestRate`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Interest Rate (%)</FormLabel>
-                              <FormControl>
-                                <Input type="number" step="0.01" placeholder="e.g., 4.5" {...field} />
-                              </FormControl>
-                              <FormMessage>{state?.errors?.loans?.[index]?.interestRate}</FormMessage>
-                            </FormItem>
-                          )}
-                        />
-                         <FormField
-                          control={form.control}
-                          name={`loans.${index}.minimumPayment`}
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Minimum Payment ($)</FormLabel>
-                              <FormControl>
-                                <Input type="number" placeholder="e.g., 250" {...field} />
-                              </FormControl>
-                               <FormMessage>{state?.errors?.loans?.[index]?.minimumPayment}</FormMessage>
-                            </FormItem>
-                          )}
-                        />
-                    </div>
-                     {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        className="absolute top-2 right-2 h-7 w-7"
-                        onClick={() => remove(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Remove loan</span>
-                      </Button>
-                    )}
-                  </div>
-                ))}
-
-                 <FormMessage>{state?.errors?.loans?.[0]}</FormMessage>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => append({ loanName: '', outstandingBalance: '', interestRate: '', minimumPayment: '' })}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Add Another Loan
-                </Button>
-              </div>
-
-              <div className="flex justify-end">
-                <SubmitButton />
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-      
-      {state?.type === 'success' && state.data?.advice && (
-        <div ref={resultsRef} className="mt-12">
-            <Card className="shadow-lg">
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <Sparkles className="text-accent h-6 w-6"/>
-                        <CardTitle className="font-headline text-2xl text-primary">Your Repayment Strategy</CardTitle>
-                    </div>
-                    <CardDescription>Here is your personalized debt repayment advice from our AI.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="prose prose-lg dark:prose-invert max-w-none whitespace-pre-wrap font-body">
-                        {state.data.advice}
-                    </div>
-                </CardContent>
-            </Card>
-        </div>
-      )}
-    </>
+      <div className="p-4 bg-background border-t">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 max-w-4xl mx-auto">
+          <Input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder="Ask about your loans..."
+            className="flex-grow"
+            disabled={isPending}
+          />
+          <Button type="submit" size="icon" disabled={isPending || !inputValue.trim()}>
+            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            <span className="sr-only">Send message</span>
+          </Button>
+        </form>
+      </div>
+    </div>
   );
 }
