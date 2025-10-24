@@ -11,7 +11,7 @@ export default function HomePage() {
   useHydrationSafe();
   
   return (
-    <div className="flex flex-col dark">
+    <div className="flex flex-col">
       {/* Hero Section */}
       <section className="w-full bg-secondary">
         <div className="container px-4 md:px-6">
