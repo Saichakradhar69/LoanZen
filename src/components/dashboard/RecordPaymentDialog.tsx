@@ -61,8 +61,15 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
     // If there's only one loan, pre-select it
     if (loans.length === 1) {
       form.setValue('loanId', loans[0].id);
+    } else {
+      // Reset when dialog is opened or loans change
+      form.reset({
+        loanId: '',
+        paymentAmount: '' as any,
+        paymentDate: new Date(),
+      });
     }
-  }, [loans, form]);
+  }, [isOpen, loans, form]);
 
   const onSubmit = async (data: PaymentFormValues) => {
     setIsLoading(true);
@@ -76,7 +83,7 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
         throw new Error("Selected loan not found.");
       }
 
-      // 1. Save the new payment
+      // 1. Save the new payment to its subcollection
       const paymentsCollectionRef = collection(firestore, 'users', userId, 'loans', data.loanId, 'payments');
       await addDoc(paymentsCollectionRef, {
         paymentAmount: data.paymentAmount,
@@ -85,40 +92,43 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
       });
 
       // 2. Fetch all payments for the loan to recalculate balance
-      const allPaymentsSnapshot = await getDocs(paymentsCollectionRef);
-      const allPayments = allPaymentsSnapshot.docs.map(doc => ({
-        date: (doc.data().paymentDate as any).toDate(),
-        amount: doc.data().paymentAmount,
-        type: 'repayment', // Assuming all recorded payments are repayments
-      }));
-      // Add the new payment to the list for immediate recalculation
-      allPayments.push({
-          date: data.paymentDate,
-          amount: data.paymentAmount,
-          type: 'repayment',
+      const allPaymentsSnapshot = await getDocs(query(paymentsCollectionRef));
+      const allPayments = allPaymentsSnapshot.docs.map(doc => {
+          const paymentData = doc.data();
+          return {
+            // Firestore timestamps need to be converted to JS Dates
+            date: (paymentData.paymentDate as any).toDate ? (paymentData.paymentDate as any).toDate() : new Date(paymentData.paymentDate),
+            amount: paymentData.paymentAmount,
+            type: 'repayment', // All recorded payments are repayments
+        };
       });
+      
+      // The new payment is now in the snapshot, so no need to add it manually
 
-      // 3. Recalculate current balance
+      // 3. Recalculate current balance using the full loan and payment history
       const calculationInput = {
         ...selectedLoan,
-        disbursementDate: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : selectedLoan.disbursementDate,
-        interestType: 'reducing', // Assuming reducing balance, adjust if necessary
-        rateType: 'fixed', // Assuming fixed rate, adjust if necessary
+        disbursementDate: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : new Date(selectedLoan.disbursementDate),
+        interestType: 'reducing',
+        rateType: selectedLoan.interestRate > 0 ? 'fixed' : 'flat', // A simple assumption
         emiAmount: selectedLoan.monthlyPayment,
-        transactions: allPayments,
+        emisPaid: (selectedLoan.emisPaid || 0) + 1, // Increment EMIs paid
+        transactions: allPayments, // Pass all historical payments to the calculator
+        disbursements: [{ date: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : new Date(selectedLoan.disbursementDate), amount: selectedLoan.originalLoanAmount }]
       };
-
+      
       const { outstandingBalance } = performExistingLoanCalculations(calculationInput as any);
 
-      // 4. Update the loan's currentBalance
+      // 4. Update the loan's currentBalance and emisPaid
       const loanDocRef = doc(firestore, 'users', userId, 'loans', data.loanId);
       await updateDoc(loanDocRef, {
         currentBalance: outstandingBalance,
+        emisPaid: (selectedLoan.emisPaid || 0) + 1,
       });
 
       toast({
         title: 'Success!',
-        description: `Payment of ${format(data.paymentDate, 'PPP')} for ${data.paymentAmount} has been recorded.`,
+        description: `Payment of ${formatCurrency(data.paymentAmount)} on ${format(data.paymentDate, 'PPP')} has been recorded.`,
       });
       
       form.reset();
@@ -128,12 +138,16 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
         toast({
             variant: "destructive",
             title: "Error",
-            description: "Could not record the payment. Please try again."
+            description: `Could not record the payment. ${error instanceof Error ? error.message : ''}`
         });
     } finally {
         setIsLoading(false);
     }
   };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -175,7 +189,7 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
                 <FormItem>
                   <FormLabel>Payment Amount</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="e.g., 500" {...field} />
+                    <Input type="number" step="0.01" placeholder="e.g., 500" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
