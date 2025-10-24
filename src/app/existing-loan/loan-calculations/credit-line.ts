@@ -6,7 +6,7 @@ import type { CalculationResult, Transaction } from '../actions';
 
 type LoanEvent = {
     date: Date;
-    type: 'withdrawal' | 'repayment' | 'rate-change';
+    type: 'withdrawal' | 'repayment' | 'rate-change' | 'disbursement'; // Added disbursement
     amount: number;
     rate?: number;
 };
@@ -42,10 +42,16 @@ export function calculateCreditLine(data: ExistingLoanFormData): CalculationResu
         }
     });
 
-    // Add withdrawals and repayments
+    // Add withdrawals/disbursements and repayments from transactions array
     (data.transactions || []).forEach(t => {
         if (t.date && t.amount > 0) {
             events.push({ date: new Date(t.date), type: t.type, amount: t.amount });
+        }
+    });
+     // Also consider the main disbursements array
+    (data.disbursements || []).forEach(d => {
+        if (d.date && d.amount > 0) {
+            events.push({ date: new Date(d.date), type: 'disbursement', amount: d.amount });
         }
     });
 
@@ -56,7 +62,7 @@ export function calculateCreditLine(data: ExistingLoanFormData): CalculationResu
     let balance = 0;
     let currentRate = interestRate;
     let interestPaidToDate = 0;
-    let lastEventDate = firstUsageDate;
+    let lastEventDate = events.length > 0 ? events[0].date : firstUsageDate;
 
     for (const event of events) {
         if (isBefore(event.date, lastEventDate) || !isBefore(lastEventDate, asOfDate)) continue;
@@ -80,13 +86,14 @@ export function calculateCreditLine(data: ExistingLoanFormData): CalculationResu
         lastEventDate = event.date;
 
         switch (event.type) {
+            case 'disbursement':
             case 'withdrawal':
                 balance += event.amount;
-                schedule.push({ date: format(event.date, 'yyyy-MM-dd'), type: event.type, amount: event.amount, principal: event.amount, interest: 0, endingBalance: balance, note: 'Withdrawal' });
+                schedule.push({ date: format(event.date, 'yyyy-MM-dd'), type: event.type, amount: event.amount, principal: event.amount, interest: 0, endingBalance: balance, note: 'Withdrawal/Disbursement' });
                 break;
             case 'rate-change':
                 currentRate = event.rate || currentRate;
-                schedule.push({ date: format(event.date, 'yyyy-MM-dd'), type: event.type, amount: event.amount, principal: 0, interest: 0, endingBalance: balance, note: `Rate changed to ${currentRate}%` });
+                schedule.push({ date: format(event.date, 'yyyy-MM-dd'), type: 'interest', amount: 0, principal: 0, interest: 0, endingBalance: balance, note: `Rate changed to ${currentRate}%` });
                 break;
             case 'repayment':
                 const interestComponent = Math.min(balance, interestForPeriod);
@@ -110,11 +117,13 @@ export function calculateCreditLine(data: ExistingLoanFormData): CalculationResu
         }
     }
     
-    const originalLoanAmount = events.filter(e => e.type === 'withdrawal').reduce((sum, e) => sum + e.amount, 0);
+    const originalLoanAmount = events.filter(e => e.type === 'withdrawal' || e.type === 'disbursement').reduce((sum, e) => sum + e.amount, 0);
 
     const perDayInterest = balance > 0 ? (balance * (currentRate / 100)) / 365.25 : 0;
     
     schedule.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    
+    const projectedTotalInterest = interestPaidToDate + (balance > 0 ? (balance * 0.1) : 0); // Rough projection
 
     return {
         outstandingBalance: balance,
@@ -127,5 +136,6 @@ export function calculateCreditLine(data: ExistingLoanFormData): CalculationResu
         interestRate: currentRate,
         perDayInterest,
         schedule,
+        projectedTotalInterest,
     };
 }

@@ -32,6 +32,12 @@ const rateChangeSchema = z.object({
   rate: z.coerce.number().positive('Rate must be positive.').max(100, "Rate seems too high."),
 });
 
+const transactionSchema = z.object({
+  date: z.date({ required_error: 'Transaction date is required.' }),
+  amount: z.coerce.number().positive('Amount must be positive.'),
+  type: z.enum(['repayment', 'disbursement']),
+});
+
 // This is the client-side validation schema.
 const formSchema = z.object({
     loanType: z.string({ required_error: 'Please select a loan type.' }),
@@ -48,6 +54,7 @@ const formSchema = z.object({
     moratoriumPaymentAmount: z.coerce.number().optional(),
     disbursements: z.array(disbursementSchema).optional(),
     rateChanges: z.array(rateChangeSchema).optional(),
+    transactions: z.array(transactionSchema).optional(), // for credit-line and custom
     emisPaid: z.coerce.number().min(0, "EMI periods passed cannot be negative.").optional(),
     missedEmis: z.coerce.number().min(0, "Missed EMIs cannot be negative.").optional(),
 }).superRefine((data, ctx) => {
@@ -128,7 +135,8 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             emisPaid: undefined,
             missedEmis: 0,
             disbursements: [],
-            rateChanges: []
+            rateChanges: [],
+            transactions: [],
         },
     });
     
@@ -155,6 +163,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
     
     const { fields: disbursementFields, append: appendDisbursement, remove: removeDisbursement } = useFieldArray({ control: form.control, name: 'disbursements' });
     const { fields: rateChangeFields, append: appendRateChange, remove: removeRateChange } = useFieldArray({ control: form.control, name: 'rateChanges' });
+     const { fields: transactionFields, append: appendTransaction, remove: removeTransaction } = useFieldArray({ control: form.control, name: 'transactions' });
 
     const isOriginalAmountDisabled = disbursements && disbursements.length > 0;
 
@@ -172,7 +181,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
             ) : null}
              <FormField control={form.control} name="disbursementDate" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                    <FormLabel>First Disbursement Date</FormLabel>
+                    <FormLabel>First Disbursement/Usage Date</FormLabel>
                     <Popover>
                         <PopoverTrigger asChild>
                             <FormControl>
@@ -247,22 +256,26 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                     <FormMessage />
                 </FormItem>
             )} />
-             <FormField control={form.control} name="emiAmount" render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Monthly Payment (EMI) Amount</FormLabel>
-                    <FormControl><Input type="number" placeholder="e.g., 1200" {...field} value={field.value ?? ''} /></FormControl>
-                     <FormDescription>The amount you pay each month.</FormDescription>
-                    <FormMessage />
-                </FormItem>
-            )} />
-             <FormField control={form.control} name="paymentDueDay" render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Payment Due Day of Month</FormLabel>
-                    <FormControl><Input type="number" min="1" max="31" placeholder="e.g., 5" {...field} value={field.value ?? ''} /></FormControl>
-                     <FormDescription>The day your EMI is due each month.</FormDescription>
-                    <FormMessage />
-                </FormItem>
-            )} />
+             {loanType !== 'credit-line' && (
+                <>
+                <FormField control={form.control} name="emiAmount" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Monthly Payment (EMI) Amount</FormLabel>
+                        <FormControl><Input type="number" placeholder="e.g., 1200" {...field} value={field.value ?? ''} /></FormControl>
+                        <FormDescription>The amount you pay each month.</FormDescription>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                <FormField control={form.control} name="paymentDueDay" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Payment Due Day of Month</FormLabel>
+                        <FormControl><Input type="number" min="1" max="31" placeholder="e.g., 5" {...field} value={field.value ?? ''} /></FormControl>
+                        <FormDescription>The day your EMI is due each month.</FormDescription>
+                        <FormMessage />
+                    </FormItem>
+                )} />
+                </>
+             )}
         </>
     )
     
@@ -316,6 +329,30 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                     </div>
                 ))}
                 <Button type="button" variant="outline" onClick={() => appendDisbursement({ date: new Date(), amount: '' as any })}><Plus className="mr-2" />Add Disbursement</Button>
+            </div>
+        </div>
+    )
+    
+     const renderTransactions = () => (
+         <div>
+             <Label>Transactions</Label>
+             <FormDescription>Add all withdrawals and repayments for your line of credit.</FormDescription>
+             <div className="space-y-4 mt-2">
+                {transactionFields.map((field, index) => (
+                    <div key={field.id} className="flex items-end gap-4 p-4 border rounded-lg relative">
+                        <FormField control={form.control} name={`transactions.${index}.date`} render={({ field }) => (
+                            <FormItem className="flex flex-col"><FormLabel>Date</FormLabel><Popover><PopoverTrigger asChild><Button variant="outline" className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}><CalendarIcon className="mr-2 h-4 w-4" />{field.value ? format(field.value, 'PPP') : <span>Pick a date</span>}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name={`transactions.${index}.amount`} render={({ field }) => (
+                             <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" placeholder="e.g., 1000" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                         <FormField control={form.control} name={`transactions.${index}.type`} render={({ field }) => (
+                            <FormItem className="w-full"><FormLabel>Type</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger></FormControl><SelectContent><SelectItem value="disbursement">Withdrawal</SelectItem><SelectItem value="repayment">Repayment</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+                        )} />
+                        <Button type="button" variant="destructive" size="icon" onClick={() => removeTransaction(index)}><Trash2 className="h-4 w-4" /></Button>
+                    </div>
+                ))}
+                <Button type="button" variant="outline" onClick={() => appendTransaction({ date: new Date(), amount: '' as any, type: 'disbursement' })}><Plus className="mr-2" />Add Transaction</Button>
             </div>
         </div>
     )
@@ -427,6 +464,8 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                         )} />
                     </div>
                  );
+            case 'credit-line':
+                return renderTransactions();
             default:
                 return null;
         }
@@ -451,7 +490,7 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                                         <SelectItem value="car">Car Loan</SelectItem>
                                         <SelectItem value="home">Home Loan</SelectItem>
                                         <SelectItem value="education">Education Loan</SelectItem>
-                                        <SelectItem value="custom">Custom (Not Yet Supported)</SelectItem>
+                                        <SelectItem value="credit-line">Line of Credit</SelectItem>
                                     </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -467,15 +506,17 @@ export default function ExistingLoanForm({ onCalculate, serverState }: ExistingL
                             {renderLoanSpecificFields()}
                         </div>
 
-                        <div className="space-y-6 pt-4 border-t">
-                            <h3 className="text-lg font-medium text-primary">Advanced Details</h3>
-                             {renderDisbursements()}
-                             {rateType === 'floating' && (
-                                <div className="pt-6 border-t">
-                                    {renderFloatingRateHistory()}
-                                </div>
-                            )}
-                        </div>
+                        {loanType !== 'credit-line' && (
+                            <div className="space-y-6 pt-4 border-t">
+                                <h3 className="text-lg font-medium text-primary">Advanced Details</h3>
+                                {renderDisbursements()}
+                                {rateType === 'floating' && (
+                                    <div className="pt-6 border-t">
+                                        {renderFloatingRateHistory()}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                         
                          {serverState?.type === 'error' && serverState.errors?._global && (
                             <FormMessage className="text-center text-lg">{serverState.errors._global[0]}</FormMessage>

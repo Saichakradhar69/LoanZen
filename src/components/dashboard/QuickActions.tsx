@@ -7,9 +7,10 @@ import Link from 'next/link';
 
 interface QuickActionsProps {
     onAddLoan: () => void;
+    onRecordPayment: () => void;
 }
 
-export default function QuickActions({ onAddLoan }: QuickActionsProps) {
+export default function QuickActions({ onAddLoan, onRecordPayment }: QuickActionsProps) {
     return (
         <Card>
             <CardHeader>
@@ -19,7 +20,7 @@ export default function QuickActions({ onAddLoan }: QuickActionsProps) {
                 <Button onClick={onAddLoan}>
                     <Plus className="mr-2 h-4 w-4" /> Add New Loan
                 </Button>
-                <Button variant="secondary">
+                <Button variant="secondary" onClick={onRecordPayment}>
                     <Receipt className="mr-2 h-4 w-4" /> Record Payment
                 </Button>
                  <Button variant="secondary">

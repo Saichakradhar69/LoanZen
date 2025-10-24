@@ -25,6 +25,7 @@ import UpcomingPayments from '@/components/dashboard/UpcomingPayments';
 import AiInsights from '@/components/dashboard/AiInsights';
 import YourLoans from '@/components/dashboard/YourLoans';
 import PaymentTimeline from '@/components/dashboard/PaymentTimeline';
+import RecordPaymentDialog from '@/components/dashboard/RecordPaymentDialog';
 
 export interface Loan {
   id: string;
@@ -46,6 +47,7 @@ export default function DashboardPage() {
     const { toast } = useToast();
 
     const [isAddLoanOpen, setIsAddLoanOpen] = useState(false);
+    const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
     const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
     const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
     
@@ -91,11 +93,15 @@ export default function DashboardPage() {
         }
     };
     
-    const handleDialogClose = (open: boolean) => {
+    const handleAddLoanDialogClose = (open: boolean) => {
         if (!open) {
             setLoanToEdit(null);
         }
         setIsAddLoanOpen(open);
+    }
+    
+     const handleRecordPaymentDialogClose = () => {
+        setIsRecordPaymentOpen(false);
     }
 
     if (isLoading) {
@@ -126,7 +132,10 @@ export default function DashboardPage() {
                          <PaymentTimeline loans={loans} />
                     </div>
                     <div className="space-y-8">
-                        <QuickActions onAddLoan={() => setIsAddLoanOpen(true)} />
+                        <QuickActions 
+                            onAddLoan={() => setIsAddLoanOpen(true)}
+                            onRecordPayment={() => setIsRecordPaymentOpen(true)}
+                         />
                         <UpcomingPayments loans={loans} />
                         <AiInsights />
                     </div>
@@ -134,9 +143,15 @@ export default function DashboardPage() {
             </div>
              <AddLoanDialog
                 isOpen={isAddLoanOpen}
-                setIsOpen={handleDialogClose}
+                setIsOpen={handleAddLoanDialogClose}
                 userId={user.uid}
                 loanToEdit={loanToEdit}
+            />
+            <RecordPaymentDialog
+                isOpen={isRecordPaymentOpen}
+                setIsOpen={handleRecordPaymentDialogClose}
+                userId={user.uid}
+                loans={loans}
             />
             <AlertDialog open={!!loanToDelete} onOpenChange={() => setLoanToDelete(null)}>
                 <AlertDialogContent>

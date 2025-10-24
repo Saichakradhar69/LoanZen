@@ -1,148 +1,165 @@
 /**
- * @file Firestore Security Rules for LoanZen application.
+ * @fileoverview Firestore Security Rules for LoanZen.
  *
  * Core Philosophy:
- * This ruleset enforces a strict user-ownership model. Each user has full control over their own data, and no access to other users' data.
+ * This ruleset enforces a strict user-ownership model. Each user has exclusive
+ * access to their own data, and no user can access another user's data.
  *
  * Data Structure:
- * All data is nested under /users/{userId}, ensuring clear ownership and easy path-based security.
- * /users/{userId} : Stores user profiles.
- * /users/{userId}/loans/{loanId} : Stores loan details associated with a specific user.
- * /users/{userId}/loans/{loanId}/payments/{paymentId} : Stores payment details for a specific loan owned by a user.
- * /users/{userId}/loans/{loanId}/rateHistory/{rateId} : Stores the rate history for a specific loan owned by a user.
- * /users/{userId}/chats/{chatId}: Stores chat sessions for a user.
- * /users/{userId}/chats/{chatId}/messages/{messageId}: Stores messages within a user's chat session.
+ * All data is nested under /users/{userId}, ensuring clear ownership.  This includes
+ * loans, payments, and rate history.
  *
  * Key Security Decisions:
- * - Strict ownership: Only the authenticated user matching the `userId` path segment can read or write data within that path.
- * - No listing of all users: There is no rule allowing listing of the top-level `/users` collection. This prevents enumeration of user IDs.
- *
- * Denormalization for Authorization:
- * The `subscriptionStatus` from the user document MUST be copied into each `loan` document (and potentially into payments and rateHistory as well, if needed) to avoid costly `get()` calls in security rules.
+ * - User listing is explicitly denied.
+ * - Data required for authorization (e.g., subscription status) must be
+ *   denormalized into subcollections to avoid costly `get()` calls in rules.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Allows a user to manage their own profile.
-     * @path /users/{userId}
-     * @allow (create) User with ID 'user123' can create their profile if authenticated as 'user123'.
-     * @deny (create) User with ID 'user456' cannot create a profile for 'user123' when authenticated as 'user456'.
-     * @principle Enforces document ownership and ID consistency for user profiles.
+     * @description Root match to prevent unauthorized access to the entire database.
+     * @path /databases/{database}/documents
+     * @allow N/A
+     * @deny Any request to the root path.
+     * @principle Prevents open access to the entire database.
      */
-    match /users/{userId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
-      allow get: if isOwner(userId);
-      allow list: if false; // Prevent listing all users
-
-      allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isOwner(userId) && resource.data.id == userId; // Enforce immutability
-      allow delete: if isOwner(userId) && resource != null; // Ensure the document exists before deleting
-
+    match /{document=**} {
+      allow read, write: if false;
     }
 
     /**
-     * @description Allows a user to manage their own loans.
+     * @description Manages access to user profiles. Only the authenticated user can read/write their own profile.
+     * @path /users/{userId}
+     * @allow (create) An authenticated user can create their own profile if request.auth.uid == userId.
+     * @allow (get) An authenticated user can read their own profile if request.auth.uid == userId.
+     * @allow (update) An authenticated user can update their own profile if request.auth.uid == userId.
+     * @allow (delete) An authenticated user can delete their own profile if request.auth.uid == userId.
+     * @deny (create) A user cannot create a profile with a userId that does not match their auth.uid.
+     * @deny (read) A user cannot read another user's profile.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false; // User listing is not permitted
+
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Manages access to loan documents. Only the owner can read, write, or delete their loans.
      * @path /users/{userId}/loans/{loanId}
-     * @allow (create) User 'user123' can create a loan under their profile.
-     * @deny (update) User 'user456' cannot update a loan under 'user123' profile.
-     * @principle Enforces user-ownership for loan data.
+     * @allow (create) Authenticated user can create a loan under their userId if they own the userId.
+     * @allow (get) Authenticated user can read a loan under their userId if they own the userId.
+     * @allow (update) Authenticated user can update a loan under their userId if they own the userId.
+     * @allow (delete) Authenticated user can delete a loan under their userId if they own the userId.
+     * @deny (create) A user cannot create a loan for another user.
+     * @deny (read) A user cannot read another user's loan.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId}/loans/{loanId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
 
       allow create: if isOwner(userId) && request.resource.data.userId == userId;
-      allow update: if isOwner(userId) && resource.data.userId == userId && resource != null; //Enforce immutability and check for existance
-      allow delete: if isOwner(userId) && resource != null;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows a user to manage their own loan payments.
+     * @description Manages access to payment documents. Only the owner of the loan can manage its payments.
      * @path /users/{userId}/loans/{loanId}/payments/{paymentId}
-     * @allow (create) User 'user123' can create a payment record for their loan.
-     * @deny (delete) User 'user456' cannot delete payment records under 'user123' loan.
-     * @principle Enforces user-ownership for loan payment data.
+     * @allow (create) Authenticated user can create a payment under their loan if they own the loan and user.
+     * @allow (get) Authenticated user can read a payment under their loan if they own the loan and user.
+     * @allow (update) Authenticated user can update a payment under their loan if they own the loan and user.
+     * @allow (delete) Authenticated user can delete a payment under their loan if they own the loan and user.
+     * @deny (create) A user cannot create a payment for another user's loan.
+     * @deny (read) A user cannot read another user's loan's payment.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId}/loans/{loanId}/payments/{paymentId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
 
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource != null;
-      allow delete: if isOwner(userId) && resource != null;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows a user to manage the rate history of their loans.
+     * @description Manages access to rate history documents. Only the loan owner can manage the rate history.
      * @path /users/{userId}/loans/{loanId}/rateHistory/{rateId}
-     * @allow (create) User 'user123' can create a rate history record for their loan.
-     * @deny (update) User 'user456' cannot modify rate history records under 'user123' loan.
-     * @principle Enforces user-ownership for loan rate history data.
+     * @allow (create) Authenticated user can create a rate history entry under their loan if they own the loan and user.
+     * @allow (get) Authenticated user can read a rate history entry under their loan if they own the loan and user.
+     * @allow (update) Authenticated user can update a rate history entry under their loan if they own the loan and user.
+     * @allow (delete) Authenticated user can delete a rate history entry under their loan if they own the loan and user.
+     * @deny (create) A user cannot create a rate history entry for another user's loan.
+     * @deny (read) A user cannot read another user's loan's rate history.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId}/loans/{loanId}/rateHistory/{rateId} {
-      function isOwner(userId) {
-        return request.auth != null && request.auth.uid == userId;
-      }
-
       allow get: if isOwner(userId);
       allow list: if isOwner(userId);
 
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) && resource != null;
-      allow delete: if isOwner(userId) && resource != null;
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows a user to manage their own chats.
+     * @description Manages access to chat sessions. Only the owner of the chat can read/write their chats.
      * @path /users/{userId}/chats/{chatId}
-     * @allow (create) User 'user123' can create a chat.
-     * @deny (update) User 'user456' cannot update a chat under 'user123'.
-     * @principle Enforces user-ownership for chat sessions.
+     * @allow (create) An authenticated user can create a chat if request.auth.uid == userId.
+     * @allow (get) An authenticated user can read their own chat if request.auth.uid == userId.
+     * @allow (update) An authenticated user can update their own chat if request.auth.uid == userId.
+     * @allow (delete) An authenticated user can delete their own chat if request.auth.uid == userId.
+     * @deny (create) A user cannot create a chat with a userId that does not match their auth.uid.
+     * @deny (read) A user cannot read another user's chat.
+     * @principle Enforces document ownership for all operations.
      */
-    match /users/{userId}/chats/{chatId} {
-        function isOwner(userId) {
-            return request.auth != null && request.auth.uid == userId;
-        }
-
+     match /users/{userId}/chats/{chatId} {
         allow get: if isOwner(userId);
         allow list: if isOwner(userId);
 
-        allow create: if isOwner(userId);
-        allow update: if isOwner(userId) && resource != null;
-        allow delete: if isOwner(userId) && resource != null;
+        allow create: if isOwner(userId) && request.resource.data.userId == userId;
+        allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+        allow delete: if isExistingOwner(userId);
     }
 
     /**
-     * @description Allows a user to manage their own chat messages.
+     * @description Manages access to chat messages. Only the owner of the chat session can read/write messages.
      * @path /users/{userId}/chats/{chatId}/messages/{messageId}
-     * @allow (create) User 'user123' can create a message in their chat.
-     * @deny (delete) User 'user456' cannot delete messages in 'user123' chat.
-     * @principle Enforces user-ownership for chat messages.
+     * @allow (create) An authenticated user can create a message if they own the chat session.
+     * @allow (get) An authenticated user can read messages in their own chat session.
+     * @allow (update) An authenticated user can update messages in their own chat session.
+     * @allow (delete) An authenticated user can delete messages in their own chat session.
+     * @deny (create) A user cannot create a message in another user's chat session.
+     * @deny (read) A user cannot read messages in another user's chat session.
+     * @principle Enforces document ownership for all operations.
      */
     match /users/{userId}/chats/{chatId}/messages/{messageId} {
-        function isOwner(userId) {
-            return request.auth != null && request.auth.uid == userId;
-        }
-
         allow get: if isOwner(userId);
         allow list: if isOwner(userId);
 
         allow create: if isOwner(userId);
-        allow update: if isOwner(userId) && resource != null;
-        allow delete: if isOwner(userId) && resource != null;
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+        return isOwner(userId) && resource != null;
     }
   }
 }
