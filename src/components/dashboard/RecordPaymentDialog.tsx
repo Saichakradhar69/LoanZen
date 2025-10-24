@@ -23,7 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, toDate } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { performExistingLoanCalculations } from '@/app/existing-loan/calculations';
 import type { Loan } from '@/app/dashboard/page';
@@ -61,6 +61,10 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
     // If there's only one loan, pre-select it
     if (loans.length === 1) {
       form.setValue('loanId', loans[0].id);
+      const selectedLoan = loans.find(l => l.id === loans[0].id);
+      if (selectedLoan) {
+          form.setValue('paymentAmount', selectedLoan.monthlyPayment);
+      }
     } else {
       // Reset when dialog is opened or loans change
       form.reset({
@@ -90,40 +94,29 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
         paymentDate: data.paymentDate,
         createdAt: serverTimestamp(),
       });
-
-      // 2. Fetch all payments for the loan to recalculate balance
-      const allPaymentsSnapshot = await getDocs(query(paymentsCollectionRef));
-      const allPayments = allPaymentsSnapshot.docs.map(doc => {
-          const paymentData = doc.data();
-          return {
-            // Firestore timestamps need to be converted to JS Dates
-            date: (paymentData.paymentDate as any).toDate ? (paymentData.paymentDate as any).toDate() : new Date(paymentData.paymentDate),
-            amount: paymentData.paymentAmount,
-            type: 'repayment', // All recorded payments are repayments
-        };
-      });
       
-      // The new payment is now in the snapshot, so no need to add it manually
+      // The number of EMIs paid is now incremented by 1
+      const newEmisPaidCount = (selectedLoan.emisPaid || 0) + 1;
 
-      // 3. Recalculate current balance using the full loan and payment history
+      // 2. Recalculate current balance using the full loan and payment history
       const calculationInput = {
         ...selectedLoan,
-        disbursementDate: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : new Date(selectedLoan.disbursementDate),
+        disbursementDate: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : toDate(selectedLoan.disbursementDate),
         interestType: 'reducing',
-        rateType: selectedLoan.interestRate > 0 ? 'fixed' : 'flat', // A simple assumption
+        rateType: 'fixed',
         emiAmount: selectedLoan.monthlyPayment,
-        emisPaid: (selectedLoan.emisPaid || 0) + 1, // Increment EMIs paid
-        transactions: allPayments, // Pass all historical payments to the calculator
-        disbursements: [{ date: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : new Date(selectedLoan.disbursementDate), amount: selectedLoan.originalLoanAmount }]
+        emisPaid: newEmisPaidCount, // Use the new count
+        disbursements: [{ date: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : toDate(selectedLoan.disbursementDate), amount: selectedLoan.originalLoanAmount }]
       };
       
+      // performExistingLoanCalculations now handles all transactions internally
       const { outstandingBalance } = performExistingLoanCalculations(calculationInput as any);
 
-      // 4. Update the loan's currentBalance and emisPaid
+      // 3. Update the loan's currentBalance and emisPaid
       const loanDocRef = doc(firestore, 'users', userId, 'loans', data.loanId);
       await updateDoc(loanDocRef, {
         currentBalance: outstandingBalance,
-        emisPaid: (selectedLoan.emisPaid || 0) + 1,
+        emisPaid: newEmisPaidCount, // Update the emisPaid count in Firestore
       });
 
       toast({
@@ -144,6 +137,13 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
         setIsLoading(false);
     }
   };
+  
+    const handleLoanChange = (loanId: string) => {
+        const selectedLoan = loans.find(loan => loan.id === loanId);
+        if (selectedLoan) {
+            form.setValue('paymentAmount', selectedLoan.monthlyPayment);
+        }
+    }
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -166,7 +166,7 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Loan</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                  <Select onValueChange={(value) => {field.onChange(value); handleLoanChange(value);}} defaultValue={field.value} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a loan to pay" />
