@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Bot, Loader2, Send, User as UserIcon } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy, addDoc, serverTimestamp, doc, getDoc, getDocs, limit, setDoc } from 'firebase/firestore';
 import { askAdvisorAction } from './actions';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
@@ -39,6 +39,12 @@ export default function ChatInterface({ userId, chatId }: ChatInterfaceProps) {
   
   const { data: messages, isLoading } = useCollection<Message>(messagesQuery);
   
+  const loansQuery = useMemoFirebase(() => {
+    if (!userId) return null;
+    return collection(firestore, 'users', userId, 'loans');
+  }, [firestore, userId]);
+  const { data: loans } = useCollection<any>(loansQuery);
+  
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -46,6 +52,35 @@ export default function ChatInterface({ userId, chatId }: ChatInterfaceProps) {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Ensure the parent chat document exists to satisfy security rules and provide metadata
+  useEffect(() => {
+    const ensureChatDoc = async () => {
+      if (!userId || !chatId) return;
+      try {
+        const chatDocRef = doc(firestore, 'users', userId, 'chats', chatId);
+        const chatDoc = await getDoc(chatDocRef);
+        if (!chatDoc.exists()) {
+          await setDoc(chatDocRef, {
+            userId,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+          // Seed greeting if there are no messages yet
+          const msgsRef = collection(firestore, 'users', userId, 'chats', chatId, 'messages');
+          await addDoc(msgsRef, {
+            role: 'model',
+            content: 'Hello! I am your personal financial advisor. How can I help you with your loans today?',
+            createdAt: serverTimestamp(),
+          });
+        }
+      } catch (e: any) {
+        console.error('Failed to ensure chat doc:', e);
+        toast({ variant: 'destructive', title: 'Chat unavailable', description: e?.message || 'Could not start chat.' });
+      }
+    };
+    ensureChatDoc();
+  }, [firestore, userId, chatId, toast]);
 
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -56,13 +91,55 @@ export default function ChatInterface({ userId, chatId }: ChatInterfaceProps) {
     setInputValue('');
 
     startTransition(async () => {
-      const result = await askAdvisorAction(userId, chatId, messageContent);
+      // 1) Ensure chat doc exists, then write the user's message
+      const chatDocRef = doc(firestore, 'users', userId, 'chats', chatId);
+      const chatDoc = await getDoc(chatDocRef);
+      if (!chatDoc.exists()) {
+        await setDoc(chatDocRef, { userId, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      }
+      const messagesRef = collection(firestore, 'users', userId, 'chats', chatId, 'messages');
+      await addDoc(messagesRef, { role: 'user', content: messageContent, createdAt: serverTimestamp() });
+
+      // 2) Build rich context on the client
+      const userDocRef = doc(firestore, 'users', userId);
+      const userDoc = await getDoc(userDocRef);
+      const userProfile = userDoc.exists() ? userDoc.data() : {};
+
+      const loansWithPayments = await Promise.all(
+        (loans || []).map(async (ln: any) => {
+          try {
+            const paysQ = query(
+              collection(firestore, 'users', userId, 'loans', ln.id, 'payments'),
+              orderBy('paymentDate', 'desc'),
+              limit(12)
+            );
+            const paysSnap = await getDocs(paysQ);
+            const payments = paysSnap.docs.map(p => ({ id: p.id, ...p.data() }));
+            return { ...ln, payments };
+          } catch {
+            return { ...ln, payments: [] };
+          }
+        })
+      );
+
+      const recentHistory = (messages || []).slice(-30).map(m => ({ role: m.role, content: m.content }));
+
+      // 3) Call server action purely for LLM, passing context
+      const result = await askAdvisorAction(userId, chatId, messageContent, {
+        userProfile,
+        loans: loansWithPayments,
+        history: recentHistory,
+      });
       if (result?.type === 'error') {
         toast({
             variant: "destructive",
             title: "Error",
             description: result.error,
         });
+      } else if (result?.type === 'success') {
+        const reply = result.data.content;
+        // 4) Write the model reply client-side and bump chat updatedAt
+        await addDoc(messagesRef, { role: 'model', content: reply, createdAt: serverTimestamp() });
       }
     });
   };

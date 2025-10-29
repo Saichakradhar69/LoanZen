@@ -7,18 +7,21 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Bell, ChevronDown, Cog, LogOut, Menu, User } from 'lucide-react';
 import Logo from '../logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { useState, useEffect } from 'react';
-import { useUser } from '@/firebase';
+import { useState, useEffect, useMemo } from 'react';
+import { useUser, useFirestore } from '@/firebase';
 import { getAuth, signOut } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
 import ClientOnly from '../ClientOnly';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
+import { useDoc } from '@/firebase/firestore/use-doc';
 
 export default function Header() {
   const [currency, setCurrency] = useState('USD');
   const [isMounted, setIsMounted] = useState(false);
   const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
   const auth = getAuth();
 
   useEffect(() => {
@@ -48,14 +51,43 @@ export default function Header() {
 
   const currencies = ['USD', 'EUR', 'GBP', 'INR'];
 
+  // Subscribe to the authenticated user's profile to determine trial status
+  type UserProfile = {
+    subscriptionStatus?: 'trial' | 'active' | 'expired' | string;
+    trialEnds?: any; // Firestore Timestamp | Date | string
+  };
+
+  const userDocRef = useMemo(() => (
+    user ? doc(firestore, 'users', user.uid) : null
+  ), [user, firestore]);
+
+  const { data: userProfile } = useDoc<UserProfile>(userDocRef);
+
+  const trialDaysLeft = useMemo(() => {
+    if (!user || !userProfile || userProfile.subscriptionStatus !== 'trial') return 0;
+    const raw = userProfile.trialEnds as any;
+    let endsAt: Date | null = null;
+    if (raw && typeof raw?.toDate === 'function') {
+      endsAt = raw.toDate();
+    } else if (raw) {
+      endsAt = new Date(raw);
+    }
+    if (!endsAt) return 0;
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const diff = Math.ceil((endsAt.getTime() - Date.now()) / msPerDay);
+    return diff > 0 ? diff : 0;
+  }, [user, userProfile]);
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         <div className="mr-auto hidden md:flex items-center gap-4">
           <Logo />
-           <div className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "cursor-default hover:bg-transparent")}>
-            Trial: 12 days left
-          </div>
+          {trialDaysLeft > 0 && (
+            <div className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "cursor-default hover:bg-transparent")}> 
+              Trial: {trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} left
+            </div>
+          )}
         </div>
 
         <div className="md:hidden flex-1">

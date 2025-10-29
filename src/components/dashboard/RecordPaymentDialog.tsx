@@ -95,8 +95,9 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
         createdAt: serverTimestamp(),
       });
       
-      // The number of EMIs paid is now incremented by 1
-      const newEmisPaidCount = (selectedLoan.emisPaid || 0) + 1;
+      // Determine whether this counts as a full EMI or a partial/extra payment
+      const isFullEmiPayment = data.paymentAmount >= (selectedLoan.monthlyPayment - 0.01);
+      const newEmisPaidCount = (selectedLoan.emisPaid || 0) + (isFullEmiPayment ? 1 : 0);
 
       // 2. Recalculate current balance using the full loan and payment history
       const calculationInput = {
@@ -105,18 +106,27 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
         interestType: 'reducing',
         rateType: 'fixed',
         emiAmount: selectedLoan.monthlyPayment,
-        emisPaid: newEmisPaidCount, // Use the new count
+        emisPaid: newEmisPaidCount, // Use the new count if it was a full EMI
         disbursements: [{ date: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : toDate(selectedLoan.disbursementDate), amount: selectedLoan.originalLoanAmount }]
       };
       
       // performExistingLoanCalculations now handles all transactions internally
-      const { outstandingBalance } = performExistingLoanCalculations(calculationInput as any);
+      let { outstandingBalance } = performExistingLoanCalculations(calculationInput as any);
+
+      // Apply any extra or partial amount as a direct principal adjustment
+      // - If full EMI: extraAmount reduces principal immediately
+      // - If partial (less than EMI): treat the whole amount as a principal-only payment today
+      const extraAmount = isFullEmiPayment ? (data.paymentAmount - selectedLoan.monthlyPayment) : data.paymentAmount;
+      if (extraAmount && extraAmount > 0) {
+        outstandingBalance = Math.max(0, outstandingBalance - extraAmount);
+      }
 
       // 3. Update the loan's currentBalance and emisPaid
       const loanDocRef = doc(firestore, 'users', userId, 'loans', data.loanId);
       await updateDoc(loanDocRef, {
         currentBalance: outstandingBalance,
-        emisPaid: newEmisPaidCount, // Update the emisPaid count in Firestore
+        emisPaid: newEmisPaidCount,
+        updatedAt: serverTimestamp(),
       });
 
       toast({
