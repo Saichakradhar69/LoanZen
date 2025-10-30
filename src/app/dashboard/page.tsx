@@ -23,7 +23,6 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import QuickActions from '@/components/dashboard/QuickActions';
 import UpcomingPayments from '@/components/dashboard/UpcomingPayments';
-import AiInsights from '@/components/dashboard/AiInsights';
 import YourLoans from '@/components/dashboard/YourLoans';
 import PaymentTimeline from '@/components/dashboard/PaymentTimeline';
 import RecordPaymentDialog from '@/components/dashboard/RecordPaymentDialog';
@@ -118,8 +117,8 @@ export default function DashboardPage() {
     }
 
     return (
-        <div className="min-h-screen bg-background">
-            <div className="container mx-auto p-4 sm:p-6 md:p-8 space-y-8">
+        <div className="min-h-screen bg-gradient-to-b from-background via-muted/30 to-background">
+            <div className="container mx-auto p-4 sm:p-6 md:p-8 space-y-6 md:space-y-8">
                 <LoanSummaryCards loans={loans} />
                 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -138,7 +137,6 @@ export default function DashboardPage() {
                             onRecordPayment={() => setIsRecordPaymentOpen(true)}
                          />
                         <UpcomingPayments loans={loans} />
-                        <AiInsights />
                     </div>
                 </div>
             </div>

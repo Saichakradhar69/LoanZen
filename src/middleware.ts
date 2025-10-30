@@ -6,22 +6,20 @@ import type { NextRequest } from 'next/server'
 // trying to access login/signup pages. The protection of the /dashboard
 // route will be handled client-side by checking auth state and redirecting.
 export function middleware(request: NextRequest) {
-  // NOTE: The Firebase client SDK manages auth state on the client, often in localStorage.
-  // Directly checking for a specific auth cookie on the server via middleware is unreliable
-  // for determining a user's logged-in status with Firebase client auth.
-  // We'll let client-side checks in a layout or provider handle protected routes.
+  const isAuthed = Boolean(request.cookies.get('lz_auth')?.value);
+  const { pathname } = request.nextUrl;
 
-  const currentUser = request.cookies.get('firebase-auth-token')?.value; // This cookie might not be reliably set by the client SDK
-
-   if (['/login', '/signup'].includes(request.nextUrl.pathname)) {
-    if (currentUser) {
-      // If a user has an auth token, they shouldn't be on the login/signup page.
-      // Redirect them to the dashboard.
-      return NextResponse.redirect(new URL('/dashboard', request.url));
-    }
+  // 1) Redirect logged-in users away from landing and auth pages
+  if (isAuthed && (pathname === '/' || pathname === '/login' || pathname === '/signup')) {
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  return NextResponse.next()
+  // 2) Protect dashboard for logged-out users
+  if (!isAuthed && pathname.startsWith('/dashboard')) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  return NextResponse.next();
 }
 
 export const config = {

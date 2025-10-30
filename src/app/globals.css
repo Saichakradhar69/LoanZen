@@ -2,6 +2,73 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Light mode definition and contrast helpers */
+@layer base {
+  /* Subtle background definition in light mode */
+  .light body {
+    background:
+      radial-gradient(1200px 600px at 0% -20%, hsl(var(--muted)/0.35), transparent 60%),
+      radial-gradient(1200px 600px at 100% -20%, hsl(var(--muted)/0.25), transparent 60%),
+      hsl(var(--background));
+  }
+}
+
+@layer components {
+  /* Reusable surface with subtle border/shadow (great for light mode) */
+  .surface {
+    @apply bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 rounded-xl border shadow-sm;
+  }
+
+  /* Section separators for all-white pages in light mode */
+  .section-contrast {
+    @apply relative;
+  }
+  .section-contrast::before {
+    content: "";
+    @apply absolute inset-x-0 top-0 h-px bg-border/80;
+  }
+
+  /* Card-like emphasis without changing structure */
+  .elevated {
+    @apply border bg-card shadow-sm rounded-xl;
+  }
+}
+
+@layer utilities {
+  /* Subtle white-on-white section tints for light mode */
+  .bg-plate {
+    background: linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--muted)/0.10) 100%);
+  }
+  .bg-plate-2 {
+    background: linear-gradient(180deg, hsl(var(--muted)/0.12) 0%, hsl(var(--background)) 100%);
+  }
+  .bg-plate-strong {
+    background: linear-gradient(180deg, hsl(var(--muted)/0.18) 0%, hsl(var(--background)) 100%);
+  }
+
+  /* Hairline gradient dividers for section edges */
+  .divider-top {
+    position: relative;
+  }
+  .divider-top::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--border)), transparent);
+  }
+  .divider-bottom {
+    position: relative;
+  }
+  .divider-bottom::after {
+    content: "";
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--border)), transparent);
+  }
+}
+
 body {
   font-family: Arial, Helvetica, sans-serif;
 }

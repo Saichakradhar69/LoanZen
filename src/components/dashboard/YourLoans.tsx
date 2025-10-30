@@ -15,14 +15,14 @@ interface YourLoansProps {
 
 export default function YourLoans({ loans, onAddLoan, onEdit, onDelete }: YourLoansProps) {
     return (
-        <Card>
+        <Card className="elevated">
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Your Loans</CardTitle>
-                        <CardDescription>Manage and track your loan portfolio</CardDescription>
+                        <CardTitle className="text-xl">Your Loans</CardTitle>
+                        <CardDescription className="mt-1">Manage and track your loan portfolio</CardDescription>
                     </div>
-                    <Button variant="ghost" onClick={onAddLoan}>
+                    <Button variant="ghost" onClick={onAddLoan} className="hover:bg-primary/10">
                         <Plus className="h-4 w-4 mr-2" />
                         Add Loan
                     </Button>
@@ -41,9 +41,9 @@ export default function YourLoans({ loans, onAddLoan, onEdit, onDelete }: YourLo
                         ))}
                     </div>
                 ) : (
-                    <div className="text-center py-12 border-2 border-dashed border-secondary rounded-lg">
-                        <h3 className="text-lg font-semibold text-muted-foreground">No Loans Added Yet</h3>
-                        <p className="text-sm text-muted-foreground mt-2 mb-4">Click "Add Loan" to start tracking your debts.</p>
+                    <div className="text-center py-16 border-2 border-dashed border-muted rounded-xl bg-muted/20">
+                        <h3 className="text-lg font-semibold text-foreground">No Loans Added Yet</h3>
+                        <p className="text-sm text-muted-foreground mt-2 mb-6">Click "Add Loan" to start tracking your debts.</p>
                         <Button onClick={onAddLoan}>
                             <Plus className="h-4 w-4 mr-2" />
                             Add Your First Loan

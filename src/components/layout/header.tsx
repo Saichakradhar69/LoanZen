@@ -16,10 +16,13 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
 import { useDoc } from '@/firebase/firestore/use-doc';
+import SettingsDialog from './SettingsDialog';
+import NotificationsPopover from './NotificationsPopover';
 
 export default function Header() {
   const [currency, setCurrency] = useState('USD');
   const [isMounted, setIsMounted] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const auth = getAuth();
@@ -43,11 +46,19 @@ export default function Header() {
     return names[0][0].toUpperCase();
   }
 
-  const navLinks = [
+  // Navigation links change based on auth state
+  const loggedOutLinks = [
     { href: '/', label: 'Home' },
     { href: '/#how-it-works', label: 'How It Works' },
     { href: '/#pricing', label: 'Pricing' },
   ];
+
+  const loggedInLinks = [
+    { href: '/dashboard', label: 'Dashboard' },
+    { href: '/advisor', label: 'AI Advisor' },
+  ];
+
+  const navLinks = user ? loggedInLinks : loggedOutLinks;
 
   const currencies = ['USD', 'EUR', 'GBP', 'INR'];
 
@@ -82,8 +93,8 @@ export default function Header() {
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         <div className="mr-auto hidden md:flex items-center gap-4">
-          <Logo />
-          {trialDaysLeft > 0 && (
+          <Logo href={user ? '/dashboard' : '/'} />
+          {user && trialDaysLeft > 0 && (
             <div className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), "cursor-default hover:bg-transparent")}> 
               Trial: {trialDaysLeft} {trialDaysLeft === 1 ? 'day' : 'days'} left
             </div>
@@ -100,7 +111,7 @@ export default function Header() {
             </SheetTrigger>
             <SheetContent side="left">
               <nav className="grid gap-6 text-lg font-medium mt-6">
-                <Logo />
+                <Logo href={user ? '/dashboard' : '/'} />
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
@@ -116,20 +127,18 @@ export default function Header() {
         </div>
         
         <div className="md:hidden">
-            <Logo />
+          <Logo href={user ? '/dashboard' : '/'} />
         </div>
 
         <nav className="hidden md:flex flex-1 items-center justify-center gap-6 text-sm font-medium">
           {navLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="text-foreground/60 transition-colors hover:text-foreground/80">
+            <Link key={link.href} href={link.href} className={cn(
+              "transition-colors hover:text-foreground/80",
+              link.href === '/dashboard' ? "text-foreground font-semibold" : "text-foreground/60"
+            )}>
               {link.label}
             </Link>
           ))}
-           {user && (
-            <Link href="/dashboard" className="text-foreground font-semibold transition-colors hover:text-foreground/80">
-              Dashboard
-            </Link>
-          )}
         </nav>
 
         <div className="flex items-center gap-2 ml-auto">
@@ -148,8 +157,11 @@ export default function Header() {
               <>
                 {user ? (
                   <>
-                  <Button variant="ghost" size="icon"><Bell className="h-5 w-5"/></Button>
-                  <Button variant="ghost" size="icon"><Cog className="h-5 w-5"/></Button>
+                  <NotificationsPopover />
+                  <Button variant="ghost" size="icon" onClick={() => setSettingsOpen(true)}>
+                    <Cog className="h-5 w-5"/>
+                  </Button>
+                  <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
                    <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                        <Button variant="ghost" className="relative h-10 w-10 rounded-full">

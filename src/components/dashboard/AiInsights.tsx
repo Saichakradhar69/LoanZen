@@ -5,17 +5,17 @@ import { Lightbulb } from "lucide-react";
 
 export default function AiInsights() {
     return (
-        <Card>
+        <Card className="elevated">
             <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                    <Lightbulb className="w-4 h-4 text-yellow-400" />
+                <CardTitle className="flex items-center gap-2 text-xl">
+                    <Lightbulb className="w-5 h-5 text-yellow-400" />
                     AI Insights
                 </CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="bg-secondary/50 p-3 rounded-lg">
-                    <p className="font-bold text-sm">Smart Suggestion</p>
-                    <p className="text-xs text-muted-foreground">
+                <div className="bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 p-4 rounded-xl">
+                    <p className="font-semibold text-sm mb-1.5">Smart Suggestion</p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
                         Pay extra $50 on Car Loan to save $120 in interest.
                     </p>
                 </div>

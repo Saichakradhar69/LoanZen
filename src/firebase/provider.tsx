@@ -80,10 +80,20 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
       auth,
       (firebaseUser) => { // Auth state determined
         setUserAuthState({ user: firebaseUser, isUserLoading: false, userError: null });
+        try {
+          if (typeof document !== 'undefined') {
+            if (firebaseUser) {
+              document.cookie = `lz_auth=1; path=/; max-age=${60 * 60 * 24 * 7}`; // 7 days
+            } else {
+              document.cookie = 'lz_auth=; path=/; max-age=0';
+            }
+          }
+        } catch {}
       },
       (error) => { // Auth listener error
         console.error("FirebaseProvider: onAuthStateChanged error:", error);
         setUserAuthState({ user: null, isUserLoading: false, userError: error });
+        try { if (typeof document !== 'undefined') document.cookie = 'lz_auth=; path=/; max-age=0'; } catch {}
       }
     );
     return () => unsubscribe(); // Cleanup

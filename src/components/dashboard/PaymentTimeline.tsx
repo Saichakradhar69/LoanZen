@@ -38,24 +38,24 @@ export default function PaymentTimeline({ loans }: PaymentTimelineProps) {
     }
 
     return (
-        <Card>
+        <Card className="elevated">
             <CardHeader>
-                <CardTitle>Payment Timeline</CardTitle>
-                <CardDescription>Visual overview of your loan payoff schedule</CardDescription>
+                <CardTitle className="text-xl">Payment Timeline</CardTitle>
+                <CardDescription className="mt-1">Visual overview of your loan payoff schedule</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
                 {loans.map((loan, index) => {
                     const payoffYears = calculatePayoffYears(loan);
                     const color = colorPairs[index % colorPairs.length];
 
                     return (
-                        <div key={loan.id} className={`p-4 rounded-lg ${color.secondary}`}>
+                        <div key={loan.id} className={`p-4 rounded-xl border ${color.secondary} hover:shadow-sm transition-shadow`}>
                             <div className="flex justify-between items-center">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-3">
                                     <div className={`w-3 h-3 rounded-full ${color.primary}`}></div>
                                     <span className="font-semibold">{loan.loanName}</span>
                                 </div>
-                                <span className="text-sm text-muted-foreground">
+                                <span className="text-sm text-muted-foreground font-medium">
                                     {isFinite(payoffYears) ? `Paid off in ${payoffYears.toFixed(1)} years` : 'Payoff date uncertain'}
                                 </span>
                             </div>
@@ -63,7 +63,7 @@ export default function PaymentTimeline({ loans }: PaymentTimelineProps) {
                     );
                 })}
                  {loans.length === 0 && (
-                    <div className="text-center py-8">
+                    <div className="text-center py-12">
                         <p className="text-muted-foreground">Add a loan to see its payment timeline.</p>
                     </div>
                 )}

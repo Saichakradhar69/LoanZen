@@ -41,30 +41,30 @@ export default function UpcomingPayments({ loans }: UpcomingPaymentsProps) {
         .sort((a, b) => a.paymentInfo.daysUntil - b.paymentInfo.daysUntil);
 
     return (
-        <Card>
+        <Card className="elevated">
             <CardHeader>
-                <CardTitle className="text-base">Upcoming Payments</CardTitle>
-                <CardDescription>Next 30 days</CardDescription>
+                <CardTitle className="text-xl">Upcoming Payments</CardTitle>
+                <CardDescription className="mt-1">Next 30 days</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
                 {upcoming.map(loan => (
-                    <div key={loan.id} className="flex items-center justify-between">
+                    <div key={loan.id} className="flex items-center justify-between p-3 rounded-xl border bg-card/60 hover:bg-card/80 transition-colors">
                         <div>
                             <p className="font-semibold text-sm">{loan.loanName}</p>
-                            <p className="text-xs text-muted-foreground">Due in {loan.paymentInfo.daysUntil} day{loan.paymentInfo.daysUntil !== 1 ? 's' : ''}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Due in {loan.paymentInfo.daysUntil} day{loan.paymentInfo.daysUntil !== 1 ? 's' : ''}</p>
                         </div>
                         <div className="text-right">
-                             <p className="font-bold text-sm">{formatCurrency(loan.monthlyPayment)}</p>
+                             <p className="font-bold text-base">{formatCurrency(loan.monthlyPayment)}</p>
                              {loan.paymentInfo.daysUntil < 7 ? (
-                                <Badge variant="destructive" className="text-xs">Urgent</Badge>
+                                <Badge variant="destructive" className="text-xs mt-1">Urgent</Badge>
                              ) : (
-                                <Badge variant="secondary" className="text-xs border-yellow-500/50 text-yellow-600 dark:text-yellow-400">Soon</Badge>
+                                <Badge variant="secondary" className="text-xs mt-1 border-yellow-500/50 text-yellow-600 dark:text-yellow-400">Soon</Badge>
                              )}
                         </div>
                     </div>
                 ))}
                  {upcoming.length === 0 && (
-                    <div className="text-center py-4">
+                    <div className="text-center py-8">
                         <p className="text-sm text-muted-foreground">No payments due in the next 30 days.</p>
                     </div>
                 )}
