@@ -5,14 +5,11 @@ import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import ChatInterface from './ChatInterface';
-import { getOrCreateChatAction } from './actions';
+import Chat from './Chat';
 
 export default function PrepaymentAdvisorPage() {
   const { user, isUserLoading } = useUser();
   const router = useRouter();
-  const [chatId, setChatId] = useState<string | null>(null);
-  const [isLoadingChat, setIsLoadingChat] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -21,25 +18,9 @@ export default function PrepaymentAdvisorPage() {
     }
   }, [user, isUserLoading, router]);
 
-  useEffect(() => {
-    if (user) {
-      setIsLoadingChat(true);
-      setError(null);
-      getOrCreateChatAction(user.uid)
-        .then(({ chatId, error }) => {
-          if (error) {
-            setError(error);
-          } else {
-            setChatId(chatId);
-          }
-        })
-        .finally(() => {
-          setIsLoadingChat(false);
-        });
-    }
-  }, [user]);
+  // No server call needed to create chat; client will ensure document exists
 
-  const isLoading = isUserLoading || isLoadingChat;
+  const isLoading = isUserLoading;
 
   if (isLoading) {
     return (
@@ -60,7 +41,7 @@ export default function PrepaymentAdvisorPage() {
     );
   }
   
-  if (!user || !chatId) {
+  if (!user) {
     return null; // or some other placeholder
   }
 
@@ -74,7 +55,7 @@ export default function PrepaymentAdvisorPage() {
            Chat with your personal AI to analyze your loans and find the best repayment strategy.
          </p>
        </div>
-       <ChatInterface userId={user.uid} chatId={chatId} />
+      <Chat />
     </div>
   );
 }
