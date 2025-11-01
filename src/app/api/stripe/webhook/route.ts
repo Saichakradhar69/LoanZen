@@ -158,6 +158,25 @@ async function handleStripeWebhook(event: Stripe.Event) {
     const session = event.data.object as Stripe.Checkout.Session;
     
     if (session.payment_status === 'paid') {
+      // Check if this is a subscription checkout (has userId in metadata)
+      if (session.metadata?.userId) {
+        // This is a subscription checkout - update user's subscription status
+        const userId = session.metadata.userId;
+        const subscriptionId = session.subscription as string | null;
+        
+        // Update user's subscription status in Firestore
+        // Note: This requires server-side Firestore initialization
+        // For now, we'll log and the client-side success page will handle the update
+        console.log(`Subscription checkout completed for user ${userId}`);
+        console.log(`Subscription ID: ${subscriptionId}`);
+        console.log(`Session ID: ${session.id}`);
+        
+        // TODO: Update Firestore with subscription status
+        // You may want to use the Firebase Admin SDK here for server-side Firestore access
+        return;
+      }
+      
+      // Otherwise, handle report payment (one-time payment)
       const formDataString = session.metadata?.formData;
       if (!formDataString) {
           console.error("Webhook Error: No form data found in session metadata.");

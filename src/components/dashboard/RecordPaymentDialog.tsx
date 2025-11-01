@@ -87,11 +87,33 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
         throw new Error("Selected loan not found.");
       }
 
+      // Helper to safely convert Firestore Timestamp or Date to Date object
+      const toDateObject = (dateValue: any): Date => {
+        if (!dateValue) throw new Error("Date is required");
+        if (dateValue instanceof Date) return dateValue;
+        if (dateValue && typeof dateValue.toDate === 'function') {
+          return dateValue.toDate();
+        }
+        if (dateValue && typeof dateValue.seconds === 'number') {
+          return new Date(dateValue.seconds * 1000);
+        }
+        const parsed = new Date(dateValue);
+        if (isNaN(parsed.getTime())) {
+          throw new Error(`Invalid date format: ${dateValue}`);
+        }
+        return parsed;
+      };
+
+      const disbursementDateObj = toDateObject(selectedLoan.disbursementDate);
+
       // 1. Save the new payment to its subcollection
+      // Ensure paymentDate is a proper Date object for Firestore
+      const paymentDateObj = data.paymentDate instanceof Date ? data.paymentDate : new Date(data.paymentDate);
+      
       const paymentsCollectionRef = collection(firestore, 'users', userId, 'loans', data.loanId, 'payments');
       await addDoc(paymentsCollectionRef, {
         paymentAmount: data.paymentAmount,
-        paymentDate: data.paymentDate,
+        paymentDate: paymentDateObj,
         createdAt: serverTimestamp(),
       });
       
@@ -102,16 +124,26 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
       // 2. Recalculate current balance using the full loan and payment history
       const calculationInput = {
         ...selectedLoan,
-        disbursementDate: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : toDate(selectedLoan.disbursementDate),
+        disbursementDate: disbursementDateObj,
         interestType: 'reducing',
         rateType: 'fixed',
         emiAmount: selectedLoan.monthlyPayment,
-        emisPaid: newEmisPaidCount, // Use the new count if it was a full EMI
-        disbursements: [{ date: (selectedLoan.disbursementDate as any).toDate ? (selectedLoan.disbursementDate as any).toDate() : toDate(selectedLoan.disbursementDate), amount: selectedLoan.originalLoanAmount }]
+        emisPaid: newEmisPaidCount,
+        disbursements: [{ date: disbursementDateObj, amount: selectedLoan.originalLoanAmount }]
       };
       
       // performExistingLoanCalculations now handles all transactions internally
-      let { outstandingBalance } = performExistingLoanCalculations(calculationInput as any);
+      let outstandingBalance: number;
+      try {
+        const result = performExistingLoanCalculations(calculationInput as any);
+        outstandingBalance = result.outstandingBalance;
+      } catch (calcError) {
+        console.error("Calculation error:", calcError);
+        // Fallback: simple manual calculation
+        const monthlyInterest = selectedLoan.currentBalance * (selectedLoan.interestRate / 100 / 12);
+        const principalPaid = Math.max(0, data.paymentAmount - monthlyInterest);
+        outstandingBalance = Math.max(0, selectedLoan.currentBalance - principalPaid);
+      }
 
       // Apply any extra or partial amount as a direct principal adjustment
       // - If full EMI: extraAmount reduces principal immediately

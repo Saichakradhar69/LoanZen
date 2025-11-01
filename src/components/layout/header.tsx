@@ -8,7 +8,7 @@ import { Bell, ChevronDown, Cog, LogOut, Menu, User } from 'lucide-react';
 import Logo from '../logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useState, useEffect, useMemo } from 'react';
-import { useUser, useFirestore } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { getAuth, signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import ClientOnly from '../ClientOnly';
@@ -68,7 +68,7 @@ export default function Header() {
     trialEnds?: any; // Firestore Timestamp | Date | string
   };
 
-  const userDocRef = useMemo(() => (
+  const userDocRef = useMemoFirebase(() => (
     user ? doc(firestore, 'users', user.uid) : null
   ), [user, firestore]);
 

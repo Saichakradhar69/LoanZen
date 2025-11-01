@@ -38,6 +38,23 @@ const interestRateTypeLabels: { [key: string]: string } = {
 };
 
 
+// Helper function to sanitize formData for JSON serialization
+function sanitizeFormData(data: any): any {
+  if (data === null || data === undefined) return data;
+  if (data instanceof Date) return data.toISOString();
+  if (Array.isArray(data)) return data.map(sanitizeFormData);
+  if (typeof data === 'object') {
+    const sanitized: any = {};
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        sanitized[key] = sanitizeFormData(data[key]);
+      }
+    }
+    return sanitized;
+  }
+  return data;
+}
+
 export default function CalculatorResults({ results, formData, onBack }: CalculatorResultsProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +73,9 @@ export default function CalculatorResults({ results, formData, onBack }: Calcula
     setIsSubmitting(true);
     setError(null);
     try {
+        // Sanitize formData to ensure all Date objects and nested structures are serializable
+        const sanitizedFormData = sanitizeFormData(formData);
+        
         const response = await fetch('/api/checkout_sessions', {
             method: 'POST',
             headers: {
@@ -63,15 +83,41 @@ export default function CalculatorResults({ results, formData, onBack }: Calcula
             },
             body: JSON.stringify({ 
                 appUrl: window.location.origin,
-                formData: formData,
+                formData: sanitizedFormData,
                 formType: 'new-loan',
             }),
         });
 
-        const { url, error: apiError } = await response.json();
+        // Check content type first to decide how to parse
+        const contentType = response.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
 
+        // Check if response is OK before parsing
         if (!response.ok) {
-            throw new Error(apiError || 'Failed to create checkout session.');
+            if (isJson) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Failed to create checkout session.');
+            } else {
+                // If it's HTML (error page), read as text
+                const text = await response.text();
+                throw new Error(`Server error (${response.status}): ${response.statusText}`);
+            }
+        }
+
+        // Parse JSON only if response is OK
+        if (!isJson) {
+            throw new Error('Unexpected response format from server.');
+        }
+
+        const data = await response.json();
+        const { url, error: apiError } = data;
+
+        if (apiError) {
+            throw new Error(apiError);
+        }
+
+        if (!url) {
+            throw new Error('No checkout URL received from server.');
         }
 
         setCheckoutUrl(url);

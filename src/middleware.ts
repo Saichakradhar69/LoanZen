@@ -14,8 +14,8 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  // 2) Protect dashboard for logged-out users
-  if (!isAuthed && pathname.startsWith('/dashboard')) {
+  // 2) Protect dashboard and advisor for logged-out users
+  if (!isAuthed && (pathname.startsWith('/dashboard') || pathname.startsWith('/advisor') || pathname.startsWith('/subscribe'))) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 

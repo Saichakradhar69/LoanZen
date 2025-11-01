@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { collection, doc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, deleteDoc, setDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import AddLoanDialog from "@/components/dashboard/AddLoanDialog";
 import LoanSummaryCards from "@/components/dashboard/LoanSummaryCards";
@@ -57,11 +57,73 @@ export default function DashboardPage() {
         }
     }, [user, isUserLoading, router]);
 
+    // Handle subscription success redirect
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('subscription') === 'success' && user && firestore) {
+            // Update user's subscription status to active
+            const userDocRef = doc(firestore, 'users', user.uid);
+            setDoc(userDocRef, {
+                subscriptionStatus: 'active',
+                subscribedAt: new Date(),
+            }, { merge: true }).then(() => {
+                toast({
+                    title: 'Subscription Activated!',
+                    description: 'Your subscription has been successfully activated. Welcome to Tracker Pro!',
+                });
+                // Clean up URL
+                router.replace('/dashboard');
+            }).catch((error) => {
+                console.error('Failed to update subscription status:', error);
+                toast({
+                    title: 'Subscription Activated',
+                    description: 'Payment was successful, but there was an error updating your account. Please refresh the page.',
+                    variant: 'destructive',
+                });
+            });
+        }
+    }, [user, firestore, router, toast]);
+
     const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
     const loansColRef = useMemoFirebase(() => user ? collection(firestore, 'users', user.uid, 'loans') : null, [user, firestore]);
 
     const { data: userData, isLoading: isUserDocLoading } = useDoc(userDocRef);
     const { data: loansData, isLoading: areLoansLoading } = useCollection<Loan>(loansColRef);
+
+    // Check trial expiration and redirect to subscribe page if expired
+    useEffect(() => {
+        if (!isUserDocLoading && userData) {
+            const subscriptionStatus = userData.subscriptionStatus;
+            
+            // If trial status, check if expired
+            if (subscriptionStatus === 'trial') {
+                const raw = userData.trialEnds as any;
+                let endsAt: Date | null = null;
+                if (raw && typeof raw?.toDate === 'function') {
+                    endsAt = raw.toDate();
+                } else if (raw) {
+                    endsAt = new Date(raw);
+                }
+                
+                if (endsAt) {
+                    const now = new Date();
+                    const diff = endsAt.getTime() - now.getTime();
+                    const daysLeft = Math.ceil(diff / (24 * 60 * 60 * 1000));
+                    
+                    // If trial expired (0 or less days), redirect to subscribe
+                    if (daysLeft <= 0) {
+                        router.push('/subscribe');
+                        return;
+                    }
+                }
+            }
+            
+            // If subscription status is 'none' or expired, redirect to subscribe
+            if (subscriptionStatus === 'none' || subscriptionStatus === 'expired') {
+                router.push('/subscribe');
+            }
+        }
+    }, [userData, isUserDocLoading, router]);
 
     const loans = useMemo(() => loansData || [], [loansData]);
     const isLoading = isUserLoading || isUserDocLoading || areLoansLoading;

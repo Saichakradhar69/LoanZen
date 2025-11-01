@@ -57,7 +57,9 @@ export default function LoginPage() {
 
       if (!userDoc.exists()) {
         // Create user document if it doesn't exist
+        // Note: The 'id' field is required by Firestore security rules and must match the userId
         await setDoc(userDocRef, {
+          id: user.uid, // Required by Firestore security rules
           email: user.email,
           displayName: user.displayName || 'User',
           subscriptionStatus: 'trial',

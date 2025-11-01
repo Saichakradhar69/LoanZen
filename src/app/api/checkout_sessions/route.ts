@@ -13,45 +13,82 @@ type RequestBody = {
 }
 
 export async function POST(request: Request) {
-  const { appUrl, formData, formType } = (await request.json()) as RequestBody;
-  const priceId = process.env.STRIPE_PRICE_ID;
-
-  if (!priceId) {
-    return NextResponse.json({ error: 'Stripe Price ID is not configured on the server.' }, { status: 500 });
-  }
-  
-  if (!appUrl) {
-    return NextResponse.json({ error: 'Application URL was not provided by the client.' }, { status: 500 });
-  }
-  
-  if (!formData || !formType) {
-    return NextResponse.json({ error: 'Form data or type was not provided by the client.' }, { status: 500 });
-  }
-
   try {
-    const session = await stripe.checkout.sessions.create({
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
-      mode: 'payment',
-      success_url: `${appUrl}/report/{CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/${formType === 'new-loan' ? 'calculator' : 'existing-loan'}?status=cancelled`,
-      metadata: {
-        formData: JSON.stringify(formData),
-        formType: formType,
-      }
-    });
+    const body = await request.json();
+    const { appUrl, formData, formType } = body as RequestBody;
+    const priceId = process.env.STRIPE_PRICE_ID;
 
-    return NextResponse.json({ url: session.url });
-  } catch (err) {
-    console.error(err);
-    const errorMessage = err instanceof Error ? err.message : 'Internal server error';
-    if (errorMessage.includes('Metadata values can have up to 500 characters')) {
-       return NextResponse.json({ error: `Metadata error: The loan scenario is too complex to process in one transaction. Please simplify and try again.` }, { status: 400 });
+    if (!priceId) {
+      console.error('STRIPE_PRICE_ID is not set in environment variables');
+      return NextResponse.json({ error: 'Stripe Price ID is not configured on the server.' }, { status: 500 });
     }
-    return NextResponse.json({ error: errorMessage }, { status: 500 });
+    
+    if (!appUrl) {
+      console.error('appUrl is missing from request body');
+      return NextResponse.json({ error: 'Application URL was not provided by the client.' }, { status: 400 });
+    }
+    
+    if (!formData || !formType) {
+      console.error('formData or formType is missing from request body');
+      return NextResponse.json({ error: 'Form data or type was not provided by the client.' }, { status: 400 });
+    }
+
+    // Check if STRIPE_SECRET_KEY is set
+    if (!process.env.STRIPE_SECRET_KEY) {
+      console.error('STRIPE_SECRET_KEY is not set in environment variables');
+      return NextResponse.json({ error: 'Stripe secret key is not configured on the server.' }, { status: 500 });
+    }
+
+    // Serialize formData and check size
+    const formDataString = JSON.stringify(formData);
+    if (formDataString.length > 500) {
+      console.error(`Form data is too large: ${formDataString.length} characters`);
+      return NextResponse.json({ error: 'The loan scenario is too complex to process in one transaction. Please simplify and try again.' }, { status: 400 });
+    }
+
+    try {
+      const session = await stripe.checkout.sessions.create({
+        line_items: [
+          {
+            price: priceId,
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        success_url: `${appUrl}/report/{CHECKOUT_SESSION_ID}`,
+        cancel_url: `${appUrl}/${formType === 'new-loan' ? 'calculator' : 'existing-loan'}?status=cancelled`,
+        metadata: {
+          formData: formDataString,
+          formType: formType,
+        }
+      });
+
+      if (!session.url) {
+        console.error('Stripe session created but URL is missing');
+        return NextResponse.json({ error: 'Failed to create checkout session URL.' }, { status: 500 });
+      }
+
+      return NextResponse.json({ url: session.url });
+    } catch (stripeError: any) {
+      console.error('Stripe API error:', {
+        message: stripeError.message,
+        type: stripeError.type,
+        code: stripeError.code,
+        statusCode: stripeError.statusCode,
+      });
+      
+      const errorMessage = stripeError.message || 'Failed to create checkout session';
+      
+      if (errorMessage.includes('Metadata values can have up to 500 characters') || errorMessage.includes('metadata')) {
+        return NextResponse.json({ error: 'The loan scenario is too complex to process in one transaction. Please simplify and try again.' }, { status: 400 });
+      }
+      
+      const statusCode = (stripeError as any)?.statusCode || 500;
+      return NextResponse.json({ error: `Payment processing error: ${errorMessage}` }, { status: statusCode });
+    }
+  } catch (parseError) {
+    console.error('Request parsing error:', parseError);
+    const errorMessage = parseError instanceof Error ? parseError.message : 'Failed to parse request';
+    return NextResponse.json({ error: `Request error: ${errorMessage}` }, { status: 400 });
   }
 }
