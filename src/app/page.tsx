@@ -6,17 +6,9 @@ import { BarChart3, Check, Download, Globe, Lock, PenSquare, X, Zap } from 'luci
 import Image from 'next/image';
 import Link from 'next/link';
 import { useHydrationSafe } from '@/hooks/use-hydration-safe';
-import { useUser } from '@/firebase';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
   useHydrationSafe();
-  const { user, isUserLoading } = useUser();
-  const router = useRouter();
-  useEffect(() => {
-    if (!isUserLoading && user) router.replace('/dashboard');
-  }, [user, isUserLoading, router]);
   
   return (
     <div className="flex flex-col">

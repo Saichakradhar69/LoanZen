@@ -2,6 +2,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Bell, ChevronDown, Cog, LogOut, Menu, User } from 'lucide-react';
@@ -26,6 +27,7 @@ export default function Header() {
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
   const auth = getAuth();
+  const router = useRouter();
 
   useEffect(() => {
     setIsMounted(true);
@@ -33,8 +35,17 @@ export default function Header() {
 
 
   const handleLogout = async () => {
-    await signOut(auth);
-    window.location.href = '/';
+    try {
+      await signOut(auth);
+      // Wait a moment for auth state to update and cookie to clear
+      await new Promise(resolve => setTimeout(resolve, 100));
+      // Use router.push instead of window.location to avoid breaking React context
+      router.push('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Fallback to full page reload if router fails
+      window.location.href = '/';
+    }
   };
   
   const getUserInitials = () => {

@@ -23,6 +23,9 @@ const playfairDisplay = Playfair_Display({
 export const metadata: Metadata = {
   title: 'LoanZen - Global Loan Calculator & Tracker',
   description: 'Calculate, track, and optimize your loans with LoanZen. Get AI-powered advice to pay off your debt faster.',
+  // Next.js automatically detects favicon.ico, icon.png, and apple-icon.png in the app directory
+  // We only need to specify the manifest for PWA support
+  manifest: '/site.webmanifest',
 };
 
 export default function RootLayout({
