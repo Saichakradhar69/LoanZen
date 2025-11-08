@@ -84,7 +84,7 @@ export default function SignupPage() {
       setUserId(user.uid);
       setUserEmail(user.email || null);
 
-      // Create user document in Firestore (without trial initially)
+      // Create user document in Firestore with new structure
       // Note: The 'id' field is required by Firestore security rules and must match the userId
       await setDoc(doc(firestore, 'users', user.uid), {
         id: user.uid, // Required by Firestore security rules
@@ -92,7 +92,14 @@ export default function SignupPage() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         displayName: `${formData.firstName} ${formData.lastName}`,
-        subscriptionStatus: 'none', // Will be set to 'trial' if coupon valid, or 'active' after payment
+        name: `${formData.firstName} ${formData.lastName}`,
+        role: 'trial', // Will be set to 'subscribed' after payment
+        trial: {
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+          isActive: true,
+        },
+        subscription: null, // Will be set after Stripe subscription
         createdAt: new Date(),
       });
 
@@ -148,11 +155,12 @@ export default function SignupPage() {
       }
 
       if (data.valid) {
-        // Apply free trial
+        // Apply free trial - user already has trial structure from signup
+        // Just ensure trial is active and update coupon used
         if (userId && firestore) {
           await setDoc(doc(firestore, 'users', userId), {
-            subscriptionStatus: 'trial',
-            trialEnds: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+            role: 'trial',
+            'trial.isActive': true,
             couponUsed: couponCode.toUpperCase().trim(),
           }, { merge: true });
 

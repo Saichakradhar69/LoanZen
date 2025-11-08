@@ -36,10 +36,10 @@ export default function HomePage() {
             <div className="relative py-10 md:py-24">
               <div className="mx-auto max-w-xl rounded-[24px] border bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 shadow-2xl">
                 <Image 
-                  src="https://placehold.co/1000x600.png"
+                  src="/images/hero image.png"
                   width={1000}
                   height={600}
-                  alt="App preview"
+                  alt="LoanZen App Preview"
                   className="rounded-[24px]"
                   priority
                 />

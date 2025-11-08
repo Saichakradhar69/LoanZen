@@ -45,7 +45,10 @@ service cloud.firestore {
       allow list: if false; // User listing is not permitted
 
       allow create: if isOwner(userId) && request.resource.data.id == userId;
-      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      // Allow update if user owns the document, but prevent frontend from setting 'subscribed' or 'expired' role
+      // Only Stripe webhook (via Admin SDK) can set these roles
+      allow update: if isExistingOwner(userId) && 
+        !(request.resource.data.role in ['subscribed', 'expired']);
       allow delete: if isExistingOwner(userId);
     }
 

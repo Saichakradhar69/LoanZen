@@ -7,12 +7,8 @@ import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { doc } from 'firebase/firestore';
 import { useDoc } from '@/firebase/firestore/use-doc';
+import { checkUserAccess, type UserDoc } from '@/lib/user-access';
 import Chat from './Chat';
-
-type UserProfile = {
-  subscriptionStatus?: 'trial' | 'active' | 'expired' | 'none' | string;
-  trialEnds?: any;
-};
 
 export default function PrepaymentAdvisorPage() {
   const { user, isUserLoading } = useUser();
@@ -21,7 +17,7 @@ export default function PrepaymentAdvisorPage() {
   const [error, setError] = useState<string | null>(null);
 
   const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserDoc>(userDocRef);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -32,39 +28,16 @@ export default function PrepaymentAdvisorPage() {
   // Check trial expiration and redirect to subscribe page if expired
   useEffect(() => {
     if (!isProfileLoading && userProfile && user) {
-      const subscriptionStatus = userProfile.subscriptionStatus;
+      const access = checkUserAccess(userProfile);
       
-      // If subscription is active, allow access
-      if (subscriptionStatus === 'active') {
+      // If user has access (trial or subscribed), allow access
+      if (access === 'trial' || access === 'subscribed') {
         return;
       }
       
-      // If trial status, check if expired
-      if (subscriptionStatus === 'trial') {
-        const raw = userProfile.trialEnds as any;
-        let endsAt: Date | null = null;
-        if (raw && typeof raw?.toDate === 'function') {
-          endsAt = raw.toDate();
-        } else if (raw) {
-          endsAt = new Date(raw);
-        }
-        
-        if (endsAt) {
-          const now = new Date();
-          const diff = endsAt.getTime() - now.getTime();
-          const daysLeft = Math.ceil(diff / (24 * 60 * 60 * 1000));
-          
-          // If trial expired (0 or less days), redirect to subscribe
-          if (daysLeft <= 0) {
-            router.push('/subscribe');
-            return;
-          }
-        }
-      } else {
-        // If subscription status is 'none' or expired, redirect to subscribe
-        if (subscriptionStatus === 'none' || subscriptionStatus === 'expired') {
-          router.push('/subscribe');
-        }
+      // If expired or no access, redirect to subscribe
+      if (access === 'expired' || !access) {
+        router.push('/subscribe');
       }
     }
   }, [userProfile, isProfileLoading, user, router]);

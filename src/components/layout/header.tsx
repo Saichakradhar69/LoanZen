@@ -17,6 +17,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './theme-toggle';
 import { useDoc } from '@/firebase/firestore/use-doc';
+import { getTrialDaysLeft, type UserDoc } from '@/lib/user-access';
 import SettingsDialog from './SettingsDialog';
 import NotificationsPopover from './NotificationsPopover';
 
@@ -74,30 +75,15 @@ export default function Header() {
   const currencies = ['USD', 'EUR', 'GBP', 'INR'];
 
   // Subscribe to the authenticated user's profile to determine trial status
-  type UserProfile = {
-    subscriptionStatus?: 'trial' | 'active' | 'expired' | string;
-    trialEnds?: any; // Firestore Timestamp | Date | string
-  };
-
   const userDocRef = useMemoFirebase(() => (
     user ? doc(firestore, 'users', user.uid) : null
   ), [user, firestore]);
 
-  const { data: userProfile } = useDoc<UserProfile>(userDocRef);
+  const { data: userProfile } = useDoc<UserDoc>(userDocRef);
 
   const trialDaysLeft = useMemo(() => {
-    if (!user || !userProfile || userProfile.subscriptionStatus !== 'trial') return 0;
-    const raw = userProfile.trialEnds as any;
-    let endsAt: Date | null = null;
-    if (raw && typeof raw?.toDate === 'function') {
-      endsAt = raw.toDate();
-    } else if (raw) {
-      endsAt = new Date(raw);
-    }
-    if (!endsAt) return 0;
-    const msPerDay = 24 * 60 * 60 * 1000;
-    const diff = Math.ceil((endsAt.getTime() - Date.now()) / msPerDay);
-    return diff > 0 ? diff : 0;
+    if (!user || !userProfile) return 0;
+    return getTrialDaysLeft(userProfile);
   }, [user, userProfile]);
 
   return (

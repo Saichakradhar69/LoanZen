@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useDoc } from '@/firebase/firestore/use-doc';
-import { collection, doc, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, doc, deleteDoc } from 'firebase/firestore';
+import { checkUserAccess, type UserDoc } from '@/lib/user-access';
 import { Loader2 } from 'lucide-react';
 import AddLoanDialog from "@/components/dashboard/AddLoanDialog";
 import LoanSummaryCards from "@/components/dashboard/LoanSummaryCards";
@@ -50,6 +51,7 @@ export default function DashboardPage() {
     const [isRecordPaymentOpen, setIsRecordPaymentOpen] = useState(false);
     const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
     const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
+    const [isWaitingForSubscription, setIsWaitingForSubscription] = useState(false);
     
     useEffect(() => {
         if (!isUserLoading && !user) {
@@ -57,73 +59,133 @@ export default function DashboardPage() {
         }
     }, [user, isUserLoading, router]);
 
-    // Handle subscription success redirect
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('subscription') === 'success' && user && firestore) {
-            // Update user's subscription status to active
-            const userDocRef = doc(firestore, 'users', user.uid);
-            setDoc(userDocRef, {
-                subscriptionStatus: 'active',
-                subscribedAt: new Date(),
-            }, { merge: true }).then(() => {
-                toast({
-                    title: 'Subscription Activated!',
-                    description: 'Your subscription has been successfully activated. Welcome to Tracker Pro!',
-                });
-                // Clean up URL
-                router.replace('/dashboard');
-            }).catch((error) => {
-                console.error('Failed to update subscription status:', error);
-                toast({
-                    title: 'Subscription Activated',
-                    description: 'Payment was successful, but there was an error updating your account. Please refresh the page.',
-                    variant: 'destructive',
-                });
-            });
-        }
-    }, [user, firestore, router, toast]);
-
     const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
     const loansColRef = useMemoFirebase(() => user ? collection(firestore, 'users', user.uid, 'loans') : null, [user, firestore]);
 
     const { data: userData, isLoading: isUserDocLoading } = useDoc(userDocRef);
     const { data: loansData, isLoading: areLoansLoading } = useCollection<Loan>(loansColRef);
 
-    // Check trial expiration and redirect to subscribe page if expired
+    // Handle subscription success - automatically update subscription
     useEffect(() => {
-        if (!isUserDocLoading && userData) {
-            const subscriptionStatus = userData.subscriptionStatus;
+        const params = new URLSearchParams(window.location.search);
+        const sessionId = params.get('session_id');
+        
+        if (sessionId && user && !isWaitingForSubscription) {
+            console.log('🔵 Payment successful, automatically updating subscription...');
+            setIsWaitingForSubscription(true);
             
-            // If trial status, check if expired
-            if (subscriptionStatus === 'trial') {
-                const raw = userData.trialEnds as any;
-                let endsAt: Date | null = null;
-                if (raw && typeof raw?.toDate === 'function') {
-                    endsAt = raw.toDate();
-                } else if (raw) {
-                    endsAt = new Date(raw);
-                }
+            // Clean up URL immediately
+            router.replace('/dashboard');
+            
+            // Show success toast
+            toast({
+                title: 'Payment Successful!',
+                description: 'Your subscription is being activated automatically...',
+            });
+            
+            let pollInterval: NodeJS.Timeout | null = null;
+            
+            // Polling function as fallback
+            const startPolling = () => {
+                let attempts = 0;
+                const maxAttempts = 15; // 15 seconds max wait
                 
-                if (endsAt) {
-                    const now = new Date();
-                    const diff = endsAt.getTime() - now.getTime();
-                    const daysLeft = Math.ceil(diff / (24 * 60 * 60 * 1000));
+                pollInterval = setInterval(() => {
+                    attempts++;
                     
-                    // If trial expired (0 or less days), redirect to subscribe
-                    if (daysLeft <= 0) {
-                        router.push('/subscribe');
-                        return;
+                    // Check if userData has been updated with subscription
+                    if (userData) {
+                        const access = checkUserAccess(userData as UserDoc);
+                        if (access === 'subscribed') {
+                            if (pollInterval) clearInterval(pollInterval);
+                            setIsWaitingForSubscription(false);
+                            toast({
+                                title: 'Subscription Activated!',
+                                description: 'Welcome to LoanZen Pro! Your subscription is now active.',
+                            });
+                            return;
+                        }
                     }
+                    
+                    // If max attempts reached, stop polling
+                    if (attempts >= maxAttempts) {
+                        if (pollInterval) clearInterval(pollInterval);
+                        setIsWaitingForSubscription(false);
+                        toast({
+                            title: 'Subscription Processing',
+                            description: 'Your payment was successful. Please refresh the page in a moment.',
+                            variant: 'default',
+                        });
+                    }
+                }, 1000); // Check every second
+            };
+            
+            // Automatically trigger update immediately
+            const triggerUpdate = async () => {
+                try {
+                    console.log('🔄 Automatically updating subscription...');
+                    const response = await fetch('/api/subscription/manual-update', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: user.uid,
+                            sessionId: sessionId,
+                        }),
+                    });
+                    
+                    const data = await response.json();
+                    console.log('📥 Auto-update response:', data);
+                    
+                    if (response.ok && data.success) {
+                        console.log('✅ Automatic update successful');
+                        toast({
+                            title: 'Subscription Activated!',
+                            description: 'Welcome to LoanZen Pro! Your subscription is now active.',
+                        });
+                        setIsWaitingForSubscription(false);
+                        // Force page refresh to reload userData
+                        setTimeout(() => window.location.reload(), 1000);
+                    } else {
+                        console.error('❌ Automatic update failed:', data.error);
+                        // Fall back to polling
+                        startPolling();
+                    }
+                } catch (error) {
+                    console.error('❌ Automatic update request failed:', error);
+                    // Fall back to polling
+                    startPolling();
                 }
+            };
+            
+            // Trigger update immediately
+            triggerUpdate();
+            
+            // Cleanup on unmount
+            return () => {
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                }
+            };
+        }
+    }, [user, router, toast, userData, isWaitingForSubscription]);
+
+    // Check user access and redirect to subscribe page if expired
+    // Skip this check if we're waiting for subscription to be activated
+    useEffect(() => {
+        if (!isUserDocLoading && userData && !isWaitingForSubscription) {
+            const access = checkUserAccess(userData as UserDoc);
+            
+            // If user has access (trial or subscribed), allow access
+            if (access === 'trial' || access === 'subscribed') {
+                return;
             }
             
-            // If subscription status is 'none' or expired, redirect to subscribe
-            if (subscriptionStatus === 'none' || subscriptionStatus === 'expired') {
+            // If expired or no access, redirect to subscribe
+            if (access === 'expired' || !access) {
                 router.push('/subscribe');
             }
         }
-    }, [userData, isUserDocLoading, router]);
+    }, [userData, isUserDocLoading, router, isWaitingForSubscription]);
 
     const loans = useMemo(() => loansData || [], [loansData]);
     const isLoading = isUserLoading || isUserDocLoading || areLoansLoading;
@@ -166,10 +228,18 @@ export default function DashboardPage() {
         setIsRecordPaymentOpen(false);
     }
 
-    if (isLoading) {
+    if (isLoading || isWaitingForSubscription) {
         return (
-            <div className="container mx-auto p-4 sm:p-6 md:p-8 flex justify-center items-center min-h-[60vh]">
+            <div className="container mx-auto p-4 sm:p-6 md:p-8 flex flex-col justify-center items-center min-h-[60vh] gap-4">
                 <Loader2 className="h-16 w-16 text-primary animate-spin" />
+                {isWaitingForSubscription && (
+                    <div className="text-center space-y-2 max-w-md">
+                        <p className="text-lg font-semibold">Activating Your Subscription</p>
+                        <p className="text-sm text-muted-foreground">
+                            Your payment was successful. We're activating your subscription automatically...
+                        </p>
+                    </div>
+                )}
             </div>
         );
     }

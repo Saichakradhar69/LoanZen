@@ -4,6 +4,8 @@ import { stripe } from '@/lib/stripe';
 import { headers } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { getAdminFirestore, toFirestoreTimestamp } from '@/lib/firebase-admin';
+import { Timestamp } from 'firebase-admin/firestore';
 import type { FormData as CalculatorFormData } from '@/app/calculator/form';
 import type { ExistingLoanFormData, CalculationResult as ExistingLoanCalculationResult } from '@/app/existing-loan/actions';
 import { performExistingLoanCalculations } from '@/app/existing-loan/calculations';
@@ -152,31 +154,214 @@ function generateCouponCode(): string {
 
 
 async function handleStripeWebhook(event: Stripe.Event) {
-    if (event.type !== 'checkout.session.completed') {
+    console.log(`📥 Received webhook event: ${event.type}`);
+    
+    let db;
+    try {
+        db = getAdminFirestore();
+        console.log('✅ Firestore Admin initialized successfully');
+    } catch (error: any) {
+        console.error('❌ Failed to initialize Firestore Admin:', error);
+        console.error('Error details:', {
+            message: error?.message,
+            code: error?.code,
+            stack: error?.stack,
+        });
+        throw new Error(`Firestore Admin initialization failed: ${error?.message || 'Unknown error'}`);
+    }
+    
+    // Handle subscription checkout completion
+    if (event.type === 'checkout.session.completed') {
+        const session = event.data.object as Stripe.Checkout.Session;
+        
+        console.log(`📋 Checkout session: ${session.id}, Payment status: ${session.payment_status}`);
+        
+        if (session.payment_status === 'paid') {
+            // Check if this is a subscription checkout (has uid or userId in metadata)
+            const userId = session.metadata?.uid || session.metadata?.userId;
+            if (userId) {
+                // This is a subscription checkout - update user's subscription status
+                const subscriptionId = session.subscription as string | null;
+                const customerId = session.customer as string | null;
+                
+                console.log(`🔵 Subscription checkout completed for user ${userId}`);
+                console.log(`   Subscription ID: ${subscriptionId}`);
+                console.log(`   Customer ID: ${customerId}`);
+                console.log(`   Session ID: ${session.id}`);
+                
+                if (!subscriptionId) {
+                    console.error('❌ No subscription ID found in session');
+                    throw new Error('No subscription ID found in checkout session');
+                }
+                
+                try {
+                    // Retrieve full subscription details from Stripe
+                    console.log(`📞 Retrieving subscription details from Stripe...`);
+                    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+                    console.log(`✅ Subscription retrieved: ${subscription.status}`);
+                    
+                    // Update user's subscription status in Firestore using Admin SDK
+                    const userRef = db.collection('users').doc(userId);
+                    
+                    // Get existing user data to preserve trial info
+                    console.log(`📖 Reading existing user document...`);
+                    const userDoc = await userRef.get();
+                    
+                    if (!userDoc.exists) {
+                        console.error(`❌ User document ${userId} does not exist`);
+                        throw new Error(`User document ${userId} does not exist`);
+                    }
+                    
+                    const existingData = userDoc.data();
+                    console.log(`📄 Existing user data:`, {
+                        role: existingData?.role,
+                        subscriptionStatus: existingData?.subscriptionStatus,
+                        hasTrial: !!existingData?.trial,
+                    });
+                    
+                    // Prepare update data with Firestore Timestamp
+                    // Use Firestore Timestamp for proper date handling
+                    const currentPeriodEndDate = new Date(subscription.current_period_end * 1000);
+                    const currentPeriodEndTimestamp = Timestamp.fromDate(currentPeriodEndDate);
+                    
+                    // Build update data - Admin SDK supports nested objects directly
+                    const updateData: any = {
+                        role: 'subscribed',
+                        subscriptionStatus: 'active', // Legacy field for backward compatibility
+                        subscription: {
+                            stripeCustomerId: subscription.customer as string,
+                            stripeSubscriptionId: subscription.id,
+                            currentPeriodEnd: currentPeriodEndTimestamp,
+                            status: subscription.status === 'active' ? 'active' : subscription.status,
+                        },
+                    };
+                    
+                    // Deactivate trial if it exists
+                    if (existingData?.trial) {
+                        updateData.trial = {
+                            ...existingData.trial,
+                            isActive: false,
+                        };
+                        console.log(`🔄 Deactivating trial`);
+                    }
+                    
+                    console.log(`📝 Updating user document with:`, {
+                        role: updateData.role,
+                        subscriptionStatus: updateData.subscriptionStatus,
+                        subscriptionStatusValue: updateData.subscription.status,
+                    });
+                    
+                    // Update Firestore using Admin SDK (bypasses security rules)
+                    // Admin SDK update() supports nested objects directly
+                    await userRef.update(updateData);
+                    
+                    // Verify the update
+                    const updatedDoc = await userRef.get();
+                    const updatedData = updatedDoc.data();
+                    console.log(`✅ Successfully updated user ${userId} subscription status`);
+                    console.log(`   New role: ${updatedData?.role}`);
+                    console.log(`   New subscriptionStatus: ${updatedData?.subscriptionStatus}`);
+                    console.log(`   Subscription status: ${updatedData?.subscription?.status}`);
+                } catch (error: any) {
+                    console.error(`❌ Failed to update user ${userId} subscription:`, error);
+                    console.error('Error details:', {
+                        message: error?.message,
+                        code: error?.code,
+                        stack: error?.stack,
+                    });
+                    throw error; // Re-throw to trigger webhook retry
+                }
+                
+                return;
+            }
+        }
+    }
+    
+    // Handle subscription lifecycle events
+    if (event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.updated') {
+        const subscription = event.data.object as Stripe.Subscription;
+        const customerId = subscription.customer as string;
+        
+        console.log(`Subscription ${event.type} for customer ${customerId}`);
+        
+        try {
+            // Find user by Stripe customer ID
+            const usersSnapshot = await db.collection('users')
+                .where('subscription.stripeCustomerId', '==', customerId)
+                .limit(1)
+                .get();
+            
+            if (usersSnapshot.empty) {
+                console.warn(`No user found with customer ID ${customerId}`);
+                return;
+            }
+            
+            const userDoc = usersSnapshot.docs[0];
+            const userRef = userDoc.ref;
+            
+            if (event.type === 'customer.subscription.deleted') {
+                // Subscription was canceled - mark as expired
+                await userRef.update({
+                    role: 'expired',
+                    'subscription.status': 'canceled',
+                    subscriptionStatus: 'expired',
+                });
+                console.log(`✅ Marked user ${userDoc.id} as expired`);
+            } else if (event.type === 'customer.subscription.updated') {
+                // Subscription was updated (e.g., renewed, changed plan)
+                await userRef.update({
+                    'subscription.status': subscription.status,
+                    'subscription.currentPeriodEnd': new Date(subscription.current_period_end * 1000),
+                    subscriptionStatus: subscription.status === 'active' ? 'active' : 'expired',
+                });
+                console.log(`✅ Updated subscription for user ${userDoc.id}`);
+            }
+        } catch (error) {
+            console.error(`❌ Failed to handle subscription ${event.type}:`, error);
+            throw error;
+        }
+        
         return;
     }
+    
+    // Handle invoice payment failures
+    if (event.type === 'invoice.payment_failed') {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+        const subscriptionId = invoice.subscription as string | null;
+        
+        console.log(`Invoice payment failed for customer ${customerId}`);
+        
+        if (subscriptionId) {
+            try {
+                // Find user by Stripe customer ID
+                const usersSnapshot = await db.collection('users')
+                    .where('subscription.stripeCustomerId', '==', customerId)
+                    .limit(1)
+                    .get();
+                
+                if (!usersSnapshot.empty) {
+                    const userRef = usersSnapshot.docs[0].ref;
+                    await userRef.update({
+                        'subscription.status': 'incomplete',
+                        subscriptionStatus: 'expired',
+                    });
+                    console.log(`✅ Marked user ${usersSnapshot.docs[0].id} subscription as incomplete`);
+                }
+            } catch (error) {
+                console.error(`❌ Failed to handle payment failure:`, error);
+            }
+        }
+        
+        return;
+    }
+    
+    // Handle report payment (one-time payment) - existing logic
+    if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
     
-    if (session.payment_status === 'paid') {
-      // Check if this is a subscription checkout (has userId in metadata)
-      if (session.metadata?.userId) {
-        // This is a subscription checkout - update user's subscription status
-        const userId = session.metadata.userId;
-        const subscriptionId = session.subscription as string | null;
-        
-        // Update user's subscription status in Firestore
-        // Note: This requires server-side Firestore initialization
-        // For now, we'll log and the client-side success page will handle the update
-        console.log(`Subscription checkout completed for user ${userId}`);
-        console.log(`Subscription ID: ${subscriptionId}`);
-        console.log(`Session ID: ${session.id}`);
-        
-        // TODO: Update Firestore with subscription status
-        // You may want to use the Firebase Admin SDK here for server-side Firestore access
-        return;
-      }
-      
-      // Otherwise, handle report payment (one-time payment)
+        if (session.payment_status === 'paid' && !session.metadata?.userId) {
+            // This is a report payment (one-time payment)
       const formDataString = session.metadata?.formData;
       if (!formDataString) {
           console.error("Webhook Error: No form data found in session metadata.");
@@ -191,6 +376,7 @@ async function handleStripeWebhook(event: Stripe.Event) {
       console.log(`Payment for session ${session.id} successful.`);
       console.log(`Would save calculation data to DB for client retrieval.`);
       console.log(`User email: ${session.customer_details?.email}`);
+        }
     }
 }
 
@@ -266,11 +452,18 @@ export async function POST(req: Request) {
 
   try {
     await handleStripeWebhook(event);
+    console.log('✅ Webhook handler completed successfully');
     return NextResponse.json({ received: true });
   } catch (err) {
      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-     console.error(`Webhook handler failed: ${errorMessage}`);
-     return NextResponse.json({ error: `Webhook handler error: ${errorMessage}` }, { status: 500 });
+     const errorStack = err instanceof Error ? err.stack : undefined;
+     console.error(`❌ Webhook handler failed: ${errorMessage}`);
+     console.error('Error stack:', errorStack);
+     // Return 500 to trigger Stripe webhook retry
+     return NextResponse.json({ 
+       error: `Webhook handler error: ${errorMessage}`,
+       details: process.env.NODE_ENV === 'development' ? errorStack : undefined
+     }, { status: 500 });
   }
 }
 

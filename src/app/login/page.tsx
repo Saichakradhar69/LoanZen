@@ -56,14 +56,20 @@ export default function LoginPage() {
       const userDoc = await getDoc(userDocRef);
 
       if (!userDoc.exists()) {
-        // Create user document if it doesn't exist
+        // Create user document if it doesn't exist with new structure
         // Note: The 'id' field is required by Firestore security rules and must match the userId
         await setDoc(userDocRef, {
           id: user.uid, // Required by Firestore security rules
           email: user.email,
           displayName: user.displayName || 'User',
-          subscriptionStatus: 'trial',
-          trialEnds: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+          name: user.displayName || 'User',
+          role: 'trial',
+          trial: {
+            startDate: new Date(),
+            endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+            isActive: true,
+          },
+          subscription: null,
           createdAt: new Date(),
         });
       }

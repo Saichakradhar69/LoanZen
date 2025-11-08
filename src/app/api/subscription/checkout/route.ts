@@ -1,6 +1,7 @@
 // src/app/api/subscription/checkout/route.ts
 import { stripe } from '@/lib/stripe';
 import { NextResponse } from 'next/server';
+import { getAdminFirestore } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
   try {
@@ -27,9 +28,10 @@ export async function POST(request: Request) {
           },
         ],
         mode: 'subscription',
-        success_url: `${request.headers.get('origin') || 'http://localhost:3000'}/dashboard?subscription=success`,
+        success_url: `${request.headers.get('origin') || 'http://localhost:3000'}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${request.headers.get('origin') || 'http://localhost:3000'}/signup?subscription=cancelled`,
         metadata: {
+          uid: userId, // Use 'uid' for consistency with guide (also keep userId for backward compatibility)
           userId: userId,
           userEmail: userEmail,
         },
@@ -37,6 +39,20 @@ export async function POST(request: Request) {
 
       if (!session.url) {
         return NextResponse.json({ error: 'Failed to create checkout session URL.' }, { status: 500 });
+      }
+
+      // Optionally log session in Firestore for reference
+      try {
+        const db = getAdminFirestore();
+        await db.collection('checkout_sessions').add({
+          userId,
+          sessionId: session.id,
+          createdAt: new Date(),
+          type: 'subscription',
+        });
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        console.error('Failed to log checkout session:', logError);
       }
 
       return NextResponse.json({ url: session.url });

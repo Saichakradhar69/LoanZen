@@ -5,15 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { useDoc } from '@/firebase/firestore/use-doc';
+import { checkUserAccess, type UserDoc } from '@/lib/user-access';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, Lock, Check, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-
-type UserProfile = {
-  subscriptionStatus?: 'trial' | 'active' | 'expired' | 'none' | string;
-  trialEnds?: any;
-};
 
 export default function SubscribePage() {
   const { user, isUserLoading } = useUser();
@@ -23,7 +19,7 @@ export default function SubscribePage() {
   const [isCreatingCheckout, setIsCreatingCheckout] = useState(false);
 
   const userDocRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [user, firestore]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserDoc>(userDocRef);
 
   // Redirect if not logged in
   useEffect(() => {
@@ -32,10 +28,13 @@ export default function SubscribePage() {
     }
   }, [user, isUserLoading, router]);
 
-  // Redirect if already subscribed (active)
+  // Redirect if already subscribed
   useEffect(() => {
-    if (!isProfileLoading && userProfile?.subscriptionStatus === 'active') {
-      router.push('/dashboard');
+    if (!isProfileLoading && userProfile) {
+      const access = checkUserAccess(userProfile);
+      if (access === 'subscribed') {
+        router.push('/dashboard');
+      }
     }
   }, [userProfile, isProfileLoading, router]);
 
@@ -96,7 +95,7 @@ export default function SubscribePage() {
     return null; // Will redirect
   }
 
-  if (userProfile?.subscriptionStatus === 'active') {
+  if (userProfile && checkUserAccess(userProfile) === 'subscribed') {
     return null; // Will redirect
   }
 
