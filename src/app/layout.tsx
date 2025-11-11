@@ -7,6 +7,7 @@ import Footer from '@/components/layout/footer';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 import NoSSR from '@/components/NoSSR';
 import { ThemeProvider } from '@/components/theme-provider';
+import { Analytics } from '@vercel/analytics/react';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -103,6 +104,7 @@ export default function RootLayout({
             <Toaster />
           </FirebaseClientProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
