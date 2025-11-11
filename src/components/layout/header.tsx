@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Bell, ChevronDown, Cog, LogOut, Menu, User } from 'lucide-react';
@@ -29,6 +29,7 @@ export default function Header() {
   const firestore = useFirestore();
   const auth = getAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     setIsMounted(true);
@@ -109,15 +110,23 @@ export default function Header() {
             <SheetContent side="left">
               <nav className="grid gap-6 text-lg font-medium mt-6">
                 <Logo href={user ? '/dashboard' : '/'} />
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
+                {navLinks.map((link) => {
+                  const isActive = pathname === link.href || 
+                    (link.href === '/dashboard' && pathname?.startsWith('/dashboard')) || 
+                    (link.href === '/advisor' && pathname?.startsWith('/advisor'));
+                  return (
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      className={cn(
+                        "transition-colors hover:text-foreground",
+                        isActive ? "text-foreground font-semibold" : "text-muted-foreground"
+                      )}
+                    >
+                      {link.label}
+                    </Link>
+                  );
+                })}
               </nav>
             </SheetContent>
           </Sheet>
@@ -128,14 +137,19 @@ export default function Header() {
         </div>
 
         <nav className="hidden md:flex flex-1 items-center justify-center gap-6 text-sm font-medium">
-          {navLinks.map((link) => (
-            <Link key={link.href} href={link.href} className={cn(
-              "transition-colors hover:text-foreground/80",
-              link.href === '/dashboard' ? "text-foreground font-semibold" : "text-foreground/60"
-            )}>
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map((link) => {
+            const isActive = pathname === link.href || 
+              (link.href === '/dashboard' && pathname?.startsWith('/dashboard')) || 
+              (link.href === '/advisor' && pathname?.startsWith('/advisor'));
+            return (
+              <Link key={link.href} href={link.href} className={cn(
+                "transition-colors hover:text-foreground/80",
+                isActive ? "text-foreground font-semibold" : "text-foreground/60"
+              )}>
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-2 ml-auto">

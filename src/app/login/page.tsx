@@ -74,8 +74,11 @@ export default function LoginPage() {
         });
       }
 
-      // Redirect to dashboard
-      router.push('/dashboard');
+      // Wait a moment for auth state to update and cookie to be set
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Use window.location for a full page reload to ensure middleware sees the cookie
+      window.location.href = '/dashboard';
     } catch (error: any) {
       console.error('Login error:', error);
       let errorMessage = 'An error occurred during login. Please try again.';
