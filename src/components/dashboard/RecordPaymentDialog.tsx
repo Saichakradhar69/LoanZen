@@ -27,6 +27,7 @@ import { format, toDate } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { performExistingLoanCalculations } from '@/app/existing-loan/calculations';
 import type { Loan } from '@/app/dashboard/page';
+import { useCurrency } from '@/contexts/currency-context';
 
 const paymentFormSchema = z.object({
   loanId: z.string({ required_error: 'Please select a loan.' }),
@@ -47,6 +48,7 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
   const [isLoading, setIsLoading] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { formatCurrency } = useCurrency();
 
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentFormSchema),
@@ -187,9 +189,6 @@ export default function RecordPaymentDialog({ isOpen, setIsOpen, userId, loans }
         }
     }
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

@@ -9,6 +9,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import type { FormData as CalculatorFormData } from '@/app/calculator/form';
 import type { ExistingLoanFormData, CalculationResult as ExistingLoanCalculationResult } from '@/app/existing-loan/actions';
 import { performExistingLoanCalculations } from '@/app/existing-loan/calculations';
+import { LOANZEN_TRIAL_COUPON_CODE } from '@/lib/coupon-code';
 
 // --- Data types needed for recalculation ---
 
@@ -143,14 +144,8 @@ function performNewLoanCalculations(formData: CalculatorFormData, userEmail: str
 }
 
 
-function generateCouponCode(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = 'PREMIUM-';
-    for (let i = 0; i < 6; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return code;
-}
+// Static coupon code is now used instead of generating random codes
+// See src/lib/coupon-code.ts for the coupon code constant
 
 
 async function handleStripeWebhook(event: Stripe.Event) {
@@ -408,7 +403,7 @@ async function handleGetRequest(req: NextRequest) {
                 ...partialResults,
                 formType: 'new-loan',
                 generatedAt: new Date().toISOString(),
-                couponCode: generateCouponCode(),
+                couponCode: LOANZEN_TRIAL_COUPON_CODE,
             };
         } else { // existing-loan
             const formData: ExistingLoanFormData = JSON.parse(formDataString);
@@ -418,7 +413,7 @@ async function handleGetRequest(req: NextRequest) {
                 formType: 'existing-loan',
                 userEmail: userEmail,
                 generatedAt: new Date().toISOString(),
-                couponCode: generateCouponCode(),
+                couponCode: LOANZEN_TRIAL_COUPON_CODE,
             };
         }
 

@@ -20,9 +20,9 @@ import { useDoc } from '@/firebase/firestore/use-doc';
 import { getTrialDaysLeft, type UserDoc } from '@/lib/user-access';
 import SettingsDialog from './SettingsDialog';
 import NotificationsPopover from './NotificationsPopover';
+import { useCurrency, type Currency } from '@/contexts/currency-context';
 
 export default function Header() {
-  const [currency, setCurrency] = useState('USD');
   const [isMounted, setIsMounted] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, isUserLoading } = useUser();
@@ -30,6 +30,7 @@ export default function Header() {
   const auth = getAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const { currency, setCurrency } = useCurrency();
 
   useEffect(() => {
     setIsMounted(true);
@@ -73,7 +74,7 @@ export default function Header() {
 
   const navLinks = user ? loggedInLinks : loggedOutLinks;
 
-  const currencies = ['USD', 'EUR', 'GBP', 'INR'];
+  const currencies: Currency[] = ['USD', 'EUR', 'GBP', 'INR'];
 
   // Subscribe to the authenticated user's profile to determine trial status
   const userDocRef = useMemoFirebase(() => (
@@ -225,7 +226,7 @@ export default function Header() {
             </DropdownMenuTrigger>
             <DropdownMenuContent>
               {currencies.map(c => (
-                <DropdownMenuItem key={c} onSelect={() => setCurrency(c)}>
+                <DropdownMenuItem key={c} onSelect={() => setCurrency(c as Currency)}>
                   {c}
                 </DropdownMenuItem>
               ))}

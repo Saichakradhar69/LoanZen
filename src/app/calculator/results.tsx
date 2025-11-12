@@ -12,16 +12,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useState } from 'react';
 import Link from 'next/link';
 import type { FormData } from './form';
+import { useCurrency } from '@/contexts/currency-context';
 
 interface CalculatorResultsProps {
   results: CalculationResults;
   formData: FormData;
   onBack: () => void;
 }
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-};
 
 const loanTypeLabels: { [key: string]: string } = {
   home: 'Home Loan',
@@ -56,6 +53,7 @@ function sanitizeFormData(data: any): any {
 }
 
 export default function CalculatorResults({ results, formData, onBack }: CalculatorResultsProps) {
+  const { formatCurrency } = useCurrency();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);

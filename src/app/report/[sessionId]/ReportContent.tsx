@@ -10,6 +10,7 @@ import type { CalculationResults as ReportDataType, NewLoanCalculationResults, E
 import ReportTemplate from '@/app/calculator/report-template';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { LOANZEN_TRIAL_COUPON_CODE } from '@/lib/coupon-code';
 
 function ReportContent({ sessionId }: { sessionId: string }) {
   const [reportData, setReportData] = useState<ReportDataType | null>(null);
@@ -35,6 +36,17 @@ function ReportContent({ sessionId }: { sessionId: string }) {
             let data: ReportDataType = await res.json();
             // Inject session ID into data for the report
             (data as any).sessionId = sessionId;
+            // Inject currency from localStorage if available
+            if (typeof window !== 'undefined') {
+                const savedCurrency = localStorage.getItem('loanzen_currency');
+                if (savedCurrency && ['USD', 'EUR', 'GBP', 'INR'].includes(savedCurrency)) {
+                    (data as any).currency = savedCurrency;
+                } else {
+                    (data as any).currency = 'USD'; // Default fallback
+                }
+            } else {
+                (data as any).currency = 'USD'; // Server-side fallback
+            }
             setReportData(data);
         } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
@@ -60,19 +72,54 @@ function ReportContent({ sessionId }: { sessionId: string }) {
         
         for (let i = 0; i < pageElements.length; i++) {
             const pageElement = pageElements[i];
-            await new Promise(resolve => setTimeout(resolve, 100)); // Short delay for rendering
+            // Longer delay to ensure all charts are rendered
+            await new Promise(resolve => setTimeout(resolve, 500));
             
             const canvas = await html2canvas(pageElement, {
                 scale: 2,
                 useCORS: true,
+                allowTaint: true,
                 logging: false,
                 width: pageElement.offsetWidth,
                 height: pageElement.offsetHeight,
                 windowWidth: pageElement.scrollWidth,
                 windowHeight: pageElement.scrollHeight,
                 scrollX: 0,
-                scrollY: 0, // Set scrollY to 0
-                backgroundColor: null, // Use element's background
+                scrollY: 0,
+                backgroundColor: '#ffffff',
+                imageTimeout: 15000,
+                removeContainer: false,
+                onclone: (clonedDoc) => {
+                    // Ensure all images are loaded and visible
+                    const images = clonedDoc.querySelectorAll('img');
+                    images.forEach((img) => {
+                        if (img.src) {
+                            img.style.display = 'block';
+                            img.style.visibility = 'visible';
+                            img.style.opacity = '1';
+                        }
+                    });
+                    // Ensure SVG elements (charts) are visible
+                    const svgs = clonedDoc.querySelectorAll('svg');
+                    svgs.forEach((svg) => {
+                        svg.style.display = 'block';
+                        svg.style.visibility = 'visible';
+                        svg.style.opacity = '1';
+                        svg.style.position = 'relative';
+                    });
+                    // Ensure canvas elements are visible
+                    const canvases = clonedDoc.querySelectorAll('canvas');
+                    canvases.forEach((canvas) => {
+                        canvas.style.display = 'block';
+                        canvas.style.visibility = 'visible';
+                    });
+                    // Ensure Recharts containers are visible
+                    const rechartsContainers = clonedDoc.querySelectorAll('.recharts-wrapper');
+                    rechartsContainers.forEach((container) => {
+                        (container as HTMLElement).style.display = 'block';
+                        (container as HTMLElement).style.visibility = 'visible';
+                    });
+                }
             });
 
             const imgData = canvas.toDataURL('image/png');
@@ -234,7 +281,7 @@ function ReportContent({ sessionId }: { sessionId: string }) {
             </CardHeader>
             <CardContent className="text-center">
                 <div className="bg-background border-dashed border-2 border-muted-foreground p-4 rounded-lg inline-block">
-                    <p className="text-3xl font-mono tracking-widest text-primary">{reportData.couponCode}</p>
+                    <p className="text-3xl font-mono tracking-widest text-primary">{LOANZEN_TRIAL_COUPON_CODE}</p>
                 </div>
                 <p className="text-muted-foreground mt-4 text-sm max-w-md mx-auto">
                     To redeem, create an account and enter this code on the billing page. Enjoy tracking your loans and finding more ways to save!

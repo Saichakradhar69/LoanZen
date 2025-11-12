@@ -3,16 +3,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DollarSign, TrendingDown, Calendar, TrendingUp, AlertTriangle, Target, Percent } from 'lucide-react';
 import type { Loan } from '@/app/dashboard/page';
+import { useCurrency } from '@/contexts/currency-context';
 
 interface LoanSummaryCardsProps {
     loans: Loan[];
 }
 
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-};
-
 export default function LoanSummaryCards({ loans }: LoanSummaryCardsProps) {
+    const { formatCurrency } = useCurrency();
     const totalDebt = loans.reduce((acc, loan) => acc + loan.currentBalance, 0);
     const totalMonthlyPayment = loans.reduce((acc, loan) => acc + loan.monthlyPayment, 0);
     const highestInterestLoan = loans.reduce((prev, current) => (prev.interestRate > current.interestRate) ? prev : current, loans[0] || { interestRate: 0, loanName: 'N/A' });

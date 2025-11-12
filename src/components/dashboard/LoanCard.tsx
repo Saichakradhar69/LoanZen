@@ -15,6 +15,7 @@ import {
   Pencil
 } from 'lucide-react';
 import type { Loan } from '@/app/dashboard/page';
+import { useCurrency } from '@/contexts/currency-context';
 
 interface LoanCardProps {
   loan: Loan;
@@ -31,11 +32,8 @@ const loanTypeIcons = {
   'other': PiggyBank
 };
 
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-};
-
 export default function LoanCard({ loan, onEdit, onDelete }: LoanCardProps) {
+  const { formatCurrency } = useCurrency();
   const { 
     loanName, 
     loanType, 

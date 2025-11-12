@@ -4,16 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Loan } from "@/app/dashboard/page";
 import { differenceInDays, addMonths, setDate, isAfter } from 'date-fns';
+import { useCurrency } from '@/contexts/currency-context';
 
 interface UpcomingPaymentsProps {
     loans: Loan[];
 }
 
-const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-};
-
 export default function UpcomingPayments({ loans }: UpcomingPaymentsProps) {
+    const { formatCurrency } = useCurrency();
     
     const getNextPaymentDate = (loan: Loan) => {
         const today = new Date();

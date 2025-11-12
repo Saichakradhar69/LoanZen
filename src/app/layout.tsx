@@ -8,6 +8,7 @@ import { FirebaseClientProvider } from '@/firebase/client-provider';
 import NoSSR from '@/components/NoSSR';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Analytics } from '@vercel/analytics/react';
+import { CurrencyProvider } from '@/contexts/currency-context';
 
 const ptSans = PT_Sans({
   subsets: ['latin'],
@@ -93,16 +94,18 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <FirebaseClientProvider>
-            <NoSSR>
-              <div className="flex flex-col min-h-screen">
-                <Header />
-                <main className="flex-grow">{children}</main>
-                <Footer />
-              </div>
-            </NoSSR>
-            <Toaster />
-          </FirebaseClientProvider>
+          <CurrencyProvider>
+            <FirebaseClientProvider>
+              <NoSSR>
+                <div className="flex flex-col min-h-screen">
+                  <Header />
+                  <main className="flex-grow">{children}</main>
+                  <Footer />
+                </div>
+              </NoSSR>
+              <Toaster />
+            </FirebaseClientProvider>
+          </CurrencyProvider>
         </ThemeProvider>
         <Analytics />
       </body>

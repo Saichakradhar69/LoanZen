@@ -1,9 +1,11 @@
 // src/app/api/subscription/validate-coupon/route.ts
 import { NextResponse } from 'next/server';
+import { LOANZEN_TRIAL_COUPON_CODE } from '@/lib/coupon-code';
 
 // Valid coupon codes that grant free trial
 // In production, you might want to store these in Firestore
 const VALID_COUPON_CODES = [
+  LOANZEN_TRIAL_COUPON_CODE, // Static coupon code from coupon-code.ts
   'TRIAL2024',
   'FREETRIAL',
   'WELCOME',

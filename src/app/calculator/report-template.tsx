@@ -7,15 +7,13 @@ import type { CalculationResults as ReportDataType, NewLoanCalculationResults, E
 import { Banknote, CalendarCheck, Check, Gift, Lightbulb, TrendingUp } from 'lucide-react';
 import Logo from '@/components/logo';
 import { Progress } from '@/components/ui/progress';
+import { useCurrency } from '@/contexts/currency-context';
+import { LOANZEN_TRIAL_COUPON_CODE } from '@/lib/coupon-code';
 
 
 interface ReportTemplateProps {
   reportData: ReportDataType;
 }
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-};
 
 const loanTypeLabels: { [key: string]: string } = {
   home: 'Home Loan',
@@ -143,7 +141,7 @@ const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: 
 
 
     return (
-        <div className="w-[720px] mx-auto">
+        <div className="w-[720px] mx-auto" style={{ display: 'block', visibility: 'visible' }}>
         <ResponsiveContainer width={720} height={150 + (validScenarios.length * 20)}>
             <BarChart data={data} layout="vertical" barCategoryGap="25%" margin={{ left: 30, right: 50 }}>
                 <XAxis type="number" domain={[0, dataMax => Math.ceil(dataMax / 12) * 12]} tickFormatter={(val) => `${val / 12}y`} />
@@ -168,7 +166,7 @@ const AmortizationTimelineChart = ({ originalTerm, scenarios }: { originalTerm: 
 }
 
 
-const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }) => {
+const NewLoanReport = ({ reportData, formatCurrency, currency, getCurrencyName }: { reportData: NewLoanCalculationResults; formatCurrency: (value: number) => string; currency: string; getCurrencyName: () => string }) => {
     const { scenarios } = reportData;
     const hasMultipleScenarios = scenarios.length > 1;
     const bestScenario = [...scenarios].sort((a, b) => a.totalPayment - b.totalPayment)[0];
@@ -196,9 +194,14 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
         <>
             {/* Page 2: Executive Summary */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">
-                    {hasMultipleScenarios ? "Your Recommended Path" : "Your Loan Health Snapshot"}
-                </h2>
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 font-headline">
+                        {hasMultipleScenarios ? "Your Recommended Path" : "Your Loan Health Snapshot"}
+                    </h2>
+                    <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                        <strong>Currency:</strong> {getCurrencyName()}
+                    </div>
+                </div>
                 {hasMultipleScenarios && (
                     <div className="text-center bg-green-50/50 p-6 rounded-lg mb-8">
                         <p className="text-xl text-green-800">Based on our analysis, you could save:</p>
@@ -224,7 +227,10 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                         </div>
                     )}
                     <div className="bg-gray-50 p-6 rounded-lg border">
-                         <h3 className="text-xl font-semibold mb-4 text-center">Key Insights</h3>
+                         <div className="flex justify-between items-center mb-4">
+                             <h3 className="text-xl font-semibold text-center flex-1">Key Insights</h3>
+                             <span className="text-xs text-gray-500 ml-2">All amounts in {currency}</span>
+                         </div>
                          <ul className="space-y-3">
                             {hasMultipleScenarios && (
                                 <li className="flex gap-3"><Check className="text-green-500 w-5 h-5 mt-1 shrink-0" /> <span><strong>Save Big:</strong> Choosing our recommendation saves you <span className="font-bold">{formatCurrency(savings)}</span> in interest.</span></li>
@@ -247,10 +253,15 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
 
             {/* Page 3: Visual Comparison */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-              <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Visual Breakdown of Your Options</h2>
+              <div className="flex justify-between items-center mb-8">
+                  <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 font-headline">Visual Breakdown of Your Options</h2>
+                  <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                      <strong>Currency:</strong> {getCurrencyName()}
+                  </div>
+              </div>
                 <div className="mb-12">
                     <h3 className="text-2xl font-semibold text-center mb-6">Paydown Timeline</h3>
-                    <div className="w-[720px] mx-auto">
+                    <div className="w-[720px] mx-auto" style={{ display: 'block', visibility: 'visible' }}>
                         <ResponsiveContainer width={720} height={400}>
                             <ComposedChart data={bestScenario.amortizationSchedule.filter(a => a.month % 12 === 0 || a.month === 1).map(a => ({ year: Math.floor(a.month / 12), balance: a.remainingBalance }))} margin={{ top: 5, right: 30, left: 50, bottom: 20 }}>
                                 <defs>
@@ -272,7 +283,12 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
                 </div>
             </div>
              <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Accelerated Payoff Comparison</h2>
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 font-headline">Accelerated Payoff Comparison</h2>
+                    <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                        <strong>Currency:</strong> {getCurrencyName()}
+                    </div>
+                </div>
                 <div className="mt-8">
                      <h3 className="text-2xl font-semibold text-center mb-6">Amortization Timeline with Extra Payments</h3>
                      <AmortizationTimelineChart originalTerm={baseMonths} scenarios={whatIfScenarios} />
@@ -306,7 +322,7 @@ const NewLoanReport = ({ reportData }: { reportData: NewLoanCalculationResults }
 }
 
 
-const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResults }) => {
+const ExistingLoanReport = ({ reportData, formatCurrency, currency, getCurrencyName }: { reportData: ExistingLoanReportResults; formatCurrency: (value: number) => string; currency: string; getCurrencyName: () => string }) => {
     const { originalLoanAmount, outstandingBalance, interestPaidToDate, schedule, interestRate, nextEmiDate, perDayInterest, emiAmount, projectedTotalInterest } = reportData;
     const paidAmount = originalLoanAmount - outstandingBalance;
     const paidPercentage = originalLoanAmount > 0 ? (paidAmount / originalLoanAmount) * 100 : 0;
@@ -373,7 +389,12 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
         <>
             {/* Page 2: Loan Health Dashboard */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Loan Health at a Glance</h2>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 font-headline">Your Loan Health at a Glance</h2>
+                    <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                        <strong>Currency:</strong> {getCurrencyName()}
+                    </div>
+                </div>
                  <div className="grid grid-cols-2 gap-4 border-b pb-4 mb-4">
                     <div className="space-y-1">
                         <p className="text-sm text-gray-500">Loan Type</p>
@@ -405,7 +426,10 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                         <ProgressRing progress={paidPercentage} />
                     </div>
                     <div className="bg-gray-50 p-6 rounded-lg border">
-                        <h3 className="text-xl font-semibold mb-4">Key Stats</h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-semibold">Key Stats</h3>
+                            <span className="text-xs text-gray-500">All amounts in {currency}</span>
+                        </div>
                         <div className="grid grid-cols-2 gap-x-6 gap-y-3">
                             <div>
                                 <p className="text-sm text-gray-500">Original Amount</p>
@@ -444,7 +468,10 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                     </div>
                 </div>
                 <div className="mt-8">
-                    <h3 className="text-xl font-semibold text-center mb-4">Total Lifetime Cost Breakdown</h3>
+                    <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-xl font-semibold text-center flex-1">Total Lifetime Cost Breakdown</h3>
+                        <span className="text-xs text-gray-500">All amounts in {currency}</span>
+                    </div>
                      <div className="bg-gray-50 p-6 rounded-lg border">
                          <div className="flex justify-between mb-2 text-sm">
                            <span>Paid to Date: {formatCurrency(totalPaidToDate)}</span>
@@ -457,10 +484,15 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
             </div>
 
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Financial Overview</h2>
+                 <div className="flex justify-between items-center mb-8">
+                     <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 font-headline">Financial Overview</h2>
+                     <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                         <strong>Currency:</strong> {getCurrencyName()}
+                     </div>
+                 </div>
                  <div className="mb-12">
                     <h3 className="text-2xl font-semibold text-center mb-4">Where Your Money Has Gone (To Date)</h3>
-                    <div className="w-[720px] mx-auto">
+                    <div className="w-[720px] mx-auto" style={{ display: 'block', visibility: 'visible' }}>
                         <ResponsiveContainer width={720} height={350}>
                             <PieChart>
                                 <Pie data={interestPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} labelLine={false} label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, name, value }) => {
@@ -487,11 +519,16 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
             
              {/* Page 3: Actionable Insights */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                 <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Take Control of Your Debt</h2>
+                 <div className="flex justify-between items-center mb-8">
+                     <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 font-headline">Take Control of Your Debt</h2>
+                     <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                         <strong>Currency:</strong> {getCurrencyName()}
+                     </div>
+                 </div>
                  
                  <div className="mb-8">
                      <h3 className="text-2xl font-semibold text-center mb-4">Your Paydown Timeline</h3>
-                     <div className="w-[720px] mx-auto">
+                     <div className="w-[720px] mx-auto" style={{ display: 'block', visibility: 'visible' }}>
                         <ResponsiveContainer width={720} height={400}>
                             <ComposedChart data={timelineData} margin={{ top: 5, right: 30, left: 60, bottom: 20 }}>
                                 <defs>
@@ -524,7 +561,10 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                  <p className="text-center text-gray-600 mb-8">See how extra payments can accelerate your journey to being debt-free.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-                        <h3 className="text-xl font-semibold mb-4 text-green-800">Extra Monthly Payments</h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-semibold text-green-800">Extra Monthly Payments</h3>
+                            <span className="text-xs text-gray-500">Amounts in {currency}</span>
+                        </div>
                         <div className="space-y-4">
                             {isFinite(whatIf5Percent.months) && whatIf5Percent.monthsSaved > 0 && <p><span className="font-bold">Pay an extra {formatCurrency(extraPayment5Percent)} per month (5% of EMI):</span><br/>🕐 Pay off <strong>{whatIf5Percent.monthsSaved.toFixed(0)} months sooner</strong><br/>💰 Save <strong className="text-green-600">{formatCurrency(whatIf5Percent.interestSaved)}</strong> in interest.</p>}
                             {isFinite(whatIf10Percent.months) && whatIf10Percent.interestSaved > 0 && <hr className="border-gray-300"/>}
@@ -532,7 +572,10 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                         </div>
                     </div>
                      <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
-                        <h3 className="text-xl font-semibold mb-4 text-orange-800">Lump-Sum Payment</h3>
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-semibold text-orange-800">Lump-Sum Payment</h3>
+                            <span className="text-xs text-gray-500">Amounts in {currency}</span>
+                        </div>
                         <div className="space-y-4">
                              {isFinite(whatIf1PercentLump.interestSaved) && whatIf1PercentLump.interestSaved > 0 && <p><span className="font-bold">Make a one-time {formatCurrency(lumpSum1Percent)} payment (1% of balance):</span><br/>🕐 Shorten loan by <strong>{whatIf1PercentLump.monthsSaved.toFixed(0)} months</strong><br/>💰 Save <strong className="text-orange-600">{formatCurrency(whatIf1PercentLump.interestSaved)}</strong> in interest.</p>}
                         </div>
@@ -540,7 +583,12 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
                 </div>
             </div>
              <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Accelerated Payoff Comparison</h2>
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 font-headline">Accelerated Payoff Comparison</h2>
+                    <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                        <strong>Currency:</strong> {getCurrencyName()}
+                    </div>
+                </div>
                  <div className="mt-8">
                      <h3 className="text-2xl font-semibold text-center mb-6">How Extra Payments Shorten Your Loan Term</h3>
                      <AmortizationTimelineChart originalTerm={totalMonthsFromNow} scenarios={whatIfScenarios} />
@@ -549,10 +597,15 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
 
             {hasMultipleDisbursements && (
                 <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                    <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Disbursement History</h2>
+                    <div className="flex justify-between items-center mb-8">
+                        <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 font-headline">Disbursement History</h2>
+                        <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                            <strong>Currency:</strong> {getCurrencyName()}
+                        </div>
+                    </div>
                     <div className="mt-8">
                         <h3 className="text-2xl font-semibold text-center mb-6">Loan Funds Released Over Time</h3>
-                        <div className="w-[720px] mx-auto">
+                        <div className="w-[720px] mx-auto" style={{ display: 'block', visibility: 'visible' }}>
                             <ResponsiveContainer width={720} height={300 + (disbursementChartData.length * 30)}>
                                <BarChart
                                     data={disbursementChartData}
@@ -578,7 +631,12 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
 
             {/* Page 4: Action Plan & Upsell */}
             <div className="pdf-page h-full flex flex-col p-10 pt-16 bg-white text-gray-800">
-                <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 mb-8 font-headline">Your Recommended Action Plan</h2>
+                <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-3xl font-bold text-blue-900 border-b-2 border-blue-800 pb-2 font-headline">Your Recommended Action Plan</h2>
+                    <div className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                        <strong>Currency:</strong> {getCurrencyName()}
+                    </div>
+                </div>
 
                 <div className="bg-gray-50 p-6 rounded-lg border mb-12">
                      <h3 className="text-xl font-bold text-gray-800 mb-4">Based on your report, here are your next steps:</h3>
@@ -604,9 +662,81 @@ const ExistingLoanReport = ({ reportData }: { reportData: ExistingLoanReportResu
 }
 
 export default function ReportTemplate({ reportData }: ReportDataType) {
+  const currencyContext = useCurrency();
+  // Use currency from reportData if available (for PDF generation), otherwise use context
+  const reportCurrency = (reportData as any).currency || currencyContext.currency;
+  
+  // Create formatCurrency function using the report currency
+  const formatCurrency = (value: number): string => {
+    const CURRENCY_LOCALE_MAP: Record<string, string> = {
+      USD: 'en-US',
+      EUR: 'en-US',
+      GBP: 'en-GB',
+      INR: 'en-IN',
+    };
+    
+    const CURRENCY_SYMBOLS: Record<string, string> = {
+      USD: '$',
+      EUR: '€',
+      GBP: '£',
+      INR: '₹',
+    };
+    
+    const locale = CURRENCY_LOCALE_MAP[reportCurrency] || 'en-US';
+    const currencyCode = reportCurrency || 'USD';
+    const expectedSymbol = CURRENCY_SYMBOLS[currencyCode] || '$';
+    
+    try {
+      // Create formatter with explicit locale and currency
+      const formatter = new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: currencyCode,
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+        numberingSystem: 'latn', // Force Latin numbering system
+      });
+      
+      const formatted = formatter.format(value);
+      
+      // Double-check: if the formatted string contains unexpected currency symbols, fix it
+      // This is a safety check in case browser locale interferes
+      if (expectedSymbol && !formatted.includes(expectedSymbol) && !formatted.includes(currencyCode)) {
+        // If the expected symbol is missing, manually format with the correct symbol
+        const numberPart = value.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+        return `${expectedSymbol}${numberPart}`;
+      }
+      
+      return formatted;
+    } catch (error) {
+      // Fallback: manually format with correct symbol
+      console.warn('Currency formatting error, using manual format:', error);
+      const numberPart = value.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+      return `${expectedSymbol}${numberPart}`;
+    }
+  };
+  
+  // Get currency name for display
+  const getCurrencyName = (): string => {
+    const currencyNames: Record<string, string> = {
+      USD: 'US Dollar (USD)',
+      EUR: 'Euro (EUR)',
+      GBP: 'British Pound (GBP)',
+      INR: 'Indian Rupee (INR)',
+    };
+    return currencyNames[reportCurrency] || 'US Dollar (USD)';
+  };
+  
     if (!reportData) return null;
 
-    const { formType, userEmail, generatedAt, couponCode } = reportData;
+    const { formType, userEmail, generatedAt } = reportData;
+    // Using static coupon code instead of dynamic one
+    const couponCode = LOANZEN_TRIAL_COUPON_CODE;
     const { sessionId } = (reportData as any);
     
     // Find the first disbursement date
@@ -629,19 +759,30 @@ export default function ReportTemplate({ reportData }: ReportDataType) {
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='800' height='1120' viewBox='0 0 800 1120' xmlns='http://www.w3.org/2000/svg'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='0' y1='0' y2='1'%3E%3Cstop stop-color='%23F0F9FF' offset='0%25'/%3E%3Cstop stop-color='white' offset='100%25'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect fill='url(%23g)' width='800' height='1120'/%3E%3C/svg%3E")`,
             backgroundSize: 'cover'
         }}>
-          <div className="text-center pt-32">
-             <div className="inline-block">
-                <Logo />
+          <div className="flex flex-col items-center justify-center flex-1">
+            {/* Logo Section - Centered */}
+            <div className="flex flex-col items-center justify-center mb-16">
+              <div className="flex items-center gap-3 mb-4">
+                <img 
+                  src="/logo.png" 
+                  alt="LoanZen Logo" 
+                  style={{ width: '64px', height: '64px', objectFit: 'contain' }}
+                  crossOrigin="anonymous"
+                />
+                <span className="font-headline text-4xl font-bold text-blue-900">LoanZen</span>
+              </div>
             </div>
-            <p className="text-5xl font-semibold mt-24 font-headline text-blue-900">
+            
+            <p className="text-5xl font-semibold mt-8 font-headline text-blue-900 text-center">
               {formType === 'new-loan' ? 'Loan Comparison Report' : 'Loan Health Statement'}
             </p>
-             <div className="mt-16 text-lg text-gray-600">
+             <div className="mt-16 text-lg text-gray-600 text-center">
               <p className="text-2xl">Prepared Exclusively for</p>
               <p className="font-bold text-3xl text-blue-800 mt-2">{userEmail || 'Valued Customer'}</p>
             </div>
-             <div className="mt-24 text-sm text-gray-500 space-y-1">
+             <div className="mt-24 text-sm text-gray-500 space-y-1 text-center">
                 {sessionId && <p><strong>Report ID:</strong> {sessionId}</p>}
+                <p><strong>Currency:</strong> {getCurrencyName()}</p>
                 <p><strong>Statement Period:</strong> {disbursementDate} to {new Date(generatedAt).toLocaleDateString()}</p>
                 <p><strong>Date of Generation:</strong> {new Date(generatedAt).toLocaleString()}</p>
             </div>
@@ -652,8 +793,8 @@ export default function ReportTemplate({ reportData }: ReportDataType) {
         </div>
 
         {formType === 'new-loan' 
-            ? <NewLoanReport reportData={reportData as NewLoanCalculationResults} />
-            : <ExistingLoanReport reportData={reportData as ExistingLoanReportResults} />
+            ? <NewLoanReport reportData={reportData as NewLoanCalculationResults} formatCurrency={formatCurrency} currency={reportCurrency} getCurrencyName={getCurrencyName} />
+            : <ExistingLoanReport reportData={reportData as ExistingLoanReportResults} formatCurrency={formatCurrency} currency={reportCurrency} getCurrencyName={getCurrencyName} />
         }
         
       </div>
