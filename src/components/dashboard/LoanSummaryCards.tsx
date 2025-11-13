@@ -10,7 +10,18 @@ interface LoanSummaryCardsProps {
 }
 
 export default function LoanSummaryCards({ loans }: LoanSummaryCardsProps) {
-    const { formatCurrency } = useCurrency();
+    const { formatCurrency, formatCurrencyWithCode, currency: globalCurrency } = useCurrency();
+    
+    // Helper to format with loan currency if available
+    const formatLoanCurrency = (value: number, loanCurrency?: 'USD' | 'EUR' | 'GBP' | 'INR') => {
+      const currencyToUse = (loanCurrency && ['USD', 'EUR', 'GBP', 'INR'].includes(loanCurrency))
+        ? loanCurrency
+        : globalCurrency;
+      return formatCurrencyWithCode(value, currencyToUse);
+    };
+    
+    // For summary cards, we'll use the global currency since we're aggregating across loans
+    // (loans might have different currencies, so we use the user's default)
     const totalDebt = loans.reduce((acc, loan) => acc + loan.currentBalance, 0);
     const totalMonthlyPayment = loans.reduce((acc, loan) => acc + loan.monthlyPayment, 0);
     const highestInterestLoan = loans.reduce((prev, current) => (prev.interestRate > current.interestRate) ? prev : current, loans[0] || { interestRate: 0, loanName: 'N/A' });

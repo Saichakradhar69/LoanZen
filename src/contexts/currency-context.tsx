@@ -8,6 +8,7 @@ interface CurrencyContextType {
   currency: Currency;
   setCurrency: (currency: Currency) => void;
   formatCurrency: (value: number) => string;
+  formatCurrencyWithCode: (value: number, currencyCode: Currency) => string;
 }
 
 const CurrencyContext = createContext<CurrencyContextType | undefined>(undefined);
@@ -46,12 +47,17 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   // Format currency based on selected currency
   const formatCurrency = (value: number): string => {
-    const locale = CURRENCY_LOCALE_MAP[currency];
+    return formatCurrencyWithCode(value, currency);
+  };
+
+  // Format currency with a specific currency code
+  const formatCurrencyWithCode = (value: number, currencyCode: Currency): string => {
+    const locale = CURRENCY_LOCALE_MAP[currencyCode];
     try {
       // Create formatter with explicit locale and currency
       const formatter = new Intl.NumberFormat(locale, {
         style: 'currency',
-        currency: currency,
+        currency: currencyCode,
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
         numberingSystem: 'latn', // Force Latin numbering system
@@ -61,8 +67,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       
       // Double-check: if the formatted string contains unexpected currency symbols, fix it
       // This is a safety check in case browser locale interferes
-      const expectedSymbol = CURRENCY_SYMBOLS[currency];
-      if (expectedSymbol && !formatted.includes(expectedSymbol) && !formatted.includes(currency)) {
+      const expectedSymbol = CURRENCY_SYMBOLS[currencyCode];
+      if (expectedSymbol && !formatted.includes(expectedSymbol) && !formatted.includes(currencyCode)) {
         // If the expected symbol is missing, manually format with the correct symbol
         const numberPart = value.toLocaleString('en-US', {
           minimumFractionDigits: 2,
@@ -79,12 +85,12 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       });
-      return `${CURRENCY_SYMBOLS[currency] || '$'}${numberPart}`;
+      return `${CURRENCY_SYMBOLS[currencyCode] || '$'}${numberPart}`;
     }
   };
 
   return (
-    <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency }}>
+    <CurrencyContext.Provider value={{ currency, setCurrency, formatCurrency, formatCurrencyWithCode }}>
       {children}
     </CurrencyContext.Provider>
   );

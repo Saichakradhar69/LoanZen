@@ -11,6 +11,7 @@ import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { useUser } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { calculateCurrentBalance } from '@/utils/loan-calculations';
+import { useCurrency } from '@/contexts/currency-context';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon } from 'lucide-react';
@@ -50,6 +51,7 @@ export default function LoanOnboardingForm() {
   const [error, setError] = useState('');
   const firestore = useFirestore();
   const { user } = useUser();
+  const { currency } = useCurrency();
   const router = useRouter();
 
   const handleInputChange = (field: keyof LoanData, value: string | number) => {
@@ -125,6 +127,7 @@ export default function LoanOnboardingForm() {
         currentBalance: currentBalance,
         id: loanId,
         userId: user.uid,
+        currency: currency, // Save the current currency with the loan
         createdAt: new Date(),
         updatedAt: new Date()
       };

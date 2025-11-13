@@ -39,6 +39,7 @@ export interface Loan {
   disbursementDate: { seconds: number; nanoseconds: number; } | Date;
   emisPaid?: number;
   paymentDueDay?: number;
+  currency?: 'USD' | 'EUR' | 'GBP' | 'INR';
 }
 
 export default function DashboardPage() {

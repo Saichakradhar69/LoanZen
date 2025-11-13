@@ -33,15 +33,24 @@ const loanTypeIcons = {
 };
 
 export default function LoanCard({ loan, onEdit, onDelete }: LoanCardProps) {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyWithCode, currency: globalCurrency } = useCurrency();
   const { 
     loanName, 
     loanType, 
     currentBalance, 
     interestRate, 
     monthlyPayment, 
-    originalLoanAmount 
+    originalLoanAmount,
+    currency: loanCurrency
   } = loan;
+
+  // Use loan currency if available, otherwise use global currency
+  const formatLoanCurrency = (value: number) => {
+    const currencyToUse = (loanCurrency && ['USD', 'EUR', 'GBP', 'INR'].includes(loanCurrency)) 
+      ? loanCurrency as 'USD' | 'EUR' | 'GBP' | 'INR'
+      : globalCurrency;
+    return formatCurrencyWithCode(value, currencyToUse);
+  };
 
   const IconComponent = loanTypeIcons[loanType as keyof typeof loanTypeIcons] || FileText;
   
@@ -96,9 +105,9 @@ export default function LoanCard({ loan, onEdit, onDelete }: LoanCardProps) {
                     <span>Monthly Payment</span>
                 </div>
                  <div className="grid grid-cols-3 gap-2 text-sm font-semibold">
-                    <span>{formatCurrency(currentBalance)}</span>
+                    <span>{formatLoanCurrency(currentBalance)}</span>
                     <span className={isHighInterest ? 'text-red-400' : ''}>{interestRate}%</span>
-                    <span>{formatCurrency(monthlyPayment)}</span>
+                    <span>{formatLoanCurrency(monthlyPayment)}</span>
                 </div>
 
                 <div className="mt-3 space-y-1">

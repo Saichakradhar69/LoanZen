@@ -32,6 +32,12 @@ export const stripe = {
   },
   get subscriptions() {
     return getStripeInstance().subscriptions;
+  },
+  get billingPortal() {
+    return getStripeInstance().billingPortal;
+  },
+  get customers() {
+    return getStripeInstance().customers;
   }
 } as Stripe;
 

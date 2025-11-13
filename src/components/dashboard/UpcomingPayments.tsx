@@ -11,7 +11,15 @@ interface UpcomingPaymentsProps {
 }
 
 export default function UpcomingPayments({ loans }: UpcomingPaymentsProps) {
-    const { formatCurrency } = useCurrency();
+    const { formatCurrency, formatCurrencyWithCode, currency: globalCurrency } = useCurrency();
+    
+    // Helper to format with loan currency if available
+    const formatLoanCurrency = (value: number, loanCurrency?: 'USD' | 'EUR' | 'GBP' | 'INR') => {
+      const currencyToUse = (loanCurrency && ['USD', 'EUR', 'GBP', 'INR'].includes(loanCurrency))
+        ? loanCurrency
+        : globalCurrency;
+      return formatCurrencyWithCode(value, currencyToUse);
+    };
     
     const getNextPaymentDate = (loan: Loan) => {
         const today = new Date();
@@ -52,7 +60,7 @@ export default function UpcomingPayments({ loans }: UpcomingPaymentsProps) {
                             <p className="text-xs text-muted-foreground mt-0.5">Due in {loan.paymentInfo.daysUntil} day{loan.paymentInfo.daysUntil !== 1 ? 's' : ''}</p>
                         </div>
                         <div className="text-right">
-                             <p className="font-bold text-base">{formatCurrency(loan.monthlyPayment)}</p>
+                             <p className="font-bold text-base">{formatLoanCurrency(loan.monthlyPayment, loan.currency)}</p>
                              {loan.paymentInfo.daysUntil < 7 ? (
                                 <Badge variant="destructive" className="text-xs mt-1">Urgent</Badge>
                              ) : (

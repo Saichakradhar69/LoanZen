@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { format, toDate } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { performExistingLoanCalculations } from '@/app/existing-loan/calculations';
+import { useCurrency } from '@/contexts/currency-context';
 import type { Loan } from '@/app/dashboard/page';
 
 
@@ -62,6 +63,7 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId, loanToEdit }:
   const [isLoading, setIsLoading] = useState(false);
   const firestore = useFirestore();
   const { toast } = useToast();
+  const { currency } = useCurrency();
 
   const isEditing = !!loanToEdit;
 
@@ -141,7 +143,8 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId, loanToEdit }:
       const loanData = {
           ...data,
           userId,
-          currentBalance: outstandingBalance
+          currentBalance: outstandingBalance,
+          currency: currency, // Save the current currency with the loan
       }
 
       if (isEditing && loanToEdit) {
