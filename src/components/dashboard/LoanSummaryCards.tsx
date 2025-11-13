@@ -1,7 +1,7 @@
 'use client';
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { DollarSign, TrendingDown, Calendar, TrendingUp, AlertTriangle, Target, Percent } from 'lucide-react';
+import { DollarSign, Calendar, AlertTriangle, Target } from 'lucide-react';
 import type { Loan } from '@/app/dashboard/page';
 import { useCurrency } from '@/contexts/currency-context';
 
@@ -38,9 +38,6 @@ export default function LoanSummaryCards({ loans }: LoanSummaryCardsProps) {
                 </CardHeader>
                 <CardContent>
                     <div className="text-3xl font-bold tracking-tight text-foreground">{formatCurrency(totalDebt)}</div>
-                    <p className="text-xs text-destructive/70 flex items-center gap-1 mt-2">
-                        <TrendingDown className="h-3 w-3" /> -2.3% from last month
-                    </p>
                 </CardContent>
             </Card>
 
@@ -51,9 +48,6 @@ export default function LoanSummaryCards({ loans }: LoanSummaryCardsProps) {
                 </CardHeader>
                 <CardContent>
                     <div className="text-3xl font-bold tracking-tight text-foreground">{formatCurrency(totalMonthlyPayment)}</div>
-                     <p className="text-xs text-primary/70 flex items-center gap-1 mt-2">
-                        <TrendingUp className="h-3 w-3" /> +$120 this month
-                    </p>
                 </CardContent>
             </Card>
 

@@ -16,9 +16,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Loader2 } from 'lucide-react';
@@ -39,6 +40,7 @@ const loanFormSchema = z.object({
   monthlyPayment: z.coerce.number().positive('Must be a positive number.'),
   emisPaid: z.coerce.number().min(0, 'Cannot be negative.'),
   paymentDueDay: z.coerce.number().min(1).max(31).optional(),
+  autoPay: z.boolean().optional(),
 });
 
 type LoanFormValues = z.infer<typeof loanFormSchema>;
@@ -78,6 +80,7 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId, loanToEdit }:
       monthlyPayment: '' as any,
       emisPaid: '' as any,
       paymentDueDay: 1,
+      autoPay: false,
     },
   });
 
@@ -100,6 +103,7 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId, loanToEdit }:
         monthlyPayment: loanToEdit.monthlyPayment,
         emisPaid: loanToEdit.emisPaid,
         paymentDueDay: loanToEdit.paymentDueDay || 1,
+        autoPay: loanToEdit.autoPay || false,
       });
     } else {
       form.reset({
@@ -111,6 +115,7 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId, loanToEdit }:
         monthlyPayment: '' as any,
         emisPaid: 0,
         paymentDueDay: 1,
+        autoPay: false,
       });
     }
   }, [loanToEdit, isEditing, form]);
@@ -336,6 +341,26 @@ export default function AddLoanDialog({ isOpen, setIsOpen, userId, loanToEdit }:
                     </FormItem>
                 )}
                 />
+              <FormField
+                control={form.control}
+                name="autoPay"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Auto-Deduct Payment</FormLabel>
+                      <FormDescription>
+                        Automatically log payments when the due date arrives
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value || false}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
 
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>

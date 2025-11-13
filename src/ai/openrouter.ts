@@ -15,8 +15,10 @@ export async function callOpenRouter(messages: ORMessage[], model?: string): Pro
     ...(configured ? [configured] : []),
     ...fallbacksEnv,
     'openrouter/auto',
-    'deepseek/deepseek-r1:free',
-    'qwen/qwen2.5-7b-instruct:free',
+    'meta-llama/llama-3.2-3b-instruct:free',
+    'google/gemini-flash-1.5:free',
+    'qwen/qwen-2.5-7b-instruct',
+    'deepseek/deepseek-chat:free',
   ];
 
   let lastErr: any = null;
@@ -37,6 +39,11 @@ export async function callOpenRouter(messages: ORMessage[], model?: string): Pro
 
         if (!res.ok) {
           const body = await res.text().catch(() => '');
+          // On 400 (invalid model), skip to next model immediately
+          if (res.status === 400) {
+            lastErr = new Error(`OpenRouter error ${res.status} for ${mdl}: ${body}`);
+            break; // Skip to next model, don't retry
+          }
           // On 429 or 5xx, retry or fall through to next model
           if (res.status === 429 || (res.status >= 500 && res.status < 600)) {
             lastErr = new Error(`OpenRouter error ${res.status} for ${mdl}: ${body}`);
@@ -44,7 +51,9 @@ export async function callOpenRouter(messages: ORMessage[], model?: string): Pro
             await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
             continue;
           }
-          throw new Error(`OpenRouter error ${res.status} for ${mdl}: ${body}`);
+          // For other errors (401, 403, etc.), try next model
+          lastErr = new Error(`OpenRouter error ${res.status} for ${mdl}: ${body}`);
+          break; // Skip to next model
         }
 
         const json = await res.json();

@@ -40,6 +40,8 @@ export interface Loan {
   emisPaid?: number;
   paymentDueDay?: number;
   currency?: 'USD' | 'EUR' | 'GBP' | 'INR';
+  autoPay?: boolean; // Auto-deduct payment flag
+  lastAutoPaymentDate?: { seconds: number; nanoseconds: number; } | Date; // Track last auto-payment to avoid duplicates
 }
 
 export default function DashboardPage() {
@@ -65,6 +67,40 @@ export default function DashboardPage() {
 
     const { data: userData, isLoading: isUserDocLoading } = useDoc(userDocRef);
     const { data: loansData, isLoading: areLoansLoading } = useCollection<Loan>(loansColRef);
+
+    // Check for auto-payments when dashboard loads
+    useEffect(() => {
+        const checkAutoPayments = async () => {
+            if (!user) return;
+            
+            try {
+                const response = await fetch('/api/loans/auto-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ userId: user.uid }),
+                });
+
+                const data = await response.json();
+                
+                if (data.success && data.processedCount > 0) {
+                    toast({
+                        title: 'Auto-Payments Processed',
+                        description: `${data.processedCount} payment(s) automatically logged for: ${data.processedLoans.join(', ')}`,
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to check auto-payments:', error);
+                // Don't show error to user, just log it silently
+            }
+        };
+
+        // Check on mount
+        if (user && !isUserLoading) {
+            checkAutoPayments();
+        }
+    }, [user, isUserLoading, toast]);
 
     // Handle subscription success - automatically update subscription
     useEffect(() => {

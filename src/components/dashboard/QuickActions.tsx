@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus, Receipt, Download, Bot } from "lucide-react";
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 interface QuickActionsProps {
     onAddLoan: () => void;
@@ -11,6 +12,15 @@ interface QuickActionsProps {
 }
 
 export default function QuickActions({ onAddLoan, onRecordPayment }: QuickActionsProps) {
+    const { toast } = useToast();
+
+    const handleGenerateReport = () => {
+        toast({
+            title: 'Feature Coming Soon',
+            description: 'Report generation is currently in progress. Stay tuned for updates!',
+            variant: 'default',
+        });
+    };
     return (
         <Card className="elevated">
             <CardHeader>
@@ -23,7 +33,7 @@ export default function QuickActions({ onAddLoan, onRecordPayment }: QuickAction
                 <Button variant="secondary" onClick={onRecordPayment} className="justify-start w-full">
                     <Receipt className="mr-2 h-4 w-4" /> Record Payment
                 </Button>
-                 <Button variant="secondary" className="justify-start w-full">
+                 <Button variant="secondary" onClick={handleGenerateReport} className="justify-start w-full">
                     <Download className="mr-2 h-4 w-4" /> Generate Report
                 </Button>
                  <Button variant="secondary" asChild className="justify-start w-full">

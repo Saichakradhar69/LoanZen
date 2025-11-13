@@ -30,7 +30,10 @@ import {
   XCircle,
   Key,
   Trash2,
-  Loader2
+  Loader2,
+  Edit2,
+  Check,
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { 
@@ -38,10 +41,11 @@ import {
   sendPasswordResetEmail, 
   deleteUser,
   reauthenticateWithCredential,
-  EmailAuthProvider
+  EmailAuthProvider,
+  updateProfile
 } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
 interface SettingsDialogProps {
   open: boolean;
@@ -64,6 +68,9 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [isManagingSubscription, setIsManagingSubscription] = useState(false);
+  const [isEditingDisplayName, setIsEditingDisplayName] = useState(false);
+  const [newDisplayName, setNewDisplayName] = useState('');
+  const [isUpdatingDisplayName, setIsUpdatingDisplayName] = useState(false);
 
   // Check email verification status
   const isEmailVerified = user?.emailVerified || false;
@@ -75,6 +82,52 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
     EUR: 'Euro (€)',
     GBP: 'British Pound (£)',
     INR: 'Indian Rupee (₹)',
+  };
+
+  const handleStartEditDisplayName = () => {
+    setNewDisplayName(user?.displayName || '');
+    setIsEditingDisplayName(true);
+  };
+
+  const handleCancelEditDisplayName = () => {
+    setIsEditingDisplayName(false);
+    setNewDisplayName('');
+  };
+
+  const handleSaveDisplayName = async () => {
+    if (!user || !newDisplayName.trim()) return;
+
+    setIsUpdatingDisplayName(true);
+    try {
+      // Update Firebase Auth profile
+      await updateProfile(user, {
+        displayName: newDisplayName.trim()
+      });
+
+      // Update Firestore document
+      const userDocRef = doc(firestore, 'users', user.uid);
+      await updateDoc(userDocRef, {
+        displayName: newDisplayName.trim(),
+        name: newDisplayName.trim(),
+      });
+
+      toast({
+        title: 'Display name updated',
+        description: 'Your display name has been successfully updated.',
+      });
+
+      setIsEditingDisplayName(false);
+      setNewDisplayName('');
+    } catch (error: any) {
+      console.error('Failed to update display name:', error);
+      toast({
+        title: 'Update failed',
+        description: error.message || 'Failed to update display name. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUpdatingDisplayName(false);
+    }
   };
 
   const handleCurrencyChange = async (newCurrency: Currency) => {
@@ -426,8 +479,55 @@ export default function SettingsDialog({ open, onOpenChange }: SettingsDialogPro
                 )}
               </div>
               <div className="text-sm">
-                <p className="text-muted-foreground">Display Name</p>
-                <p className="font-medium">{user?.displayName || 'Not set'}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex-1">
+                    <p className="text-muted-foreground">Display Name</p>
+                    {isEditingDisplayName ? (
+                      <Input
+                        value={newDisplayName}
+                        onChange={(e) => setNewDisplayName(e.target.value)}
+                        placeholder="Enter display name"
+                        className="mt-1"
+                        disabled={isUpdatingDisplayName}
+                      />
+                    ) : (
+                      <p className="font-medium">{user?.displayName || 'Not set'}</p>
+                    )}
+                  </div>
+                  {isEditingDisplayName ? (
+                    <div className="flex gap-1 mt-5">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleSaveDisplayName}
+                        disabled={isUpdatingDisplayName || !newDisplayName.trim()}
+                      >
+                        {isUpdatingDisplayName ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Check className="h-4 w-4 text-green-600" />
+                        )}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleCancelEditDisplayName}
+                        disabled={isUpdatingDisplayName}
+                      >
+                        <X className="h-4 w-4 text-red-600" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleStartEditDisplayName}
+                      className="mt-5"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="space-y-2 pt-2">
                 <Button

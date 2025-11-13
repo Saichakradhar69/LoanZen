@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Bell, ChevronDown, Cog, LogOut, Menu, User } from 'lucide-react';
+import { Bell, ChevronDown, Cog, LogOut, Menu } from 'lucide-react';
 import Logo from '../logo';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '../ui/dropdown-menu';
 import { useState, useEffect, useMemo } from 'react';
@@ -190,11 +190,6 @@ export default function Header() {
                           <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
                         </div>
                       </DropdownMenuLabel>
-                       <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                            <User className="mr-2 h-4 w-4" />
-                            <span>Profile</span>
-                        </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleLogout}>
                         <LogOut className="mr-2 h-4 w-4" />

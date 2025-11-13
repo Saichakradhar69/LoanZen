@@ -128,6 +128,7 @@ export default function LoanOnboardingForm() {
         id: loanId,
         userId: user.uid,
         currency: currency, // Save the current currency with the loan
+        autoPay: false, // Default to false for onboarding
         createdAt: new Date(),
         updatedAt: new Date()
       };
