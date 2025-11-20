@@ -58,7 +58,7 @@ export default function HomePage() {
             </p>
             <div className="relative mt-10 max-w-4xl mx-auto">
                 <Image 
-                    src="https://placehold.co/1000x600.png"
+                    src="/images/dashboard img.png"
                     width={1000}
                     height={600}
                     alt="Dashboard Preview"
@@ -198,7 +198,6 @@ export default function HomePage() {
 
             {/* One-time (Featured) */}
             <Card className="relative border-primary/60 ring-2 ring-primary/50 shadow-2xl bg-gradient-to-b from-primary/10 to-background">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 text-xs md:text-sm font-semibold rounded-full shadow-sm">Most popular</div>
               <CardHeader  className="items-center space-y-2">
                 <div className="text-xs px-3 py-1 rounded-full border bg-card/60">Standard</div>
                 <CardTitle className="text-xl">Full Report</CardTitle>
