@@ -3,7 +3,7 @@
 
 import { useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { collection, doc, deleteDoc } from 'firebase/firestore';
@@ -104,6 +104,12 @@ export default function DashboardPage() {
     const [loanToEdit, setLoanToEdit] = useState<Loan | null>(null);
     const [loanToDelete, setLoanToDelete] = useState<Loan | null>(null);
     const [isWaitingForSubscription, setIsWaitingForSubscription] = useState(false);
+    const hasRecalculatedRef = useRef(false);
+    
+    // Reset recalculation flag when user changes
+    useEffect(() => {
+        hasRecalculatedRef.current = false;
+    }, [user?.uid]);
     
     useEffect(() => {
         if (!isUserLoading && !user) {
@@ -151,10 +157,13 @@ export default function DashboardPage() {
         }
     }, [user, isUserLoading, toast]);
 
-    // Recalculate loan balances when dashboard loads
+    // Recalculate loan balances when dashboard loads (only once)
     useEffect(() => {
         const recalculateBalances = async () => {
-            if (!user) return;
+            if (!user || hasRecalculatedRef.current) return;
+            
+            // Mark as recalculated to prevent multiple calls
+            hasRecalculatedRef.current = true;
             
             try {
                 const response = await fetch('/api/loans/recalculate-balances', {
@@ -174,14 +183,18 @@ export default function DashboardPage() {
             } catch (error) {
                 console.error('Failed to recalculate balances:', error);
                 // Don't show error to user, just log it silently
+                // Reset the ref on error so it can retry if needed
+                hasRecalculatedRef.current = false;
             }
         };
 
-        // Recalculate on mount (after loans are loaded)
-        if (user && !isUserLoading && !areLoansLoading && loansData) {
+        // Recalculate only once when loans are first loaded
+        // Note: We check loansData exists but don't include it in deps to avoid infinite loop
+        if (user && !isUserLoading && !areLoansLoading && loansData && !hasRecalculatedRef.current) {
             recalculateBalances();
         }
-    }, [user, isUserLoading, areLoansLoading, loansData]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user, isUserLoading, areLoansLoading]);
 
     // Handle subscription success - automatically update subscription
     useEffect(() => {
