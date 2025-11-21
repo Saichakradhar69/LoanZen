@@ -99,15 +99,27 @@ export default function LoanCard({ loan, onEdit, onDelete }: LoanCardProps) {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground mt-3">
-                    <span>Balance</span>
-                    <span>Interest Rate</span>
-                    <span>Monthly Payment</span>
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 text-xs text-muted-foreground mt-3">
+                    <div className="min-w-0">
+                        <span className="block">Balance</span>
+                    </div>
+                    <div className="min-w-0">
+                        <span className="block">Interest Rate</span>
+                    </div>
+                    <div className="min-w-0">
+                        <span className="block">Monthly Payment</span>
+                    </div>
                 </div>
-                 <div className="grid grid-cols-3 gap-2 text-sm font-semibold">
-                    <span>{formatLoanCurrency(currentBalance)}</span>
-                    <span className={isHighInterest ? 'text-red-400' : ''}>{interestRate}%</span>
-                    <span>{formatLoanCurrency(monthlyPayment)}</span>
+                 <div className="grid grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm font-semibold">
+                    <div className="min-w-0">
+                        <span className="block break-words" title={formatLoanCurrency(currentBalance)}>{formatLoanCurrency(currentBalance)}</span>
+                    </div>
+                    <div className="min-w-0">
+                        <span className={`block ${isHighInterest ? 'text-red-400' : ''}`}>{interestRate}%</span>
+                    </div>
+                    <div className="min-w-0">
+                        <span className="block break-words" title={formatLoanCurrency(monthlyPayment)}>{formatLoanCurrency(monthlyPayment)}</span>
+                    </div>
                 </div>
 
                 <div className="mt-3 space-y-1">

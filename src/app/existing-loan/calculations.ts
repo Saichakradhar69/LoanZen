@@ -17,6 +17,7 @@ export function performExistingLoanCalculations(data: ExistingLoanFormData): Omi
         case 'home':
         case 'student':
         case 'mortgage':
+        case 'credit-card':
         case 'other':
             return calculateStandardLoan(data);
         case 'education': // This could have more complex logic in the future

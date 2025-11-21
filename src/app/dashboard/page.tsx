@@ -42,6 +42,55 @@ export interface Loan {
   currency?: 'USD' | 'EUR' | 'GBP' | 'INR';
   autoPay?: boolean; // Auto-deduct payment flag
   lastAutoPaymentDate?: { seconds: number; nanoseconds: number; } | Date; // Track last auto-payment to avoid duplicates
+  lastBalanceUpdate?: { seconds: number; nanoseconds: number; } | Date; // Track last balance recalculation
+  
+  // Education Loan specific fields
+  interestType?: 'reducing' | 'flat';
+  moratoriumPeriod?: number;
+  moratoriumInterestType?: 'none' | 'simple' | 'partial' | 'fixed';
+  moratoriumPaymentAmount?: number;
+  missedEmis?: number;
+  disbursements?: Array<{
+    date: { seconds: number; nanoseconds: number; } | Date;
+    amount: number;
+  }>;
+  
+  // Credit Card specific fields
+  creditLimit?: number;
+  minimumPaymentPercentage?: number;
+  annualFee?: number;
+  gracePeriod?: number;
+  
+  // Credit Line specific fields
+  transactions?: Array<{
+    date: { seconds: number; nanoseconds: number; } | Date;
+    amount: number;
+    type: 'withdrawal' | 'repayment';
+  }>;
+  
+  // Mortgage specific fields
+  propertyValue?: number;
+  downPayment?: number;
+  propertyTax?: number;
+  homeInsurance?: number;
+  pmi?: number;
+  
+  // Car Loan specific fields
+  vehicleValue?: number;
+  tradeInValue?: number;
+  gapInsurance?: number;
+  
+  // Personal/Other Loan fields
+  interestType?: 'reducing' | 'flat';
+  rateType?: 'fixed' | 'floating';
+  rateChanges?: Array<{
+    date: { seconds: number; nanoseconds: number; } | Date;
+    rate: number;
+  }>;
+  disbursements?: Array<{
+    date: { seconds: number; nanoseconds: number; } | Date;
+    amount: number;
+  }>;
 }
 
 export default function DashboardPage() {
@@ -102,13 +151,44 @@ export default function DashboardPage() {
         }
     }, [user, isUserLoading, toast]);
 
+    // Recalculate loan balances when dashboard loads
+    useEffect(() => {
+        const recalculateBalances = async () => {
+            if (!user) return;
+            
+            try {
+                const response = await fetch('/api/loans/recalculate-balances', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ userId: user.uid }),
+                });
+
+                const data = await response.json();
+                
+                if (data.success && data.updatedCount > 0) {
+                    // Silently update balances - no toast notification to avoid spam
+                    // The Firestore listener will automatically update the UI
+                }
+            } catch (error) {
+                console.error('Failed to recalculate balances:', error);
+                // Don't show error to user, just log it silently
+            }
+        };
+
+        // Recalculate on mount (after loans are loaded)
+        if (user && !isUserLoading && !areLoansLoading && loansData) {
+            recalculateBalances();
+        }
+    }, [user, isUserLoading, areLoansLoading, loansData]);
+
     // Handle subscription success - automatically update subscription
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const sessionId = params.get('session_id');
         
         if (sessionId && user && !isWaitingForSubscription) {
-            console.log('🔵 Payment successful, automatically updating subscription...');
             setIsWaitingForSubscription(true);
             
             // Clean up URL immediately
@@ -160,7 +240,6 @@ export default function DashboardPage() {
             // Automatically trigger update immediately
             const triggerUpdate = async () => {
                 try {
-                    console.log('🔄 Automatically updating subscription...');
                     const response = await fetch('/api/subscription/manual-update', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -171,10 +250,8 @@ export default function DashboardPage() {
                     });
                     
                     const data = await response.json();
-                    console.log('📥 Auto-update response:', data);
                     
                     if (response.ok && data.success) {
-                        console.log('✅ Automatic update successful');
                         toast({
                             title: 'Subscription Activated!',
                             description: 'Welcome to LoanZen Pro! Your subscription is now active.',
@@ -183,12 +260,12 @@ export default function DashboardPage() {
                         // Force page refresh to reload userData
                         setTimeout(() => window.location.reload(), 1000);
                     } else {
-                        console.error('❌ Automatic update failed:', data.error);
+                        console.error('Automatic update failed:', data.error);
                         // Fall back to polling
                         startPolling();
                     }
                 } catch (error) {
-                    console.error('❌ Automatic update request failed:', error);
+                    console.error('Automatic update request failed:', error);
                     // Fall back to polling
                     startPolling();
                 }

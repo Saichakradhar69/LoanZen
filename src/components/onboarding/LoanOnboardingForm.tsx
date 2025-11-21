@@ -31,7 +31,7 @@ interface LoanData {
 const loanTypes = [
   { value: 'personal', label: 'Personal Loan' },
   { value: 'car', label: 'Car Loan' },
-  { value: 'student', label: 'Student Loan' },
+  { value: 'education', label: 'Education Loan' },
   { value: 'mortgage', label: 'Mortgage' },
   { value: 'credit-card', label: 'Credit Card' },
   { value: 'other', label: 'Other' }
