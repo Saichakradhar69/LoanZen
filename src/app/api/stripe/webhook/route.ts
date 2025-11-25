@@ -417,6 +417,16 @@ async function handleGetRequest(req: NextRequest) {
             };
         }
 
+        // Generate AI tips for the report
+        try {
+            const { generateReportTips } = await import('@/app/api/reports/generate-ai-tips');
+            const aiTips = await generateReportTips(finalResults);
+            (finalResults as any).aiTips = aiTips;
+        } catch (aiError) {
+            console.error('Failed to generate AI tips, continuing without them:', aiError);
+            // Continue without AI tips if generation fails
+        }
+
         return NextResponse.json(finalResults);
 
     } catch (err) {

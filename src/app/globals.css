@@ -152,3 +152,14 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* PDF Page Constraints */
+.pdf-page {
+  width: 800px !important;
+  height: 1120px !important;
+  min-height: 1120px !important;
+  max-height: 1120px !important;
+  page-break-after: always;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
