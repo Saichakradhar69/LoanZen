@@ -8,6 +8,9 @@
 - ✅ `STRIPE_SECRET_KEY` - **FOUND**
 - ✅ `STRIPE_SUBSCRIPTION_PRICE_ID` - **FOUND** (price_1SOS7iPDdD3CHwpoMinhDi1D)
 - ⚠️ `STRIPE_WEBHOOK_SECRET` - **FOUND** but set to placeholder (`whsec_your_webhook_secret_here`)
+- ⚠️ `RESEND_API_KEY` - **REQUIRED** for email sending (report purchase emails)
+- ⚠️ `RESEND_FROM_EMAIL` - **OPTIONAL** (defaults to `onboarding@resend.dev` for testing)
+- ⚠️ `NEXT_PUBLIC_APP_URL` - **OPTIONAL** (defaults to `http://localhost:3000`)
 
 ### 2. Code Files Status
 - ✅ `src/lib/firebase-admin.ts` - **EXISTS** (Firebase Admin initialization)
@@ -52,6 +55,23 @@ STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 
 **Impact:** Webhook signature verification will fail, preventing webhook from working.
 
+### Issue 3: Email Service Configuration (IMPORTANT)
+**Problem:** Email sending for report purchases requires Resend API key
+
+**Setup needed:**
+1. Sign up at https://resend.com (free tier available)
+2. Get your API key from the dashboard
+3. Add to `.env.local`:
+   ```env
+   RESEND_API_KEY=re_your_api_key_here
+   RESEND_FROM_EMAIL=LoanZen <noreply@yourdomain.com>  # Optional - use verified domain
+   NEXT_PUBLIC_APP_URL=https://yourdomain.com  # Optional - for production
+   ```
+
+**Note:** For development/testing, you can use `onboarding@resend.dev` as the from email (no domain verification needed).
+
+**Impact:** Report purchase emails won't be sent if API key is missing (webhook will still succeed, but email will be skipped).
+
 ## 🧪 Testing Steps
 
 ### Step 1: Test Firebase Admin Initialization
@@ -79,9 +99,11 @@ Look for these messages in your terminal:
 
 1. ✅ **Fix FIREBASE_SERVICE_ACCOUNT_KEY format** - Run `.\fix-env-key.ps1`
 2. ⚠️ **Set STRIPE_WEBHOOK_SECRET** - Get from Stripe Dashboard
-3. ✅ **Restart dev server** - After fixing environment variables
-4. ✅ **Test Firebase Admin** - Visit `/api/test-firebase-admin`
-5. ✅ **Test manual update** - Click button after payment
+3. ⚠️ **Set RESEND_API_KEY** - Sign up at resend.com and get API key
+4. ✅ **Restart dev server** - After fixing environment variables
+5. ✅ **Test Firebase Admin** - Visit `/api/test-firebase-admin`
+6. ✅ **Test manual update** - Click button after payment
+7. ✅ **Test email sending** - Purchase a report and check email inbox
 
 ## 🔍 Next Steps
 

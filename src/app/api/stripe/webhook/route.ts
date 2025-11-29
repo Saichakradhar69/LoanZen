@@ -363,14 +363,31 @@ async function handleStripeWebhook(event: Stripe.Event) {
           return;
       }
       
-      // In a real application, you would save the calculated data to a database (e.g., Firestore)
-      // using the session.id as the document key. This allows the "Thank You" page to retrieve it.
-      // For this demo, we'll just log that we would do this.
+      const userEmail = session.customer_details?.email;
+      const formType = session.metadata?.formType as 'new-loan' | 'existing-loan' | undefined;
       
-      console.log(`--- SIMULATING DATABASE WRITE ---`);
       console.log(`Payment for session ${session.id} successful.`);
-      console.log(`Would save calculation data to DB for client retrieval.`);
-      console.log(`User email: ${session.customer_details?.email}`);
+      console.log(`User email: ${userEmail || 'No email provided'}`);
+      
+      // Send email to user with report link and coupon code
+      if (userEmail) {
+          try {
+              const { sendReportPurchaseEmail } = await import('@/lib/email');
+              const emailResult = await sendReportPurchaseEmail(userEmail, session.id, formType || 'new-loan');
+              
+              if (emailResult.success) {
+                  console.log(`✅ Report purchase email sent successfully to ${userEmail}`);
+              } else {
+                  console.error(`❌ Failed to send email: ${emailResult.error}`);
+                  // Don't fail the webhook if email fails - payment is already successful
+              }
+          } catch (emailError) {
+              console.error('❌ Error sending report purchase email:', emailError);
+              // Don't fail the webhook if email fails
+          }
+      } else {
+          console.warn('⚠️ No user email found in session. Email not sent.');
+      }
         }
     }
 }

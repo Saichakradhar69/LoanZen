@@ -307,11 +307,24 @@ Format as JSON:
       }
     }
 
+    // Normalize actionItems to ensure they're strings
+    const normalizedActionItems = (tips.actionItems || []).map((item: any) => {
+      if (typeof item === 'string') {
+        return item;
+      } else if (typeof item === 'object' && item !== null) {
+        // Handle object format {action: "...", timeline: "..."}
+        const actionText = item.action || item.text || '';
+        const timeline = item.timeline ? ` (${item.timeline})` : '';
+        return actionText + timeline;
+      }
+      return String(item);
+    });
+
     return {
       keyRecommendations: tips.keyRecommendations || [],
       prepaymentStrategy: tips.prepaymentStrategy || { recommendation: 'Consider making extra payments to reduce interest.' },
       riskAnalysis: tips.riskAnalysis || [],
-      actionItems: tips.actionItems || [],
+      actionItems: normalizedActionItems, // Use normalized array
       refinancingOpportunity,
       insights: tips.insights || [],
     };

@@ -341,9 +341,20 @@ const NewLoanReport = ({ reportData, formatCurrency, currency, getCurrencyName, 
                                     <h3 className="text-xl font-semibold mb-3 text-purple-800">Prioritized Action Items</h3>
                                     <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
                                         <ol className="space-y-1.5 list-decimal list-inside">
-                                            {aiTips.actionItems.map((action, idx) => (
-                                                <li key={idx} className="text-gray-700 text-xs">{action}</li>
-                                            ))}
+                                            {aiTips.actionItems.map((action, idx) => {
+                                                // Handle both string and object formats
+                                                const actionText = typeof action === 'string' 
+                                                    ? action 
+                                                    : (action as any)?.action || (action as any)?.text || JSON.stringify(action);
+                                                const timeline = typeof action === 'object' && (action as any)?.timeline 
+                                                    ? ` (${(action as any).timeline})` 
+                                                    : '';
+                                                return (
+                                                    <li key={idx} className="text-gray-700 text-xs">
+                                                        {actionText}{timeline}
+                                                    </li>
+                                                );
+                                            })}
                                         </ol>
                                     </div>
                                 </div>
@@ -1072,9 +1083,20 @@ const ExistingLoanReport = ({ reportData, formatCurrency, currency, getCurrencyN
                                      <h3 className="text-xl font-semibold mb-3 text-indigo-800">Prioritized Action Items</h3>
                                      <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
                                          <ol className="space-y-1 list-decimal list-inside">
-                                             {aiTips.actionItems.map((action, idx) => (
-                                                 <li key={idx} className="text-gray-700 text-xs">{action}</li>
-                                             ))}
+                                             {aiTips.actionItems.map((action, idx) => {
+                                                 // Handle both string and object formats
+                                                 const actionText = typeof action === 'string' 
+                                                     ? action 
+                                                     : (action as any)?.action || (action as any)?.text || JSON.stringify(action);
+                                                 const timeline = typeof action === 'object' && (action as any)?.timeline 
+                                                     ? ` (${(action as any).timeline})` 
+                                                     : '';
+                                                 return (
+                                                     <li key={idx} className="text-gray-700 text-xs">
+                                                         {actionText}{timeline}
+                                                     </li>
+                                                 );
+                                             })}
                                          </ol>
                                      </div>
                                  </div>
